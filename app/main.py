@@ -394,8 +394,28 @@ class TestApp(tk.Tk):
         )
         header.pack(anchor=tk.W, pady=5)
 
-        self.question_nav_frame = ttk.Frame(self.test_frame)
-        self.question_nav_frame.pack(fill=tk.X, pady=5)
+        nav_container = ttk.Frame(self.test_frame)
+        nav_container.pack(fill=tk.X, pady=5)
+        self.question_nav_canvas = tk.Canvas(
+            nav_container, height=40, highlightthickness=0, bg="#f5f5f5"
+        )
+        self.question_nav_canvas.pack(side=tk.TOP, fill=tk.X, expand=True)
+        self.question_nav_scroll = ttk.Scrollbar(
+            nav_container, orient=tk.HORIZONTAL, command=self.question_nav_canvas.xview
+        )
+        self.question_nav_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+        self.question_nav_canvas.configure(xscrollcommand=self.question_nav_scroll.set)
+        self.question_nav_frame = ttk.Frame(self.question_nav_canvas)
+        self.question_nav_canvas.create_window(
+            (0, 0), window=self.question_nav_frame, anchor="nw"
+        )
+        self.question_nav_frame.bind(
+            "<Configure>",
+            lambda event: self.question_nav_canvas.configure(
+                scrollregion=self.question_nav_canvas.bbox("all")
+            ),
+        )
+        self.nav_buttons: list[ttk.Button] = []
 
         self.question_canvas = tk.Canvas(self.test_frame, borderwidth=1, relief=tk.SOLID)
         self.question_canvas.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -678,6 +698,7 @@ class TestApp(tk.Tk):
     def _render_question_nav(self) -> None:
         for widget in self.question_nav_frame.winfo_children():
             widget.destroy()
+        self.nav_buttons = []
         if not self.session:
             return
         for index in range(len(self.session.questions)):
@@ -720,12 +741,15 @@ class TestApp(tk.Tk):
                 command=lambda idx=index: self._jump_to_question(idx),
             )
             button.pack(side=tk.LEFT, padx=2)
+            self.nav_buttons.append(button)
+        self._center_nav_on_current()
 
     def _jump_to_question(self, index: int) -> None:
         if not self.session:
             return
         self.session.current_index = index
         self._show_question()
+        self._center_nav_on_current()
 
     def _clear_question(self) -> None:
         for widget in self.question_container.winfo_children():
@@ -782,18 +806,34 @@ class TestApp(tk.Tk):
                 rb.state(["disabled"])
             rb.pack(anchor=tk.W)
             self._render_content_block(frame, option.content)
+        self._center_nav_on_current()
 
     def _render_content_block(self, parent, content: list[ContentItem]) -> None:
+        text = tk.Text(
+            parent,
+            wrap=tk.WORD,
+            height=1,
+            borderwidth=0,
+            highlightthickness=0,
+            bg="#f5f5f5",
+            font=("Segoe UI", 10),
+        )
+        text.pack(fill=tk.X, anchor=tk.W)
         for item in content:
             if item.item_type == "text":
-                if item.value.strip():
-                    ttk.Label(parent, text=item.value, wraplength=880).pack(anchor=tk.W)
+                if item.value:
+                    text.insert(tk.END, item.value)
             elif item.item_type == "image" and Path(item.value).exists():
                 image = Image.open(item.value)
-                image.thumbnail((600, 400))
+                image.thumbnail((400, 300))
                 photo = ImageTk.PhotoImage(image)
                 self.image_cache.append(photo)
-                ttk.Label(parent, image=photo).pack(anchor=tk.W, pady=2)
+                text.image_create(tk.END, image=photo)
+            text.insert(tk.END, " ")
+        text.update_idletasks()
+        lines = int(text.index("end-1c").split(".")[0])
+        text.configure(height=max(1, lines))
+        text.configure(state=tk.DISABLED)
 
     def _save_answer(self, selected_idx: int, options: list[TestOption]) -> None:
         if not self.session:
@@ -825,6 +865,7 @@ class TestApp(tk.Tk):
         if self.session.current_index < len(self.session.questions) - 1:
             self.session.current_index += 1
             self._show_question()
+            self._center_nav_on_current()
 
     def _prev_question(self) -> None:
         if not self.session:
@@ -832,6 +873,7 @@ class TestApp(tk.Tk):
         if self.session.current_index > 0:
             self.session.current_index -= 1
             self._show_question()
+            self._center_nav_on_current()
 
     def _finish_test(self) -> None:
         if not self.session:
@@ -871,6 +913,20 @@ class TestApp(tk.Tk):
 
     def _go_to_main_menu(self) -> None:
         self._show_frame(self.extract_frame)
+
+    def _center_nav_on_current(self) -> None:
+        if not self.session or not self.nav_buttons:
+            return
+        index = self.session.current_index
+        if index < 0 or index >= len(self.nav_buttons):
+            return
+        self.update_idletasks()
+        button = self.nav_buttons[index]
+        button_center = button.winfo_x() + button.winfo_width() / 2
+        total_width = max(1, self.question_nav_frame.winfo_reqwidth())
+        view_width = max(1, self.question_nav_canvas.winfo_width())
+        target = max(0, min(button_center - view_width / 2, total_width - view_width))
+        self.question_nav_canvas.xview_moveto(target / total_width)
 
 
 if __name__ == "__main__":
