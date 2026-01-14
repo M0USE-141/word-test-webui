@@ -428,6 +428,8 @@ class TestApp(tk.Tk):
 
         self.app_dir = self._get_app_data_dir()
         self.app_dir.mkdir(parents=True, exist_ok=True)
+        self.wmf_cache_dir = self.app_dir / "wmf_cache"
+        self.wmf_cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.language = tk.StringVar(value="ru")
         self.title(self._t("app_title"))
@@ -1276,8 +1278,12 @@ class TestApp(tk.Tk):
             elif item.item_type == "image" and Path(item.value).exists():
                 image_path = Path(item.value)
                 if image_path.suffix.lower() == ".wmf":
-                    text.insert(tk.END, self._t("formula_placeholder"))
-                    continue
+                    converted = self._convert_wmf_to_png(image_path)
+                    if converted:
+                        image_path = converted
+                    else:
+                        text.insert(tk.END, self._t("formula_placeholder"))
+                        continue
                 try:
                     image = Image.open(image_path)
                 except OSError:
@@ -1297,6 +1303,33 @@ class TestApp(tk.Tk):
         image_lines = math.ceil(max_used_image_height / line_height) if max_used_image_height else 1
         text.configure(height=max(1, lines, image_lines + 1))
         text.configure(state=tk.DISABLED)
+
+    def _convert_wmf_to_png(self, image_path: Path) -> Path | None:
+        target = self.wmf_cache_dir / f"{image_path.stem}.png"
+        if target.exists() and target.stat().st_mtime >= image_path.stat().st_mtime:
+            return target
+        soffice_path = shutil.which("soffice") or shutil.which("soffice.exe")
+        if not soffice_path:
+            return None
+        result = subprocess.run(
+            [
+                soffice_path,
+                "--headless",
+                "--convert-to",
+                "png",
+                "--outdir",
+                str(self.wmf_cache_dir),
+                str(image_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return None
+        if target.exists():
+            return target
+        return None
 
     def _save_answer(self, selected_idx: int, options: list[TestOption]) -> None:
         if not self.session:
