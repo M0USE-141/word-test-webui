@@ -60,6 +60,7 @@ TRANSLATIONS = {
         "answer_wrong": "Неверно. Правильный вариант: {index}",
         "extracted": "Извлечено тестов: {count}. Сохранено: {path}",
         "no_warnings": "Нет предупреждений.",
+        "formula_placeholder": "[формула]",
         "questions_label": "Вопросов: {count}",
         "stats_line": "Правильно {correct}/{total} | Изучено {percent:.1f}% | Попытки: {attempts}",
         "no_attempts": "Нет попыток",
@@ -120,6 +121,7 @@ TRANSLATIONS = {
         "answer_wrong": "Notoʻgʻri. Toʻgʻri variant: {index}",
         "extracted": "Ajratildi: {count}. Saqlandi: {path}",
         "no_warnings": "Ogohlantirishlar yoʻq.",
+        "formula_placeholder": "[formula]",
         "questions_label": "Savollar: {count}",
         "stats_line": "Toʻgʻri {correct}/{total} | Oʻrganildi {percent:.1f}% | Urinishlar: {attempts}",
         "no_attempts": "Urinishlar yoʻq",
@@ -180,6 +182,7 @@ TRANSLATIONS = {
         "answer_wrong": "Incorrect. Correct option: {index}",
         "extracted": "Extracted: {count}. Saved: {path}",
         "no_warnings": "No warnings.",
+        "formula_placeholder": "[formula]",
         "questions_label": "Questions: {count}",
         "stats_line": "Correct {correct}/{total} | Learned {percent:.1f}% | Attempts: {attempts}",
         "no_attempts": "No attempts",
@@ -1271,7 +1274,15 @@ class TestApp(tk.Tk):
                 if item.value:
                     text.insert(tk.END, item.value)
             elif item.item_type == "image" and Path(item.value).exists():
-                image = Image.open(item.value)
+                image_path = Path(item.value)
+                if image_path.suffix.lower() == ".wmf":
+                    text.insert(tk.END, self._t("formula_placeholder"))
+                    continue
+                try:
+                    image = Image.open(image_path)
+                except OSError:
+                    text.insert(tk.END, self._t("formula_placeholder"))
+                    continue
                 if image.height > max_image_height:
                     ratio = max_image_height / image.height
                     width = max(1, int(image.width * ratio))
