@@ -560,23 +560,24 @@ class TestApp(tk.Tk):
                 continue
             questions = self._count_questions(test_file)
             test_stats = stats.get(test_file.name, {})
-            last = test_stats.get("last_score")
             best = test_stats.get("best_score")
             attempts = test_stats.get("attempts", 0)
-            stats_line = "Нет попыток"
-            if last is not None:
-                learned_percent = (best / questions * 100) if questions and best is not None else 0
-                stats_line = (
-                    f"Правильно {last}/{questions} | "
-                    f"Изучено {learned_percent:.1f}% | "
-                    f"Попытки: {attempts}"
-                )
-            self._create_test_card(test_file, questions, stats_line)
+            correct_total = best or 0
+            learned_percent = (correct_total / questions * 100) if questions else 0
+            stats_line = (
+                f"Правильно {correct_total}/{questions} | "
+                f"Изучено {learned_percent:.1f}% | "
+                f"Попытки: {attempts}"
+            )
+            self._create_test_card(test_file, questions, stats_line, learned_percent)
 
-    def _create_test_card(self, test_file: Path, questions: int, stats_line: str) -> None:
+    def _create_test_card(
+        self, test_file: Path, questions: int, stats_line: str, learned_percent: float
+    ) -> None:
+        background = self._progress_color(learned_percent)
         card = tk.Frame(
             self.cards_container,
-            bg="white",
+            bg=background,
             highlightthickness=1,
             highlightbackground="#e0e0e0",
             padx=12,
@@ -587,14 +588,14 @@ class TestApp(tk.Tk):
             card,
             text=test_file.stem,
             font=("Segoe UI", 12, "bold"),
-            bg="white",
+            bg=background,
         )
         title.pack(anchor=tk.W)
         info = tk.Label(
             card,
             text=f"Вопросов: {questions}",
             font=("Segoe UI", 10),
-            bg="white",
+            bg=background,
         )
         info.pack(anchor=tk.W, pady=(2, 0))
         stats = tk.Label(
@@ -602,7 +603,7 @@ class TestApp(tk.Tk):
             text=stats_line,
             font=("Segoe UI", 9),
             fg="#666666",
-            bg="white",
+            bg=background,
         )
         stats.pack(anchor=tk.W, pady=(2, 0))
 
@@ -623,6 +624,15 @@ class TestApp(tk.Tk):
         title.bind("<Button-1>", on_click)
         info.bind("<Button-1>", on_click)
         stats.bind("<Button-1>", on_click)
+
+    def _progress_color(self, percent: float) -> str:
+        percent = max(0.0, min(100.0, percent)) / 100.0
+        start = (255, 255, 255)
+        end = (200, 230, 201)
+        red = int(start[0] + (end[0] - start[0]) * percent)
+        green = int(start[1] + (end[1] - start[1]) * percent)
+        blue = int(start[2] + (end[2] - start[2]) * percent)
+        return f"#{red:02x}{green:02x}{blue:02x}"
 
     def _select_test(self, test_file: Path) -> None:
         self.selected_test_file = test_file
@@ -842,11 +852,29 @@ class TestApp(tk.Tk):
         selected_var = tk.IntVar(
             value=self.session.answers.get(self.session.current_index, -1)
         )
+        selected_idx = self.session.answers.get(self.session.current_index, -1)
+        correct_idx = next(
+            (i for i, option in enumerate(options) if option.is_correct), None
+        )
 
         for idx, option in enumerate(options):
+            status_color = "#ffffff"
+            if self.session.finished:
+                if correct_idx is not None and idx == correct_idx:
+                    status_color = "#c8e6c9"
+                elif selected_idx == idx:
+                    status_color = "#ffcdd2"
+            else:
+                if selected_idx == idx:
+                    if not self.show_answers_immediately.get():
+                        status_color = "#fff9c4"
+                    elif correct_idx is not None and idx == correct_idx:
+                        status_color = "#c8e6c9"
+                    else:
+                        status_color = "#ffcdd2"
             frame = tk.Frame(
                 self.question_container,
-                bg="white",
+                bg=status_color,
                 highlightthickness=1,
                 highlightbackground="#e0e0e0",
                 padx=8,
@@ -859,7 +887,7 @@ class TestApp(tk.Tk):
                 variable=selected_var,
                 value=idx,
                 command=lambda: self._save_answer(selected_var.get(), options),
-                bg="white",
+                bg=status_color,
                 anchor="w",
             )
             if self.session.finished:
@@ -929,6 +957,7 @@ class TestApp(tk.Tk):
             self.session.answer_status[self.session.current_index] = "incorrect"
         self._save_progress()
         self._render_question_nav()
+        self._show_question()
         if self.show_answers_immediately.get():
             if correct_idx is None:
                 self.answer_feedback_label.config(
