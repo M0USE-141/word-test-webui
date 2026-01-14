@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import tkinter as tk
+from tkinter import font as tkfont
 from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -462,6 +463,7 @@ class TestApp(tk.Tk):
         style.configure("TButton", padding=6, font=("Segoe UI", 10))
         style.configure("TLabelframe", background="#f5f5f5", font=("Segoe UI", 10, "bold"))
         style.configure("TLabelframe.Label", background="#f5f5f5")
+        style.configure("Current.TButton", background="#bbdefb")
         style.configure("Pending.TButton", background="#e0e0e0")
         style.configure("Neutral.TButton", background="#ffeb3b")
         style.configure("Correct.TButton", background="#4caf50", foreground="white")
@@ -733,6 +735,8 @@ class TestApp(tk.Tk):
                             style_name = "Correct.TButton"
                         else:
                             style_name = "Incorrect.TButton"
+            if index == self.session.current_index:
+                style_name = "Current.TButton"
             button = ttk.Button(
                 self.question_nav_frame,
                 text=str(index + 1),
@@ -809,6 +813,9 @@ class TestApp(tk.Tk):
         self._center_nav_on_current()
 
     def _render_content_block(self, parent, content: list[ContentItem]) -> None:
+        text_font = tkfont.Font(family="Segoe UI", size=10)
+        line_height = max(1, text_font.metrics("linespace"))
+        max_image_height = int(line_height * 1.5)
         text = tk.Text(
             parent,
             wrap=tk.WORD,
@@ -816,7 +823,7 @@ class TestApp(tk.Tk):
             borderwidth=0,
             highlightthickness=0,
             bg="#f5f5f5",
-            font=("Segoe UI", 10),
+            font=text_font,
         )
         text.pack(fill=tk.X, anchor=tk.W)
         for item in content:
@@ -825,7 +832,10 @@ class TestApp(tk.Tk):
                     text.insert(tk.END, item.value)
             elif item.item_type == "image" and Path(item.value).exists():
                 image = Image.open(item.value)
-                image.thumbnail((400, 300))
+                if image.height > max_image_height:
+                    ratio = max_image_height / image.height
+                    width = max(1, int(image.width * ratio))
+                    image = image.resize((width, max_image_height), Image.LANCZOS)
                 photo = ImageTk.PhotoImage(image)
                 self.image_cache.append(photo)
                 text.image_create(tk.END, image=photo)
