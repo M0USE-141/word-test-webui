@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import random
 import shutil
 import subprocess
@@ -40,6 +41,7 @@ class TestSession:
     current_index: int = 0
     option_orders: dict[int, list[TestOption]] = field(default_factory=dict)
     finished: bool = False
+    answer_status: dict[int, str] = field(default_factory=dict)
 
 
 class WordTestExtractor:
@@ -221,6 +223,9 @@ class TestApp(tk.Tk):
         self.minsize(900, 600)
         self._apply_style()
 
+        self.app_dir = self._get_app_data_dir()
+        self.app_dir.mkdir(parents=True, exist_ok=True)
+
         self.selected_file = tk.StringVar()
         self.symbol = tk.StringVar()
         self.log_small_tables = tk.BooleanVar(value=False)
@@ -243,67 +248,38 @@ class TestApp(tk.Tk):
         self.container = ttk.Frame(self)
         self.container.pack(fill=tk.BOTH, expand=True)
 
-        self.extract_frame = ttk.Frame(self.container, padding=10)
+        self.main_frame = ttk.Frame(self.container, padding=10)
+        self.import_frame = ttk.Frame(self.container, padding=10)
         self.settings_frame = ttk.Frame(self.container, padding=10)
         self.test_frame = ttk.Frame(self.container, padding=10)
 
-        for frame in (self.extract_frame, self.settings_frame, self.test_frame):
+        for frame in (self.main_frame, self.import_frame, self.settings_frame, self.test_frame):
             frame.grid(row=0, column=0, sticky="nsew")
         self.container.rowconfigure(0, weight=1)
         self.container.columnconfigure(0, weight=1)
 
-        self._build_extract_ui()
+        self._build_main_ui()
+        self._build_import_ui()
         self._build_settings_ui()
         self._build_test_ui()
-        self._show_frame(self.extract_frame)
+        self._show_frame(self.main_frame)
         self._refresh_saved_tests()
 
     def _show_frame(self, frame: ttk.Frame) -> None:
         frame.tkraise()
 
-    def _build_extract_ui(self) -> None:
+    def _build_main_ui(self) -> None:
         header = ttk.Label(
-            self.extract_frame,
+            self.main_frame,
             text="Главное меню",
             font=("Segoe UI", 16, "bold"),
         )
         header.pack(anchor=tk.W, pady=5)
-        file_frame = ttk.LabelFrame(self.extract_frame, text="Файл Word", padding=10)
-        file_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Entry(file_frame, textvariable=self.selected_file, width=80).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Button(file_frame, text="Выбрать", command=self._choose_file).pack(
-            side=tk.LEFT, padx=5
-        )
-
-        settings_frame = ttk.LabelFrame(
-            self.extract_frame, text="Настройки извлечения", padding=10
-        )
-        settings_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(settings_frame, text="Спец. символ для правильного ответа:").grid(
-            row=0, column=0, sticky=tk.W, pady=2
-        )
-        ttk.Entry(settings_frame, textvariable=self.symbol, width=10).grid(
-            row=0, column=1, sticky=tk.W, pady=2
-        )
-        ttk.Checkbutton(
-            settings_frame,
-            text="Показывать таблицы меньше 3 строк в логах",
-            variable=self.log_small_tables,
-        ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
-
         ttk.Button(
-            self.extract_frame, text="Извлечь тесты", command=self._extract_tests
-        ).pack(pady=10)
-
-        self.extract_status = ttk.Label(self.extract_frame, text="")
-        self.extract_status.pack(anchor=tk.W)
-
+            self.main_frame, text="Импортировать тесты", command=self._open_import
+        ).pack(anchor=tk.E, pady=5)
         results_frame = ttk.LabelFrame(
-            self.extract_frame, text="Сохранённые тесты", padding=10
+            self.main_frame, text="Сохранённые тесты", padding=10
         )
         results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.cards_canvas = tk.Canvas(results_frame, highlightthickness=0, bg="#f5f5f5")
@@ -322,10 +298,54 @@ class TestApp(tk.Tk):
             ),
         )
         ttk.Button(
-            self.extract_frame, text="Обновить список", command=self._refresh_saved_tests
+            self.main_frame, text="Обновить список", command=self._refresh_saved_tests
         ).pack(anchor=tk.E, pady=5)
 
-        log_frame = ttk.LabelFrame(self.extract_frame, text="Логи", padding=10)
+    def _build_import_ui(self) -> None:
+        header = ttk.Label(
+            self.import_frame,
+            text="Импорт тестов",
+            font=("Segoe UI", 16, "bold"),
+        )
+        header.pack(anchor=tk.W, pady=5)
+        ttk.Button(
+            self.import_frame, text="Назад в меню", command=self._go_to_main_menu
+        ).pack(anchor=tk.E)
+        file_frame = ttk.LabelFrame(self.import_frame, text="Файл Word", padding=10)
+        file_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Entry(file_frame, textvariable=self.selected_file, width=80).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(file_frame, text="Выбрать", command=self._choose_file).pack(
+            side=tk.LEFT, padx=5
+        )
+
+        settings_frame = ttk.LabelFrame(
+            self.import_frame, text="Настройки извлечения", padding=10
+        )
+        settings_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Label(settings_frame, text="Спец. символ для правильного ответа:").grid(
+            row=0, column=0, sticky=tk.W, pady=2
+        )
+        ttk.Entry(settings_frame, textvariable=self.symbol, width=10).grid(
+            row=0, column=1, sticky=tk.W, pady=2
+        )
+        ttk.Checkbutton(
+            settings_frame,
+            text="Показывать таблицы меньше 3 строк в логах",
+            variable=self.log_small_tables,
+        ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
+
+        ttk.Button(
+            self.import_frame, text="Извлечь тесты", command=self._extract_tests
+        ).pack(pady=10)
+
+        self.extract_status = ttk.Label(self.import_frame, text="")
+        self.extract_status.pack(anchor=tk.W)
+
+        log_frame = ttk.LabelFrame(self.import_frame, text="Логи", padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.log_text = tk.Text(log_frame, height=6, state=tk.DISABLED, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -478,6 +498,12 @@ class TestApp(tk.Tk):
         style.configure("Thin.Vertical.TScrollbar", gripcount=0, width=8)
         style.configure("Thin.Horizontal.TScrollbar", gripcount=0, width=8)
 
+    def _get_app_data_dir(self) -> Path:
+        if os.name == "nt":
+            base = Path(os.getenv("APPDATA", Path.home()))
+            return base / "WordTestExtractor"
+        return Path.home() / ".local" / "share" / "word_test_extractor"
+
     def _choose_file(self) -> None:
         file_path = filedialog.askopenfilename(
             filetypes=[("Word files", "*.doc *.docx")]
@@ -491,7 +517,7 @@ class TestApp(tk.Tk):
             messagebox.showwarning("Ошибка", "Выберите Word файл.")
             return
         base_name = Path(path).stem
-        output_dir = Path(path).parent / "extracted_tests"
+        output_dir = self.app_dir / "extracted_tests"
         output_dir.mkdir(exist_ok=True)
         image_dir = output_dir / f"{base_name}_images"
         extractor = WordTestExtractor(
@@ -509,7 +535,7 @@ class TestApp(tk.Tk):
 
         self.tests = tests
         base_name = Path(path).stem
-        output_dir = Path(path).parent / "extracted_tests"
+        output_dir = self.app_dir / "extracted_tests"
         output_dir.mkdir(exist_ok=True)
         output_path = output_dir / f"{base_name}.json"
         with output_path.open("w", encoding="utf-8") as handle:
@@ -523,9 +549,7 @@ class TestApp(tk.Tk):
         extractor.cleanup()
 
     def _refresh_saved_tests(self) -> None:
-        selected = self.selected_file.get()
-        base_dir = Path(selected).parent if selected else Path.cwd()
-        output_dir = base_dir / "extracted_tests"
+        output_dir = self.app_dir / "extracted_tests"
         for widget in self.cards_container.winfo_children():
             widget.destroy()
         if not output_dir.exists():
@@ -540,10 +564,10 @@ class TestApp(tk.Tk):
             best = test_stats.get("best_score")
             attempts = test_stats.get("attempts", 0)
             stats_line = "Нет попыток"
-            if best is not None:
-                learned_percent = (best / questions * 100) if questions else 0
+            if last is not None:
+                learned_percent = (best / questions * 100) if questions and best is not None else 0
                 stats_line = (
-                    f"Уникально правильно: {best}/{questions} | "
+                    f"Правильно {last}/{questions} | "
                     f"Изучено {learned_percent:.1f}% | "
                     f"Попытки: {attempts}"
                 )
@@ -722,7 +746,7 @@ class TestApp(tk.Tk):
         return tests
 
     def _load_progress(self) -> set[int]:
-        progress_file = Path("progress.json")
+        progress_file = self.app_dir / "progress.json"
         if not progress_file.exists():
             return set()
         with progress_file.open("r", encoding="utf-8") as handle:
@@ -732,7 +756,7 @@ class TestApp(tk.Tk):
     def _save_progress(self) -> None:
         if not self.session:
             return
-        progress_file = Path("progress.json")
+        progress_file = self.app_dir / "progress.json"
         answered_indices = list(self.session.answers.keys())
         with progress_file.open("w", encoding="utf-8") as handle:
             json.dump({"answered_indices": answered_indices}, handle, ensure_ascii=False)
@@ -745,36 +769,19 @@ class TestApp(tk.Tk):
             return
         for index in range(len(self.session.questions)):
             style_name = "Pending.TButton"
+            status = self.session.answer_status.get(index, "unanswered")
             if self.session.finished:
-                if index in self.session.answers:
-                    options = self.session.option_orders.get(
-                        index, self.session.questions[index].options
-                    )
-                    selected = self.session.answers.get(index)
-                    correct_idx = next(
-                        (i for i, option in enumerate(options) if option.is_correct), None
-                    )
-                    if selected is not None and correct_idx is not None:
-                        if selected == correct_idx:
-                            style_name = "Correct.TButton"
-                        else:
-                            style_name = "Incorrect.TButton"
+                if status == "correct":
+                    style_name = "Correct.TButton"
+                elif status == "incorrect":
+                    style_name = "Incorrect.TButton"
             else:
                 if not self.show_answers_immediately.get():
                     style_name = "Neutral.TButton"
-                elif index in self.session.answers:
-                    options = self.session.option_orders.get(
-                        index, self.session.questions[index].options
-                    )
-                    selected = self.session.answers.get(index)
-                    correct_idx = next(
-                        (i for i, option in enumerate(options) if option.is_correct), None
-                    )
-                    if selected is not None and correct_idx is not None:
-                        if selected == correct_idx:
-                            style_name = "Correct.TButton"
-                        else:
-                            style_name = "Incorrect.TButton"
+                elif status == "correct":
+                    style_name = "Correct.TButton"
+                elif status == "incorrect":
+                    style_name = "Incorrect.TButton"
             if index == self.session.current_index:
                 style_name = "Current.TButton"
             button = ttk.Button(
@@ -913,12 +920,16 @@ class TestApp(tk.Tk):
         if self.session.finished:
             return
         self.session.answers[self.session.current_index] = selected_idx
+        correct_idx = next((i for i, option in enumerate(options) if option.is_correct), None)
+        if correct_idx is None:
+            self.session.answer_status[self.session.current_index] = "unanswered"
+        elif selected_idx == correct_idx:
+            self.session.answer_status[self.session.current_index] = "correct"
+        else:
+            self.session.answer_status[self.session.current_index] = "incorrect"
         self._save_progress()
         self._render_question_nav()
         if self.show_answers_immediately.get():
-            correct_idx = next(
-                (i for i, option in enumerate(options) if option.is_correct), None
-            )
             if correct_idx is None:
                 self.answer_feedback_label.config(
                     text="Правильный ответ не указан.", foreground="#ff9800"
@@ -984,7 +995,10 @@ class TestApp(tk.Tk):
         self._go_to_main_menu()
 
     def _go_to_main_menu(self) -> None:
-        self._show_frame(self.extract_frame)
+        self._show_frame(self.main_frame)
+
+    def _open_import(self) -> None:
+        self._show_frame(self.import_frame)
 
     def _center_nav_on_current(self) -> None:
         if not self.session or not self.nav_buttons:
