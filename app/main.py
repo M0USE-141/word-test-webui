@@ -65,6 +65,12 @@ TRANSLATIONS = {
         "delete": "Удалить",
         "delete_title": "Удаление",
         "delete_confirm": "Удалить тест {name} и все связанные файлы?",
+        "menu": "Меню",
+        "rename": "Переименовать",
+        "rename_title": "Переименование",
+        "rename_prompt": "Новое название теста:",
+        "rename_empty": "Название не может быть пустым.",
+        "rename_exists": "Тест с таким названием уже существует.",
         "language": "Язык",
         "question_progress": "Вопрос {current} из {total}",
         "selected_test": "Выбран тест: {name}",
@@ -119,6 +125,12 @@ TRANSLATIONS = {
         "delete": "Oʻchirish",
         "delete_title": "Oʻchirish",
         "delete_confirm": "{name} testini va barcha fayllarni oʻchirish?",
+        "menu": "Menyu",
+        "rename": "Qayta nomlash",
+        "rename_title": "Qayta nomlash",
+        "rename_prompt": "Testning yangi nomi:",
+        "rename_empty": "Nom bo'sh bo'lishi mumkin emas.",
+        "rename_exists": "Bunday nomdagi test mavjud.",
         "language": "Til",
         "question_progress": "Savol {current}/{total}",
         "selected_test": "Tanlangan test: {name}",
@@ -173,6 +185,12 @@ TRANSLATIONS = {
         "delete": "Delete",
         "delete_title": "Delete",
         "delete_confirm": "Delete test {name} and all related files?",
+        "menu": "Menu",
+        "rename": "Rename",
+        "rename_title": "Rename",
+        "rename_prompt": "New test name:",
+        "rename_empty": "Name cannot be empty.",
+        "rename_exists": "A test with this name already exists.",
         "language": "Language",
         "question_progress": "Question {current} of {total}",
         "selected_test": "Selected test: {name}",
@@ -806,15 +824,15 @@ class TestApp(tk.Tk):
         )
         stats.pack(anchor=tk.W, pady=(2, 0))
 
-        delete_button = tk.Button(
+        menu_button = tk.Button(
             card,
-            text=self._t("delete"),
-            bg="#ffebee",
-            fg="#c62828",
+            text=self._t("menu"),
+            bg="#e3f2fd",
+            fg="#1565c0",
             relief=tk.FLAT,
-            command=lambda: self._delete_test(test_file),
+            command=lambda: self._open_test_menu(test_file),
         )
-        delete_button.pack(anchor=tk.E, pady=(6, 0))
+        menu_button.pack(anchor=tk.E, pady=(6, 0))
 
         def on_click(_event: tk.Event) -> None:
             self._select_test(test_file)
@@ -837,6 +855,66 @@ class TestApp(tk.Tk):
         self.selected_test_file = test_file
         self.selected_test_label.config(text=self._t("selected_test", name=test_file.name))
         self._show_frame(self.settings_frame)
+
+    def _open_test_menu(self, test_file: Path) -> None:
+        menu = tk.Toplevel(self)
+        menu.title(self._t("menu"))
+        menu.resizable(False, False)
+        menu.grab_set()
+
+        ttk.Label(menu, text=self._t("rename_prompt")).pack(anchor=tk.W, padx=10, pady=5)
+        name_var = tk.StringVar(value=test_file.stem)
+        ttk.Entry(menu, textvariable=name_var, width=40).pack(padx=10, pady=5)
+
+        actions = ttk.Frame(menu)
+        actions.pack(fill=tk.X, padx=10, pady=10)
+        ttk.Button(
+            actions,
+            text=self._t("rename"),
+            command=lambda: self._rename_test(test_file, name_var.get(), menu),
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            actions,
+            text=self._t("delete"),
+            command=lambda: self._delete_test_from_menu(test_file, menu),
+        ).pack(side=tk.RIGHT)
+
+    def _rename_test(self, test_file: Path, new_name: str, menu: tk.Toplevel) -> None:
+        clean_name = new_name.strip()
+        if not clean_name:
+            messagebox.showerror(self._t("error"), self._t("rename_empty"))
+            return
+        new_path = test_file.with_name(f"{clean_name}.json")
+        if new_path.exists() and new_path != test_file:
+            messagebox.showerror(self._t("error"), self._t("rename_exists"))
+            return
+        try:
+            test_file.rename(new_path)
+            old_images = test_file.parent / f"{test_file.stem}_images"
+            new_images = test_file.parent / f"{clean_name}_images"
+            if old_images.exists() and old_images != new_images:
+                old_images.rename(new_images)
+            stats = self._load_test_stats(test_file.parent)
+            if test_file.name in stats:
+                stats[new_path.name] = stats.pop(test_file.name)
+                with (test_file.parent / "results.json").open(
+                    "w", encoding="utf-8"
+                ) as handle:
+                    json.dump(stats, handle, ensure_ascii=False, indent=2)
+            if self.selected_test_file == test_file:
+                self.selected_test_file = new_path
+                self.selected_test_label.config(
+                    text=self._t("selected_test", name=new_path.name)
+                )
+        except OSError as exc:
+            messagebox.showerror(self._t("error"), str(exc))
+            return
+        menu.destroy()
+        self._refresh_saved_tests()
+
+    def _delete_test_from_menu(self, test_file: Path, menu: tk.Toplevel) -> None:
+        menu.destroy()
+        self._delete_test(test_file)
 
     def _delete_test(self, test_file: Path) -> None:
         if not messagebox.askyesno(
