@@ -40,15 +40,21 @@ class TestSession:
 
 
 class WordTestExtractor:
-    def __init__(self, file_path: Path, symbol: str, log_small_tables: bool):
+    def __init__(
+        self,
+        file_path: Path,
+        symbol: str,
+        log_small_tables: bool,
+        image_output_dir: Path,
+    ):
         self.file_path = file_path
         self.symbol = symbol
         self.log_small_tables = log_small_tables
-        self.extract_dir = Path(tempfile.mkdtemp(prefix="word_test_images_"))
+        self.extract_dir = image_output_dir
         self.logs: list[str] = []
 
     def cleanup(self) -> None:
-        shutil.rmtree(self.extract_dir, ignore_errors=True)
+        return
 
     def _convert_doc_to_docx(self, doc_path: Path) -> Path:
         converted = doc_path.with_suffix(".docx")
@@ -86,6 +92,7 @@ class WordTestExtractor:
         return Document(self.file_path)
 
     def _extract_images(self, doc: Document) -> dict[str, Path]:
+        self.extract_dir.mkdir(parents=True, exist_ok=True)
         image_map: dict[str, Path] = {}
         for rel_id, part in doc.part.related_parts.items():
             if "image" not in part.content_type:
@@ -380,6 +387,9 @@ class TestApp(tk.Tk):
         style.configure("TButton", padding=6, font=("Segoe UI", 10))
         style.configure("TLabelframe", background="#f5f5f5", font=("Segoe UI", 10, "bold"))
         style.configure("TLabelframe.Label", background="#f5f5f5")
+        style.configure("Pending.TButton", background="#e0e0e0")
+        style.configure("Correct.TButton", background="#4caf50", foreground="white")
+        style.configure("Incorrect.TButton", background="#f44336", foreground="white")
 
     def _choose_file(self) -> None:
         file_path = filedialog.askopenfilename(
@@ -393,10 +403,15 @@ class TestApp(tk.Tk):
         if not path:
             messagebox.showwarning("Ошибка", "Выберите Word файл.")
             return
+        base_name = Path(path).stem
+        output_dir = Path(path).parent / "extracted_tests"
+        output_dir.mkdir(exist_ok=True)
+        image_dir = output_dir / f"{base_name}_images"
         extractor = WordTestExtractor(
             Path(path),
             self.symbol.get().strip(),
             self.log_small_tables.get(),
+            image_dir,
         )
         try:
             tests = extractor.extract()
@@ -500,10 +515,23 @@ class TestApp(tk.Tk):
         if not self.session:
             return
         for index in range(len(self.session.questions)):
+            style_name = "Pending.TButton"
+            if index in self.session.answers:
+                options = self.session.option_orders.get(index, self.session.questions[index].options)
+                selected = self.session.answers.get(index)
+                correct_idx = next(
+                    (i for i, option in enumerate(options) if option.is_correct), None
+                )
+                if selected is not None and correct_idx is not None:
+                    if selected == correct_idx:
+                        style_name = "Correct.TButton"
+                    else:
+                        style_name = "Incorrect.TButton"
             button = ttk.Button(
                 self.question_nav_frame,
                 text=str(index + 1),
                 width=3,
+                style=style_name,
                 command=lambda idx=index: self._jump_to_question(idx),
             )
             button.pack(side=tk.LEFT, padx=2)
@@ -542,12 +570,12 @@ class TestApp(tk.Tk):
             if not options:
                 options = list(question.options)
                 random.shuffle(options)
-                self.session.option_orders[self.session.current_index] = options
         else:
             options = list(question.options)
 
         max_opts = max(1, self.max_options.get())
         options = options[:max_opts]
+        self.session.option_orders[self.session.current_index] = options
 
         selected_var = tk.IntVar(
             value=self.session.answers.get(self.session.current_index, -1)
@@ -558,7 +586,7 @@ class TestApp(tk.Tk):
             frame.pack(fill=tk.X, pady=2)
             rb = ttk.Radiobutton(
                 frame,
-                text=f"Вариант {idx + 1}",
+                text=f"{idx + 1}.",
                 variable=selected_var,
                 value=idx,
                 command=lambda: self._save_answer(selected_var.get(), options),
@@ -583,6 +611,7 @@ class TestApp(tk.Tk):
             return
         self.session.answers[self.session.current_index] = selected_idx
         self._save_progress()
+        self._render_question_nav()
         if self.show_answers_immediately.get():
             correct_idx = next(
                 (i for i, option in enumerate(options) if option.is_correct), None
@@ -619,7 +648,8 @@ class TestApp(tk.Tk):
             if answer is None or answer == -1:
                 continue
             answered += 1
-            if answer < len(question.options) and question.options[answer].is_correct:
+            options = self.session.option_orders.get(idx, question.options)
+            if answer < len(options) and options[answer].is_correct:
                 correct += 1
         percent = (correct / total * 100) if total else 0
         self.report_label.config(
