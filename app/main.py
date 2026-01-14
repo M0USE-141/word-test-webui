@@ -54,6 +54,7 @@ class WordTestExtractor:
         converted = doc_path.with_suffix(".docx")
         if converted.exists():
             return converted
+        temp_out = Path(tempfile.mkdtemp(prefix="word_test_docx_"))
         result = subprocess.run(
             [
                 "soffice",
@@ -61,7 +62,7 @@ class WordTestExtractor:
                 "--convert-to",
                 "docx",
                 "--outdir",
-                str(doc_path.parent),
+                str(temp_out),
                 str(doc_path),
             ],
             capture_output=True,
@@ -73,9 +74,10 @@ class WordTestExtractor:
                 "Не удалось конвертировать .doc файл. "
                 "Установите LibreOffice (soffice)."
             )
-        if not converted.exists():
+        candidates = sorted(temp_out.glob("*.docx"), key=lambda p: p.stat().st_mtime)
+        if not candidates:
             raise RuntimeError("Конвертация .doc завершилась без результата.")
-        return converted
+        return candidates[-1]
 
     def _load_document(self) -> Document:
         if self.file_path.suffix.lower() == ".doc":
