@@ -429,6 +429,8 @@ class TestApp(tk.Tk):
             side=tk.RIGHT, padx=5
         )
 
+        self.answer_feedback_label = ttk.Label(self.test_frame, text="")
+        self.answer_feedback_label.pack(anchor=tk.W, pady=2)
         self.report_label = ttk.Label(self.test_frame, text="", foreground="blue")
         self.report_label.pack(anchor=tk.W, pady=5)
 
@@ -441,6 +443,7 @@ class TestApp(tk.Tk):
         style.configure("TLabelframe", background="#f5f5f5", font=("Segoe UI", 10, "bold"))
         style.configure("TLabelframe.Label", background="#f5f5f5")
         style.configure("Pending.TButton", background="#e0e0e0")
+        style.configure("Neutral.TButton", background="#ffeb3b")
         style.configure("Correct.TButton", background="#4caf50", foreground="white")
         style.configure("Incorrect.TButton", background="#f44336", foreground="white")
 
@@ -634,6 +637,7 @@ class TestApp(tk.Tk):
             questions = questions[:count]
         self.session = TestSession(questions=questions)
         self.report_label.config(text="")
+        self.answer_feedback_label.config(text="")
         self._render_question_nav()
         self._show_question()
         self._show_frame(self.test_frame)
@@ -678,17 +682,36 @@ class TestApp(tk.Tk):
             return
         for index in range(len(self.session.questions)):
             style_name = "Pending.TButton"
-            if index in self.session.answers:
-                options = self.session.option_orders.get(index, self.session.questions[index].options)
-                selected = self.session.answers.get(index)
-                correct_idx = next(
-                    (i for i, option in enumerate(options) if option.is_correct), None
-                )
-                if selected is not None and correct_idx is not None:
-                    if selected == correct_idx:
-                        style_name = "Correct.TButton"
-                    else:
-                        style_name = "Incorrect.TButton"
+            if self.session.finished:
+                if index in self.session.answers:
+                    options = self.session.option_orders.get(
+                        index, self.session.questions[index].options
+                    )
+                    selected = self.session.answers.get(index)
+                    correct_idx = next(
+                        (i for i, option in enumerate(options) if option.is_correct), None
+                    )
+                    if selected is not None and correct_idx is not None:
+                        if selected == correct_idx:
+                            style_name = "Correct.TButton"
+                        else:
+                            style_name = "Incorrect.TButton"
+            else:
+                if not self.show_answers_immediately.get():
+                    style_name = "Neutral.TButton"
+                elif index in self.session.answers:
+                    options = self.session.option_orders.get(
+                        index, self.session.questions[index].options
+                    )
+                    selected = self.session.answers.get(index)
+                    correct_idx = next(
+                        (i for i, option in enumerate(options) if option.is_correct), None
+                    )
+                    if selected is not None and correct_idx is not None:
+                        if selected == correct_idx:
+                            style_name = "Correct.TButton"
+                        else:
+                            style_name = "Incorrect.TButton"
             button = ttk.Button(
                 self.question_nav_frame,
                 text=str(index + 1),
@@ -717,6 +740,8 @@ class TestApp(tk.Tk):
             return
         self._clear_question()
         question = self.session.questions[self.session.current_index]
+        if not self.show_answers_immediately.get() or self.session.finished:
+            self.answer_feedback_label.config(text="")
 
         ttk.Label(
             self.question_container,
@@ -783,11 +808,16 @@ class TestApp(tk.Tk):
                 (i for i, option in enumerate(options) if option.is_correct), None
             )
             if correct_idx is None:
-                messagebox.showinfo("Ответ", "Правильный ответ не указан.")
+                self.answer_feedback_label.config(
+                    text="Правильный ответ не указан.", foreground="#ff9800"
+                )
             elif selected_idx == correct_idx:
-                messagebox.showinfo("Ответ", "Верно!")
+                self.answer_feedback_label.config(text="Верно!", foreground="#4caf50")
             else:
-                messagebox.showinfo("Ответ", f"Неверно. Правильный вариант: {correct_idx + 1}")
+                self.answer_feedback_label.config(
+                    text=f"Неверно. Правильный вариант: {correct_idx + 1}",
+                    foreground="#f44336",
+                )
 
     def _next_question(self) -> None:
         if not self.session:
@@ -833,6 +863,7 @@ class TestApp(tk.Tk):
                 "Ответы",
                 f"Правильных ответов: {correct} из {total} ({percent:.1f}%)",
             )
+        self._render_question_nav()
         self._show_question()
 
     def _exit_test(self) -> None:
