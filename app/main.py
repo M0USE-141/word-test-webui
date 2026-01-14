@@ -282,14 +282,14 @@ class TestApp(tk.Tk):
             self.main_frame, text="Сохранённые тесты", padding=10
         )
         results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        self.cards_canvas = tk.Canvas(results_frame, highlightthickness=0, bg="#f5f5f5")
+        self.cards_canvas = tk.Canvas(results_frame, highlightthickness=0, bg="#f7f8fa")
         self.cards_scroll = ttk.Scrollbar(
             results_frame, orient=tk.VERTICAL, command=self.cards_canvas.yview
         )
         self.cards_canvas.configure(yscrollcommand=self.cards_scroll.set)
         self.cards_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.cards_canvas.pack(fill=tk.BOTH, expand=True)
-        self.cards_container = tk.Frame(self.cards_canvas, bg="#f5f5f5")
+        self.cards_container = tk.Frame(self.cards_canvas, bg="#f7f8fa")
         self.cards_canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
         self.cards_container.bind(
             "<Configure>",
@@ -419,7 +419,7 @@ class TestApp(tk.Tk):
         nav_container = ttk.Frame(self.test_frame)
         nav_container.pack(fill=tk.X, pady=5)
         self.question_nav_canvas = tk.Canvas(
-            nav_container, height=40, highlightthickness=0, bg="#f5f5f5"
+            nav_container, height=40, highlightthickness=0, bg="#f7f8fa"
         )
         self.question_nav_canvas.pack(side=tk.TOP, fill=tk.X, expand=True)
         self.question_nav_scroll = ttk.Scrollbar(
@@ -442,7 +442,9 @@ class TestApp(tk.Tk):
         )
         self.nav_buttons: list[ttk.Button] = []
 
-        self.question_canvas = tk.Canvas(self.test_frame, borderwidth=1, relief=tk.SOLID)
+        self.question_canvas = tk.Canvas(
+            self.test_frame, borderwidth=1, relief=tk.SOLID, bg="#ffffff"
+        )
         self.question_scroll = ttk.Scrollbar(
             self.test_frame,
             orient=tk.VERTICAL,
@@ -485,18 +487,18 @@ class TestApp(tk.Tk):
     def _apply_style(self) -> None:
         style = ttk.Style(self)
         style.theme_use("clam")
-        style.configure("TFrame", background="#f5f5f5")
-        style.configure("TLabel", background="#f5f5f5", font=("Segoe UI", 10))
-        style.configure("TButton", padding=6, font=("Segoe UI", 10))
-        style.configure("TLabelframe", background="#f5f5f5", font=("Segoe UI", 10, "bold"))
-        style.configure("TLabelframe.Label", background="#f5f5f5")
-        style.configure("Current.TButton", background="#bbdefb")
-        style.configure("Pending.TButton", background="#e0e0e0")
-        style.configure("Neutral.TButton", background="#ffeb3b")
+        style.configure("TFrame", background="#f7f8fa")
+        style.configure("TLabel", background="#f7f8fa", font=("Segoe UI", 10))
+        style.configure("TButton", padding=(10, 6), font=("Segoe UI", 10))
+        style.configure("TLabelframe", background="#f7f8fa", font=("Segoe UI", 10, "bold"))
+        style.configure("TLabelframe.Label", background="#f7f8fa")
+        style.configure("Current.TButton", background="#cfe8ff")
+        style.configure("Pending.TButton", background="#e3e7ee")
+        style.configure("Neutral.TButton", background="#ffe9a6")
         style.configure("Correct.TButton", background="#4caf50", foreground="white")
         style.configure("Incorrect.TButton", background="#f44336", foreground="white")
-        style.configure("Thin.Vertical.TScrollbar", gripcount=0, width=8)
-        style.configure("Thin.Horizontal.TScrollbar", gripcount=0, width=8)
+        style.configure("Thin.Vertical.TScrollbar", gripcount=0, width=6)
+        style.configure("Thin.Horizontal.TScrollbar", gripcount=0, width=6)
 
     def _get_app_data_dir(self) -> Path:
         if os.name == "nt":
@@ -628,7 +630,7 @@ class TestApp(tk.Tk):
     def _progress_color(self, percent: float) -> str:
         percent = max(0.0, min(100.0, percent)) / 100.0
         start = (255, 255, 255)
-        end = (200, 230, 201)
+        end = (190, 230, 200)
         red = int(start[0] + (end[0] - start[0]) * percent)
         green = int(start[1] + (end[1] - start[1]) * percent)
         blue = int(start[2] + (end[2] - start[2]) * percent)
@@ -877,8 +879,8 @@ class TestApp(tk.Tk):
                 bg=status_color,
                 highlightthickness=1,
                 highlightbackground="#e0e0e0",
-                padx=8,
-                pady=6,
+                padx=10,
+                pady=8,
             )
             frame.pack(fill=tk.X, pady=4)
             rb = tk.Radiobutton(
