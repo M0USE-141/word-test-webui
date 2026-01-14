@@ -403,7 +403,10 @@ class TestApp(tk.Tk):
         )
         self.question_nav_canvas.pack(side=tk.TOP, fill=tk.X, expand=True)
         self.question_nav_scroll = ttk.Scrollbar(
-            nav_container, orient=tk.HORIZONTAL, command=self.question_nav_canvas.xview
+            nav_container,
+            orient=tk.HORIZONTAL,
+            command=self.question_nav_canvas.xview,
+            style="Thin.Horizontal.TScrollbar",
         )
         self.question_nav_scroll.pack(side=tk.BOTTOM, fill=tk.X)
         self.question_nav_canvas.configure(xscrollcommand=self.question_nav_scroll.set)
@@ -420,12 +423,15 @@ class TestApp(tk.Tk):
         self.nav_buttons: list[ttk.Button] = []
 
         self.question_canvas = tk.Canvas(self.test_frame, borderwidth=1, relief=tk.SOLID)
-        self.question_canvas.pack(fill=tk.BOTH, expand=True, pady=5)
         self.question_scroll = ttk.Scrollbar(
-            self.test_frame, orient=tk.VERTICAL, command=self.question_canvas.yview
+            self.test_frame,
+            orient=tk.VERTICAL,
+            command=self.question_canvas.yview,
+            style="Thin.Vertical.TScrollbar",
         )
-        self.question_canvas.configure(yscrollcommand=self.question_scroll.set)
         self.question_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.question_canvas.pack(fill=tk.BOTH, expand=True, pady=5)
+        self.question_canvas.configure(yscrollcommand=self.question_scroll.set)
 
         self.question_container = ttk.Frame(self.question_canvas)
         self.question_canvas.create_window((0, 0), window=self.question_container, anchor="nw")
@@ -469,6 +475,8 @@ class TestApp(tk.Tk):
         style.configure("Neutral.TButton", background="#ffeb3b")
         style.configure("Correct.TButton", background="#4caf50", foreground="white")
         style.configure("Incorrect.TButton", background="#f44336", foreground="white")
+        style.configure("Thin.Vertical.TScrollbar", gripcount=0, width=8)
+        style.configure("Thin.Horizontal.TScrollbar", gripcount=0, width=8)
 
     def _choose_file(self) -> None:
         file_path = filedialog.askopenfilename(
@@ -532,11 +540,12 @@ class TestApp(tk.Tk):
             best = test_stats.get("best_score")
             attempts = test_stats.get("attempts", 0)
             stats_line = "Нет попыток"
-            if last is not None and best is not None:
+            if best is not None:
+                learned_percent = (best / questions * 100) if questions else 0
                 stats_line = (
-                    f"Последний результат: {last}/{questions} | "
-                    f"Лучший результат: {best}/{questions} | "
-                    f"Попыток: {attempts}"
+                    f"Уникально правильно: {best}/{questions} | "
+                    f"Изучено {learned_percent:.1f}% | "
+                    f"Попытки: {attempts}"
                 )
             self._create_test_card(test_file, questions, stats_line)
 
@@ -573,6 +582,16 @@ class TestApp(tk.Tk):
         )
         stats.pack(anchor=tk.W, pady=(2, 0))
 
+        delete_button = tk.Button(
+            card,
+            text="Удалить",
+            bg="#ffebee",
+            fg="#c62828",
+            relief=tk.FLAT,
+            command=lambda: self._delete_test(test_file),
+        )
+        delete_button.pack(anchor=tk.E, pady=(6, 0))
+
         def on_click(_event: tk.Event) -> None:
             self._select_test(test_file)
 
@@ -585,6 +604,26 @@ class TestApp(tk.Tk):
         self.selected_test_file = test_file
         self.selected_test_label.config(text=f"Выбран тест: {test_file.name}")
         self._show_frame(self.settings_frame)
+
+    def _delete_test(self, test_file: Path) -> None:
+        if not messagebox.askyesno(
+            "Удаление", f"Удалить тест {test_file.name} и все связанные файлы?"
+        ):
+            return
+        try:
+            test_file.unlink(missing_ok=True)
+            images_dir = test_file.parent / f"{test_file.stem}_images"
+            shutil.rmtree(images_dir, ignore_errors=True)
+            stats = self._load_test_stats(test_file.parent)
+            if test_file.name in stats:
+                stats.pop(test_file.name, None)
+                with (test_file.parent / "results.json").open(
+                    "w", encoding="utf-8"
+                ) as handle:
+                    json.dump(stats, handle, ensure_ascii=False, indent=2)
+        except OSError as exc:
+            messagebox.showerror("Ошибка", str(exc))
+        self._refresh_saved_tests()
 
     def _load_test_stats(self, output_dir: Path) -> dict[str, dict]:
         stats_file = output_dir / "results.json"
@@ -798,20 +837,29 @@ class TestApp(tk.Tk):
         )
 
         for idx, option in enumerate(options):
-            frame = ttk.Frame(self.question_container)
-            frame.pack(fill=tk.X, pady=2)
-            rb = ttk.Radiobutton(
+            frame = tk.Frame(
+                self.question_container,
+                bg="white",
+                highlightthickness=1,
+                highlightbackground="#e0e0e0",
+                padx=8,
+                pady=6,
+            )
+            frame.pack(fill=tk.X, pady=4)
+            rb = tk.Radiobutton(
                 frame,
                 text=f"{idx + 1}.",
                 variable=selected_var,
                 value=idx,
                 command=lambda: self._save_answer(selected_var.get(), options),
+                bg="white",
+                anchor="w",
             )
             if self.session.finished:
-                rb.state(["disabled"])
+                rb.config(state=tk.DISABLED)
             rb.pack(anchor=tk.W)
             self._render_content_block(frame, option.content)
-        self._center_nav_on_current()
+        self._render_question_nav()
 
     def _render_content_block(self, parent, content: list[ContentItem]) -> None:
         text_font = tkfont.Font(family="Segoe UI", size=10)
@@ -824,7 +872,7 @@ class TestApp(tk.Tk):
             height=1,
             borderwidth=0,
             highlightthickness=0,
-            bg="#f5f5f5",
+            bg=parent.cget("bg"),
             font=text_font,
         )
         text.pack(fill=tk.X, anchor=tk.W)
