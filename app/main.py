@@ -1,5 +1,4 @@
 import json
-import os
 import random
 import shutil
 import subprocess
@@ -37,14 +36,16 @@ class TestSession:
     questions: list[TestQuestion]
     answers: dict[int, int] = field(default_factory=dict)
     current_index: int = 0
+    option_orders: dict[int, list[TestOption]] = field(default_factory=dict)
 
 
 class WordTestExtractor:
-    def __init__(self, file_path: Path, symbol: str, include_small_tables: bool):
+    def __init__(self, file_path: Path, symbol: str, log_small_tables: bool):
         self.file_path = file_path
         self.symbol = symbol
-        self.include_small_tables = include_small_tables
+        self.log_small_tables = log_small_tables
         self.extract_dir = Path(tempfile.mkdtemp(prefix="word_test_images_"))
+        self.logs: list[str] = []
 
     def cleanup(self) -> None:
         shutil.rmtree(self.extract_dir, ignore_errors=True)
@@ -96,17 +97,26 @@ class WordTestExtractor:
 
     def _content_from_cell(self, cell, image_map: dict[str, Path]) -> list[ContentItem]:
         items: list[ContentItem] = []
+        text_buffer: list[str] = []
+
+        def flush_text() -> None:
+            if text_buffer:
+                items.append(ContentItem("text", "".join(text_buffer)))
+                text_buffer.clear()
+
         for block in cell._tc.iterchildren():
             if block.tag.endswith("}p"):
                 for run in block.iter():
                     if run.tag.endswith("}t") and run.text:
-                        items.append(ContentItem("text", run.text))
+                        text_buffer.append(run.text)
                     if run.tag.endswith("}blip"):
+                        flush_text()
                         embed = run.get(
                             "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
                         )
                         if embed and embed in image_map:
                             items.append(ContentItem("image", str(image_map[embed])))
+                flush_text()
         if not items:
             items.append(ContentItem("text", ""))
         return items
@@ -123,13 +133,21 @@ class WordTestExtractor:
         image_map = self._extract_images(doc)
         tests: list[TestQuestion] = []
 
-        for table in doc.tables:
-            if len(table.rows) < 3 and not self.include_small_tables:
+        for table_index, table in enumerate(doc.tables, start=1):
+            if len(table.rows) < 3:
+                if self.log_small_tables:
+                    self.logs.append(
+                        f"Таблица {table_index}: меньше 3 строк, пропущена."
+                    )
                 continue
             text_rows = sum(
                 1 for row in table.rows if self._row_has_text(row, image_map)
             )
-            if text_rows < 3 and not self.include_small_tables:
+            if text_rows < 3:
+                if self.log_small_tables:
+                    self.logs.append(
+                        f"Таблица {table_index}: меньше 3 строк с текстом, пропущена."
+                    )
                 continue
 
             row_contents: list[list[ContentItem]] = []
@@ -147,24 +165,36 @@ class WordTestExtractor:
             options: list[TestOption] = []
             has_marked_correct = False
 
+            def normalize_symbol(option_items: list[ContentItem]) -> bool:
+                for item in option_items:
+                    if item.item_type == "text" and item.value.strip().startswith(
+                        self.symbol
+                    ):
+                        item.value = item.value.strip()[len(self.symbol) :].lstrip()
+                        return True
+                return False
+
+            options.append(TestOption(correct_default, False))
+
             for option_items in row_contents[2:]:
                 is_correct = False
                 if self.symbol:
-                    for item in option_items:
-                        if item.item_type == "text" and item.value.strip().startswith(
-                            self.symbol
-                        ):
-                            is_correct = True
-                            has_marked_correct = True
-                            item.value = item.value.strip()[len(self.symbol) :].lstrip()
-                            break
+                    is_correct = normalize_symbol(option_items)
+                    if is_correct:
+                        has_marked_correct = True
                 options.append(TestOption(option_items, is_correct))
 
-            if has_marked_correct:
-                for option in options:
-                    if option.is_correct:
-                        correct_default = option.content
-                        break
+            if self.symbol and normalize_symbol(correct_default):
+                has_marked_correct = True
+                options[0].is_correct = True
+
+            if not has_marked_correct:
+                options[0].is_correct = True
+
+            for option in options:
+                if option.is_correct:
+                    correct_default = option.content
+                    break
 
             tests.append(TestQuestion(question, correct_default, options))
 
@@ -177,10 +207,11 @@ class TestApp(tk.Tk):
         self.title("Word Test Extractor")
         self.geometry("1024x720")
         self.minsize(900, 600)
+        self._apply_style()
 
         self.selected_file = tk.StringVar()
         self.symbol = tk.StringVar()
-        self.include_small_tables = tk.BooleanVar(value=False)
+        self.log_small_tables = tk.BooleanVar(value=False)
         self.max_options = tk.IntVar(value=4)
 
         self.question_count = tk.IntVar(value=0)
@@ -231,8 +262,8 @@ class TestApp(tk.Tk):
         )
         ttk.Checkbutton(
             settings_frame,
-            text="Показывать таблицы меньше 3 строк",
-            variable=self.include_small_tables,
+            text="Показывать таблицы меньше 3 строк в логах",
+            variable=self.log_small_tables,
         ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
 
         ttk.Button(
@@ -241,6 +272,21 @@ class TestApp(tk.Tk):
 
         self.extract_status = ttk.Label(self.extract_frame, text="")
         self.extract_status.pack(anchor=tk.W)
+
+        results_frame = ttk.LabelFrame(
+            self.extract_frame, text="Сохранённые тесты", padding=10
+        )
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        self.extracted_list = tk.Listbox(results_frame, height=6)
+        self.extracted_list.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
+        ttk.Button(
+            results_frame, text="Обновить список", command=self._refresh_saved_tests
+        ).pack(side=tk.RIGHT, padx=5)
+
+        log_frame = ttk.LabelFrame(self.extract_frame, text="Логи", padding=10)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        self.log_text = tk.Text(log_frame, height=6, state=tk.DISABLED, wrap=tk.WORD)
+        self.log_text.pack(fill=tk.BOTH, expand=True)
 
     def _build_test_ui(self) -> None:
         settings_frame = ttk.LabelFrame(
@@ -324,6 +370,15 @@ class TestApp(tk.Tk):
         self.report_label = ttk.Label(self.test_frame, text="", foreground="blue")
         self.report_label.pack(anchor=tk.W, pady=5)
 
+    def _apply_style(self) -> None:
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("TFrame", background="#f5f5f5")
+        style.configure("TLabel", background="#f5f5f5", font=("Segoe UI", 10))
+        style.configure("TButton", padding=6, font=("Segoe UI", 10))
+        style.configure("TLabelframe", background="#f5f5f5", font=("Segoe UI", 10, "bold"))
+        style.configure("TLabelframe.Label", background="#f5f5f5")
+
     def _choose_file(self) -> None:
         file_path = filedialog.askopenfilename(
             filetypes=[("Word files", "*.doc *.docx")]
@@ -339,7 +394,7 @@ class TestApp(tk.Tk):
         extractor = WordTestExtractor(
             Path(path),
             self.symbol.get().strip(),
-            self.include_small_tables.get(),
+            self.log_small_tables.get(),
         )
         try:
             tests = extractor.extract()
@@ -359,7 +414,29 @@ class TestApp(tk.Tk):
         self.extract_status.config(
             text=f"Извлечено тестов: {len(tests)}. Сохранено: {output_path}"
         )
+        self._refresh_saved_tests()
+        self._update_logs(extractor.logs)
         extractor.cleanup()
+
+    def _refresh_saved_tests(self) -> None:
+        self.extracted_list.delete(0, tk.END)
+        selected = self.selected_file.get()
+        if not selected:
+            return
+        output_dir = Path(selected).parent / "extracted_tests"
+        if not output_dir.exists():
+            return
+        for test_file in sorted(output_dir.glob("*.json")):
+            self.extracted_list.insert(tk.END, test_file.name)
+
+    def _update_logs(self, logs: list[str]) -> None:
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete("1.0", tk.END)
+        if logs:
+            self.log_text.insert(tk.END, "\n".join(logs))
+        else:
+            self.log_text.insert(tk.END, "Нет предупреждений.")
+        self.log_text.config(state=tk.DISABLED)
 
     def _serialize_tests(self, tests: list[TestQuestion]) -> list[dict]:
         def serialize_content(content: list[ContentItem]) -> list[dict]:
@@ -458,9 +535,15 @@ class TestApp(tk.Tk):
         self._render_content_block(self.question_container, question.question)
         ttk.Separator(self.question_container, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
 
-        options = list(question.options)
         if self.random_options.get():
-            random.shuffle(options)
+            options = self.session.option_orders.get(self.session.current_index)
+            if not options:
+                options = list(question.options)
+                random.shuffle(options)
+                self.session.option_orders[self.session.current_index] = options
+        else:
+            options = list(question.options)
+
         max_opts = max(1, self.max_options.get())
         options = options[:max_opts]
 
