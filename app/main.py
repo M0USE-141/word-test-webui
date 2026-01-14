@@ -37,6 +37,7 @@ class TestSession:
     answers: dict[int, int] = field(default_factory=dict)
     current_index: int = 0
     option_orders: dict[int, list[TestOption]] = field(default_factory=dict)
+    finished: bool = False
 
 
 class WordTestExtractor:
@@ -222,6 +223,7 @@ class TestApp(tk.Tk):
         self.symbol = tk.StringVar()
         self.log_small_tables = tk.BooleanVar(value=False)
         self.max_options = tk.IntVar(value=4)
+        self.selected_test_file: Path | None = None
 
         self.question_count = tk.IntVar(value=0)
         self.random_questions = tk.BooleanVar(value=False)
@@ -236,18 +238,34 @@ class TestApp(tk.Tk):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        self.container = ttk.Frame(self)
+        self.container.pack(fill=tk.BOTH, expand=True)
 
-        self.extract_frame = ttk.Frame(notebook, padding=10)
-        self.test_frame = ttk.Frame(notebook, padding=10)
-        notebook.add(self.extract_frame, text="Извлечение")
-        notebook.add(self.test_frame, text="Тестирование")
+        self.extract_frame = ttk.Frame(self.container, padding=10)
+        self.settings_frame = ttk.Frame(self.container, padding=10)
+        self.test_frame = ttk.Frame(self.container, padding=10)
+
+        for frame in (self.extract_frame, self.settings_frame, self.test_frame):
+            frame.grid(row=0, column=0, sticky="nsew")
+        self.container.rowconfigure(0, weight=1)
+        self.container.columnconfigure(0, weight=1)
 
         self._build_extract_ui()
+        self._build_settings_ui()
         self._build_test_ui()
+        self._show_frame(self.extract_frame)
+        self._refresh_saved_tests()
+
+    def _show_frame(self, frame: ttk.Frame) -> None:
+        frame.tkraise()
 
     def _build_extract_ui(self) -> None:
+        header = ttk.Label(
+            self.extract_frame,
+            text="Главное меню",
+            font=("Segoe UI", 16, "bold"),
+        )
+        header.pack(anchor=tk.W, pady=5)
         file_frame = ttk.LabelFrame(self.extract_frame, text="Файл Word", padding=10)
         file_frame.pack(fill=tk.X, pady=5)
 
@@ -286,20 +304,47 @@ class TestApp(tk.Tk):
             self.extract_frame, text="Сохранённые тесты", padding=10
         )
         results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        self.extracted_list = tk.Listbox(results_frame, height=6)
-        self.extracted_list.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
+        self.cards_canvas = tk.Canvas(results_frame, highlightthickness=0, bg="#f5f5f5")
+        self.cards_scroll = ttk.Scrollbar(
+            results_frame, orient=tk.VERTICAL, command=self.cards_canvas.yview
+        )
+        self.cards_canvas.configure(yscrollcommand=self.cards_scroll.set)
+        self.cards_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.cards_canvas.pack(fill=tk.BOTH, expand=True)
+        self.cards_container = tk.Frame(self.cards_canvas, bg="#f5f5f5")
+        self.cards_canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
+        self.cards_container.bind(
+            "<Configure>",
+            lambda event: self.cards_canvas.configure(
+                scrollregion=self.cards_canvas.bbox("all")
+            ),
+        )
         ttk.Button(
-            results_frame, text="Обновить список", command=self._refresh_saved_tests
-        ).pack(side=tk.RIGHT, padx=5)
+            self.extract_frame, text="Обновить список", command=self._refresh_saved_tests
+        ).pack(anchor=tk.E, pady=5)
 
         log_frame = ttk.LabelFrame(self.extract_frame, text="Логи", padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.log_text = tk.Text(log_frame, height=6, state=tk.DISABLED, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
-    def _build_test_ui(self) -> None:
+    def _build_settings_ui(self) -> None:
+        header = ttk.Label(
+            self.settings_frame,
+            text="Настройки теста",
+            font=("Segoe UI", 16, "bold"),
+        )
+        header.pack(anchor=tk.W, pady=5)
+        info_frame = ttk.Frame(self.settings_frame)
+        info_frame.pack(fill=tk.X, pady=5)
+        self.selected_test_label = ttk.Label(info_frame, text="Тест не выбран")
+        self.selected_test_label.pack(side=tk.LEFT)
+        ttk.Button(
+            info_frame, text="Назад в меню", command=self._go_to_main_menu
+        ).pack(side=tk.RIGHT)
+
         settings_frame = ttk.LabelFrame(
-            self.test_frame, text="Настройки перед тестированием", padding=10
+            self.settings_frame, text="Настройки перед тестированием", padding=10
         )
         settings_frame.pack(fill=tk.X, pady=5)
 
@@ -338,8 +383,16 @@ class TestApp(tk.Tk):
         )
 
         ttk.Button(
-            self.test_frame, text="Начать тестирование", command=self._start_test
-        ).pack(pady=5)
+            self.settings_frame, text="Начать тестирование", command=self._start_test
+        ).pack(pady=10)
+
+    def _build_test_ui(self) -> None:
+        header = ttk.Label(
+            self.test_frame,
+            text="Тестирование",
+            font=("Segoe UI", 16, "bold"),
+        )
+        header.pack(anchor=tk.W, pady=5)
 
         self.question_nav_frame = ttk.Frame(self.test_frame)
         self.question_nav_frame.pack(fill=tk.X, pady=5)
@@ -436,15 +489,102 @@ class TestApp(tk.Tk):
         extractor.cleanup()
 
     def _refresh_saved_tests(self) -> None:
-        self.extracted_list.delete(0, tk.END)
         selected = self.selected_file.get()
-        if not selected:
-            return
-        output_dir = Path(selected).parent / "extracted_tests"
+        base_dir = Path(selected).parent if selected else Path.cwd()
+        output_dir = base_dir / "extracted_tests"
+        for widget in self.cards_container.winfo_children():
+            widget.destroy()
         if not output_dir.exists():
             return
+        stats = self._load_test_stats(output_dir)
         for test_file in sorted(output_dir.glob("*.json")):
-            self.extracted_list.insert(tk.END, test_file.name)
+            if test_file.name == "results.json":
+                continue
+            questions = self._count_questions(test_file)
+            test_stats = stats.get(test_file.name, {})
+            last = test_stats.get("last_score")
+            best = test_stats.get("best_score")
+            attempts = test_stats.get("attempts", 0)
+            stats_line = "Нет попыток"
+            if last is not None and best is not None:
+                stats_line = (
+                    f"Последний результат: {last}/{questions} | "
+                    f"Лучший результат: {best}/{questions} | "
+                    f"Попыток: {attempts}"
+                )
+            self._create_test_card(test_file, questions, stats_line)
+
+    def _create_test_card(self, test_file: Path, questions: int, stats_line: str) -> None:
+        card = tk.Frame(
+            self.cards_container,
+            bg="white",
+            highlightthickness=1,
+            highlightbackground="#e0e0e0",
+            padx=12,
+            pady=10,
+        )
+        card.pack(fill=tk.X, pady=6)
+        title = tk.Label(
+            card,
+            text=test_file.stem,
+            font=("Segoe UI", 12, "bold"),
+            bg="white",
+        )
+        title.pack(anchor=tk.W)
+        info = tk.Label(
+            card,
+            text=f"Вопросов: {questions}",
+            font=("Segoe UI", 10),
+            bg="white",
+        )
+        info.pack(anchor=tk.W, pady=(2, 0))
+        stats = tk.Label(
+            card,
+            text=stats_line,
+            font=("Segoe UI", 9),
+            fg="#666666",
+            bg="white",
+        )
+        stats.pack(anchor=tk.W, pady=(2, 0))
+
+        def on_click(_event: tk.Event) -> None:
+            self._select_test(test_file)
+
+        card.bind("<Button-1>", on_click)
+        title.bind("<Button-1>", on_click)
+        info.bind("<Button-1>", on_click)
+        stats.bind("<Button-1>", on_click)
+
+    def _select_test(self, test_file: Path) -> None:
+        self.selected_test_file = test_file
+        self.selected_test_label.config(text=f"Выбран тест: {test_file.name}")
+        self._show_frame(self.settings_frame)
+
+    def _load_test_stats(self, output_dir: Path) -> dict[str, dict]:
+        stats_file = output_dir / "results.json"
+        if not stats_file.exists():
+            return {}
+        with stats_file.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def _save_test_stats(self, test_file: Path, correct: int, total: int) -> None:
+        output_dir = test_file.parent
+        stats = self._load_test_stats(output_dir)
+        record = stats.get(test_file.name, {})
+        attempts = record.get("attempts", 0) + 1
+        best_score = max(record.get("best_score", 0), correct)
+        stats[test_file.name] = {
+            "last_score": correct,
+            "best_score": best_score,
+            "attempts": attempts,
+        }
+        with (output_dir / "results.json").open("w", encoding="utf-8") as handle:
+            json.dump(stats, handle, ensure_ascii=False, indent=2)
+
+    def _count_questions(self, test_file: Path) -> int:
+        with test_file.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return len(data)
 
     def _update_logs(self, logs: list[str]) -> None:
         self.log_text.config(state=tk.NORMAL)
@@ -475,8 +615,12 @@ class TestApp(tk.Tk):
         ]
 
     def _start_test(self) -> None:
+        if not self.selected_test_file:
+            messagebox.showwarning("Ошибка", "Выберите тест из списка.")
+            return
+        self.tests = self._load_tests_from_file(self.selected_test_file)
         if not self.tests:
-            messagebox.showwarning("Ошибка", "Сначала извлеките тесты.")
+            messagebox.showwarning("Ошибка", "Тест пустой или не найден.")
             return
         questions = list(self.tests)
         if self.only_unanswered.get():
@@ -492,6 +636,24 @@ class TestApp(tk.Tk):
         self.report_label.config(text="")
         self._render_question_nav()
         self._show_question()
+        self._show_frame(self.test_frame)
+
+    def _load_tests_from_file(self, test_file: Path) -> list[TestQuestion]:
+        with test_file.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        tests: list[TestQuestion] = []
+        for entry in data:
+            question = [ContentItem(item["type"], item["value"]) for item in entry["question"]]
+            correct = [ContentItem(item["type"], item["value"]) for item in entry["correct"]]
+            options = [
+                TestOption(
+                    [ContentItem(item["type"], item["value"]) for item in option["content"]],
+                    option["is_correct"],
+                )
+                for option in entry["options"]
+            ]
+            tests.append(TestQuestion(question, correct, options))
+        return tests
 
     def _load_progress(self) -> set[int]:
         progress_file = Path("progress.json")
@@ -591,6 +753,8 @@ class TestApp(tk.Tk):
                 value=idx,
                 command=lambda: self._save_answer(selected_var.get(), options),
             )
+            if self.session.finished:
+                rb.state(["disabled"])
             rb.pack(anchor=tk.W)
             self._render_content_block(frame, option.content)
 
@@ -608,6 +772,8 @@ class TestApp(tk.Tk):
 
     def _save_answer(self, selected_idx: int, options: list[TestOption]) -> None:
         if not self.session:
+            return
+        if self.session.finished:
             return
         self.session.answers[self.session.current_index] = selected_idx
         self._save_progress()
@@ -640,6 +806,9 @@ class TestApp(tk.Tk):
     def _finish_test(self) -> None:
         if not self.session:
             return
+        if self.session.finished:
+            return
+        self.session.finished = True
         total = len(self.session.questions)
         correct = 0
         answered = 0
@@ -656,15 +825,21 @@ class TestApp(tk.Tk):
             text=f"Результат: {correct}/{total} правильных, "
             f"отвечено {answered}, {percent:.1f}%"
         )
+        if self.selected_test_file:
+            self._save_test_stats(self.selected_test_file, correct, total)
+            self._refresh_saved_tests()
         if not self.show_answers_immediately.get():
             messagebox.showinfo(
                 "Ответы",
                 f"Правильных ответов: {correct} из {total} ({percent:.1f}%)",
             )
+        self._show_question()
 
     def _exit_test(self) -> None:
-        if messagebox.askyesno("Выход", "Выйти из теста?"):
-            self.destroy()
+        self._go_to_main_menu()
+
+    def _go_to_main_menu(self) -> None:
+        self._show_frame(self.extract_frame)
 
 
 if __name__ == "__main__":
