@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import tkinter as tk
+import uuid
 from tkinter import font as tkfont
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -225,6 +226,7 @@ class TestSession:
     option_orders: dict[int, list[TestOption]] = field(default_factory=dict)
     finished: bool = False
     answer_status: dict[int, str] = field(default_factory=dict)
+    test_id: str | None = None
 
 
 class WordTestExtractor:
@@ -416,6 +418,8 @@ class TestApp(tk.Tk):
         self.log_small_tables = tk.BooleanVar(value=False)
         self.max_options = tk.IntVar(value=4)
         self.selected_test_file: Path | None = None
+        self.current_test_id: str | None = None
+        self.current_test_title: str | None = None
 
         self.question_count = tk.IntVar(value=0)
         self.random_questions = tk.BooleanVar(value=False)
@@ -732,9 +736,10 @@ class TestApp(tk.Tk):
             messagebox.showwarning(self._t("error"), self._t("select_word"))
             return
         base_name = Path(path).stem
+        test_id = uuid.uuid4().hex
         output_dir = self.app_dir / "extracted_tests"
         output_dir.mkdir(exist_ok=True)
-        image_dir = output_dir / f"{base_name}_images"
+        image_dir = output_dir / f"{test_id}_images"
         extractor = WordTestExtractor(
             Path(path),
             self.symbol.get().strip(),
@@ -749,12 +754,20 @@ class TestApp(tk.Tk):
             return
 
         self.tests = tests
-        base_name = Path(path).stem
         output_dir = self.app_dir / "extracted_tests"
         output_dir.mkdir(exist_ok=True)
-        output_path = output_dir / f"{base_name}.json"
+        output_path = output_dir / f"{test_id}.json"
         with output_path.open("w", encoding="utf-8") as handle:
-            json.dump(self._serialize_tests(tests), handle, ensure_ascii=False, indent=2)
+            json.dump(
+                {
+                    "id": test_id,
+                    "title": base_name,
+                    "tests": self._serialize_tests(tests),
+                },
+                handle,
+                ensure_ascii=False,
+                indent=2,
+            )
 
         self.extract_status.config(
             text=self._t("extracted", count=len(tests), path=output_path)
@@ -773,8 +786,11 @@ class TestApp(tk.Tk):
         for test_file in sorted(output_dir.glob("*.json")):
             if test_file.name == "results.json":
                 continue
-            questions = self._count_questions(test_file)
-            test_stats = stats.get(test_file.name, {})
+            metadata = self._load_test_metadata(test_file)
+            questions = metadata["count"]
+            test_id = metadata["id"]
+            title = metadata["title"]
+            test_stats = stats.get(test_id, {})
             best = test_stats.get("best_score")
             attempts = test_stats.get("attempts", 0)
             correct_total = best or 0
@@ -786,10 +802,17 @@ class TestApp(tk.Tk):
                 percent=learned_percent,
                 attempts=attempts,
             )
-            self._create_test_card(test_file, questions, stats_line, learned_percent)
+            self._create_test_card(
+                test_file, title, questions, stats_line, learned_percent
+            )
 
     def _create_test_card(
-        self, test_file: Path, questions: int, stats_line: str, learned_percent: float
+        self,
+        test_file: Path,
+        title: str,
+        questions: int,
+        stats_line: str,
+        learned_percent: float,
     ) -> None:
         background = self._progress_color(learned_percent)
         card = tk.Frame(
@@ -803,7 +826,7 @@ class TestApp(tk.Tk):
         card.pack(fill=tk.X, pady=6)
         title = tk.Label(
             card,
-            text=test_file.stem,
+            text=title,
             font=("Segoe UI", 12, "bold"),
             bg=background,
         )
@@ -853,7 +876,10 @@ class TestApp(tk.Tk):
 
     def _select_test(self, test_file: Path) -> None:
         self.selected_test_file = test_file
-        self.selected_test_label.config(text=self._t("selected_test", name=test_file.name))
+        metadata = self._load_test_metadata(test_file)
+        self.selected_test_label.config(
+            text=self._t("selected_test", name=metadata["title"])
+        )
         self._show_frame(self.settings_frame)
 
     def _open_test_menu(self, test_file: Path) -> None:
@@ -863,7 +889,8 @@ class TestApp(tk.Tk):
         menu.grab_set()
 
         ttk.Label(menu, text=self._t("rename_prompt")).pack(anchor=tk.W, padx=10, pady=5)
-        name_var = tk.StringVar(value=test_file.stem)
+        metadata = self._load_test_metadata(test_file)
+        name_var = tk.StringVar(value=metadata["title"])
         ttk.Entry(menu, textvariable=name_var, width=40).pack(padx=10, pady=5)
 
         actions = ttk.Frame(menu)
@@ -884,27 +911,18 @@ class TestApp(tk.Tk):
         if not clean_name:
             messagebox.showerror(self._t("error"), self._t("rename_empty"))
             return
-        new_path = test_file.with_name(f"{clean_name}.json")
-        if new_path.exists() and new_path != test_file:
-            messagebox.showerror(self._t("error"), self._t("rename_exists"))
-            return
         try:
-            test_file.rename(new_path)
-            old_images = test_file.parent / f"{test_file.stem}_images"
-            new_images = test_file.parent / f"{clean_name}_images"
-            if old_images.exists() and old_images != new_images:
-                old_images.rename(new_images)
-            stats = self._load_test_stats(test_file.parent)
-            if test_file.name in stats:
-                stats[new_path.name] = stats.pop(test_file.name)
-                with (test_file.parent / "results.json").open(
-                    "w", encoding="utf-8"
-                ) as handle:
-                    json.dump(stats, handle, ensure_ascii=False, indent=2)
+            with test_file.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if isinstance(data, list):
+                data = {"id": test_file.stem, "title": clean_name, "tests": data}
+            else:
+                data["title"] = clean_name
+            with test_file.open("w", encoding="utf-8") as handle:
+                json.dump(data, handle, ensure_ascii=False, indent=2)
             if self.selected_test_file == test_file:
-                self.selected_test_file = new_path
                 self.selected_test_label.config(
-                    text=self._t("selected_test", name=new_path.name)
+                    text=self._t("selected_test", name=clean_name)
                 )
         except OSError as exc:
             messagebox.showerror(self._t("error"), str(exc))
@@ -917,18 +935,19 @@ class TestApp(tk.Tk):
         self._delete_test(test_file)
 
     def _delete_test(self, test_file: Path) -> None:
+        metadata = self._load_test_metadata(test_file)
         if not messagebox.askyesno(
             self._t("delete_title"),
-            self._t("delete_confirm", name=test_file.name),
+            self._t("delete_confirm", name=metadata["title"]),
         ):
             return
         try:
             test_file.unlink(missing_ok=True)
-            images_dir = test_file.parent / f"{test_file.stem}_images"
+            images_dir = test_file.parent / f"{metadata['id']}_images"
             shutil.rmtree(images_dir, ignore_errors=True)
             stats = self._load_test_stats(test_file.parent)
-            if test_file.name in stats:
-                stats.pop(test_file.name, None)
+            if metadata["id"] in stats:
+                stats.pop(metadata["id"], None)
                 with (test_file.parent / "results.json").open(
                     "w", encoding="utf-8"
                 ) as handle:
@@ -947,10 +966,11 @@ class TestApp(tk.Tk):
     def _save_test_stats(self, test_file: Path, correct: int, total: int) -> None:
         output_dir = test_file.parent
         stats = self._load_test_stats(output_dir)
-        record = stats.get(test_file.name, {})
+        test_id = self.current_test_id or test_file.stem
+        record = stats.get(test_id, {})
         attempts = record.get("attempts", 0) + 1
         best_score = max(record.get("best_score", 0), correct)
-        stats[test_file.name] = {
+        stats[test_id] = {
             "last_score": correct,
             "best_score": best_score,
             "attempts": attempts,
@@ -961,7 +981,24 @@ class TestApp(tk.Tk):
     def _count_questions(self, test_file: Path) -> int:
         with test_file.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-        return len(data)
+        if isinstance(data, list):
+            return len(data)
+        return len(data.get("tests", []))
+
+    def _load_test_metadata(self, test_file: Path) -> dict[str, object]:
+        with test_file.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, list):
+            return {
+                "id": test_file.stem,
+                "title": test_file.stem,
+                "count": len(data),
+            }
+        return {
+            "id": data.get("id", test_file.stem),
+            "title": data.get("title", test_file.stem),
+            "count": len(data.get("tests", [])),
+        }
 
     def _update_logs(self, logs: list[str]) -> None:
         self.log_text.config(state=tk.NORMAL)
@@ -1019,8 +1056,16 @@ class TestApp(tk.Tk):
     def _load_tests_from_file(self, test_file: Path) -> list[TestQuestion]:
         with test_file.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
+        if isinstance(data, list):
+            tests_data = data
+            test_id = test_file.stem
+            title = test_file.stem
+        else:
+            tests_data = data.get("tests", [])
+            test_id = data.get("id", test_file.stem)
+            title = data.get("title", test_file.stem)
         tests: list[TestQuestion] = []
-        for entry in data:
+        for entry in tests_data:
             question = [ContentItem(item["type"], item["value"]) for item in entry["question"]]
             correct = [ContentItem(item["type"], item["value"]) for item in entry["correct"]]
             options = [
@@ -1031,6 +1076,8 @@ class TestApp(tk.Tk):
                 for option in entry["options"]
             ]
             tests.append(TestQuestion(question, correct, options))
+        self.current_test_id = test_id
+        self.current_test_title = title
         return tests
 
     def _load_progress(self) -> set[int]:
