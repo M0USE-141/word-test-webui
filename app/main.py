@@ -247,6 +247,9 @@ class WordTestExtractor:
         return
 
     def _convert_doc_to_docx(self, doc_path: Path) -> Path:
+        doc_path = doc_path.resolve()
+        if not doc_path.exists():
+            raise RuntimeError(f"Файл не найден: {doc_path}")
         converted = doc_path.with_suffix(".docx")
         if converted.exists():
             return converted
@@ -324,6 +327,8 @@ class WordTestExtractor:
         for cell in row.cells:
             for item in self._content_from_cell(cell, image_map):
                 if item.item_type == "text" and item.value.strip():
+                    return True
+                if item.item_type == "image":
                     return True
         return False
 
