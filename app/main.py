@@ -253,10 +253,16 @@ class WordTestExtractor:
         converted = doc_path.with_suffix(".docx")
         if converted.exists():
             return converted
+        soffice_path = shutil.which("soffice") or shutil.which("soffice.exe")
+        if not soffice_path:
+            raise RuntimeError(
+                "Не удалось найти soffice для конвертации .doc. "
+                "Установите LibreOffice и добавьте soffice в PATH."
+            )
         temp_out = Path(tempfile.mkdtemp(prefix="word_test_docx_"))
         result = subprocess.run(
             [
-                "soffice",
+                soffice_path,
                 "--headless",
                 "--convert-to",
                 "docx",
@@ -309,6 +315,11 @@ class WordTestExtractor:
         for block in cell._tc.iterchildren():
             if block.tag.endswith("}p"):
                 for run in block.iter():
+                    if run.tag.endswith("}oMath") or run.tag.endswith("}oMathPara"):
+                        flush_text()
+                        math_text = "".join(run.itertext()).strip()
+                        items.append(ContentItem("text", math_text or "[formula]"))
+                        continue
                     if run.tag.endswith("}t") and run.text:
                         text_buffer.append(run.text)
                     if run.tag.endswith("}blip"):
