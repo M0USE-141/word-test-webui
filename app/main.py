@@ -866,10 +866,16 @@ class TestApp(tk.Tk):
         line_height = max(1, text_font.metrics("linespace"))
         max_image_height = int(line_height * 1.5)
         max_used_image_height = 0
-        try:
-            background = parent.cget("bg")
-        except tk.TclError:
-            background = parent.cget("background")
+        background = "#f5f5f5"
+        if isinstance(parent, tk.Widget):
+            try:
+                background = parent.cget("bg")
+            except tk.TclError:
+                try:
+                    background = parent.cget("background")
+                except tk.TclError:
+                    style = ttk.Style()
+                    background = style.lookup(parent.winfo_class(), "background") or background
         text = tk.Text(
             parent,
             wrap=tk.WORD,
