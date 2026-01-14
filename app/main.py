@@ -866,13 +866,17 @@ class TestApp(tk.Tk):
         line_height = max(1, text_font.metrics("linespace"))
         max_image_height = int(line_height * 1.5)
         max_used_image_height = 0
+        try:
+            background = parent.cget("bg")
+        except tk.TclError:
+            background = parent.cget("background")
         text = tk.Text(
             parent,
             wrap=tk.WORD,
             height=1,
             borderwidth=0,
             highlightthickness=0,
-            bg=parent.cget("bg"),
+            bg=background,
             font=text_font,
         )
         text.pack(fill=tk.X, anchor=tk.W)
