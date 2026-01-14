@@ -1,4 +1,5 @@
 import json
+import math
 import random
 import shutil
 import subprocess
@@ -816,6 +817,7 @@ class TestApp(tk.Tk):
         text_font = tkfont.Font(family="Segoe UI", size=10)
         line_height = max(1, text_font.metrics("linespace"))
         max_image_height = int(line_height * 1.5)
+        max_used_image_height = 0
         text = tk.Text(
             parent,
             wrap=tk.WORD,
@@ -836,13 +838,15 @@ class TestApp(tk.Tk):
                     ratio = max_image_height / image.height
                     width = max(1, int(image.width * ratio))
                     image = image.resize((width, max_image_height), Image.LANCZOS)
+                max_used_image_height = max(max_used_image_height, image.height)
                 photo = ImageTk.PhotoImage(image)
                 self.image_cache.append(photo)
                 text.image_create(tk.END, image=photo)
             text.insert(tk.END, " ")
         text.update_idletasks()
         lines = int(text.index("end-1c").split(".")[0])
-        text.configure(height=max(1, lines))
+        image_lines = math.ceil(max_used_image_height / line_height) if max_used_image_height else 1
+        text.configure(height=max(1, lines, image_lines + 1))
         text.configure(state=tk.DISABLED)
 
     def _save_answer(self, selected_idx: int, options: list[TestOption]) -> None:
