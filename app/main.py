@@ -14,6 +14,171 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 from docx import Document
 
+TRANSLATIONS = {
+    "ru": {
+        "app_title": "Word Test Extractor",
+        "main_menu": "Главное меню",
+        "import_tests": "Импортировать тесты",
+        "saved_tests": "Сохранённые тесты",
+        "refresh_list": "Обновить список",
+        "import_title": "Импорт тестов",
+        "back_to_menu": "Назад в меню",
+        "word_file": "Файл Word",
+        "choose": "Выбрать",
+        "extract_settings": "Настройки извлечения",
+        "correct_symbol": "Спец. символ для правильного ответа:",
+        "small_tables_log": "Показывать таблицы меньше 3 строк в логах",
+        "extract_tests": "Извлечь тесты",
+        "logs": "Логи",
+        "test_settings_title": "Настройки теста",
+        "test_not_selected": "Тест не выбран",
+        "pretest_settings": "Настройки перед тестированием",
+        "question_count": "Количество вопросов (0 = все):",
+        "random_questions": "Случайный порядок вопросов",
+        "random_options": "Случайный порядок вариантов ответов",
+        "only_unanswered": "Только нерешённые вопросы",
+        "show_answers_immediately": "Показывать правильный ответ сразу",
+        "max_options": "Макс. вариантов ответа:",
+        "start_test": "Начать тестирование",
+        "testing": "Тестирование",
+        "prev": "Назад",
+        "next": "Дальше",
+        "finish_test": "Завершить тест",
+        "exit": "Выход",
+        "no_questions": "Нет вопросов для тестирования.",
+        "select_word": "Выберите Word файл.",
+        "select_test": "Выберите тест из списка.",
+        "empty_test": "Тест пустой или не найден.",
+        "info": "Информация",
+        "error": "Ошибка",
+        "result": "Результат: {correct}/{total} правильных, отвечено {answered}, {percent:.1f}%",
+        "answers": "Ответы",
+        "answers_count": "Правильных ответов: {correct} из {total} ({percent:.1f}%)",
+        "answer_missing": "Правильный ответ не указан.",
+        "answer_correct": "Верно!",
+        "answer_wrong": "Неверно. Правильный вариант: {index}",
+        "extracted": "Извлечено тестов: {count}. Сохранено: {path}",
+        "no_warnings": "Нет предупреждений.",
+        "questions_label": "Вопросов: {count}",
+        "stats_line": "Правильно {correct}/{total} | Изучено {percent:.1f}% | Попытки: {attempts}",
+        "no_attempts": "Нет попыток",
+        "delete": "Удалить",
+        "delete_title": "Удаление",
+        "delete_confirm": "Удалить тест {name} и все связанные файлы?",
+        "language": "Язык",
+        "question_progress": "Вопрос {current} из {total}",
+        "selected_test": "Выбран тест: {name}",
+    },
+    "uz": {
+        "app_title": "Word Test Extractor",
+        "main_menu": "Bosh menyu",
+        "import_tests": "Testlarni import qilish",
+        "saved_tests": "Saqlangan testlar",
+        "refresh_list": "Roʻyxatni yangilash",
+        "import_title": "Test importi",
+        "back_to_menu": "Menyuga qaytish",
+        "word_file": "Word fayl",
+        "choose": "Tanlash",
+        "extract_settings": "Ajratib olish sozlamalari",
+        "correct_symbol": "Toʻgʻri javob belgisi:",
+        "small_tables_log": "3 qatordan kam jadvallarni logda koʻrsatish",
+        "extract_tests": "Testlarni ajratib olish",
+        "logs": "Loglar",
+        "test_settings_title": "Test sozlamalari",
+        "test_not_selected": "Test tanlanmagan",
+        "pretest_settings": "Testdan oldingi sozlamalar",
+        "question_count": "Savollar soni (0 = hammasi):",
+        "random_questions": "Savollar tasodifiy tartibda",
+        "random_options": "Variantlar tasodifiy tartibda",
+        "only_unanswered": "Faqat yechilmagan savollar",
+        "show_answers_immediately": "Toʻgʻri javobni darhol koʻrsatish",
+        "max_options": "Variantlar maks.:",
+        "start_test": "Testni boshlash",
+        "testing": "Test",
+        "prev": "Orqaga",
+        "next": "Keyingi",
+        "finish_test": "Testni yakunlash",
+        "exit": "Chiqish",
+        "no_questions": "Test uchun savollar yoʻq.",
+        "select_word": "Word faylni tanlang.",
+        "select_test": "Roʻyxatdan testni tanlang.",
+        "empty_test": "Test bo'sh yoki topilmadi.",
+        "info": "Ma'lumot",
+        "error": "Xatolik",
+        "result": "Natija: {correct}/{total} toʻgʻri, javob berilgan {answered}, {percent:.1f}%",
+        "answers": "Javoblar",
+        "answers_count": "Toʻgʻri javoblar: {correct} / {total} ({percent:.1f}%)",
+        "answer_missing": "Toʻgʻri javob ko'rsatilmagan.",
+        "answer_correct": "Toʻgʻri!",
+        "answer_wrong": "Notoʻgʻri. Toʻgʻri variant: {index}",
+        "extracted": "Ajratildi: {count}. Saqlandi: {path}",
+        "no_warnings": "Ogohlantirishlar yoʻq.",
+        "questions_label": "Savollar: {count}",
+        "stats_line": "Toʻgʻri {correct}/{total} | Oʻrganildi {percent:.1f}% | Urinishlar: {attempts}",
+        "no_attempts": "Urinishlar yoʻq",
+        "delete": "Oʻchirish",
+        "delete_title": "Oʻchirish",
+        "delete_confirm": "{name} testini va barcha fayllarni oʻchirish?",
+        "language": "Til",
+        "question_progress": "Savol {current}/{total}",
+        "selected_test": "Tanlangan test: {name}",
+    },
+    "en": {
+        "app_title": "Word Test Extractor",
+        "main_menu": "Main Menu",
+        "import_tests": "Import Tests",
+        "saved_tests": "Saved Tests",
+        "refresh_list": "Refresh List",
+        "import_title": "Test Import",
+        "back_to_menu": "Back to Menu",
+        "word_file": "Word File",
+        "choose": "Choose",
+        "extract_settings": "Extraction Settings",
+        "correct_symbol": "Correct answer marker:",
+        "small_tables_log": "Show tables with fewer than 3 rows in logs",
+        "extract_tests": "Extract Tests",
+        "logs": "Logs",
+        "test_settings_title": "Test Settings",
+        "test_not_selected": "No test selected",
+        "pretest_settings": "Pre-test Settings",
+        "question_count": "Question count (0 = all):",
+        "random_questions": "Random question order",
+        "random_options": "Random option order",
+        "only_unanswered": "Only unanswered questions",
+        "show_answers_immediately": "Show correct answer immediately",
+        "max_options": "Max options:",
+        "start_test": "Start Test",
+        "testing": "Testing",
+        "prev": "Back",
+        "next": "Next",
+        "finish_test": "Finish Test",
+        "exit": "Exit",
+        "no_questions": "No questions for testing.",
+        "select_word": "Select a Word file.",
+        "select_test": "Select a test from the list.",
+        "empty_test": "Test is empty or not found.",
+        "info": "Information",
+        "error": "Error",
+        "result": "Result: {correct}/{total} correct, answered {answered}, {percent:.1f}%",
+        "answers": "Answers",
+        "answers_count": "Correct answers: {correct} of {total} ({percent:.1f}%)",
+        "answer_missing": "Correct answer is not specified.",
+        "answer_correct": "Correct!",
+        "answer_wrong": "Incorrect. Correct option: {index}",
+        "extracted": "Extracted: {count}. Saved: {path}",
+        "no_warnings": "No warnings.",
+        "questions_label": "Questions: {count}",
+        "stats_line": "Correct {correct}/{total} | Learned {percent:.1f}% | Attempts: {attempts}",
+        "no_attempts": "No attempts",
+        "delete": "Delete",
+        "delete_title": "Delete",
+        "delete_confirm": "Delete test {name} and all related files?",
+        "language": "Language",
+        "question_progress": "Question {current} of {total}",
+        "selected_test": "Selected test: {name}",
+    },
+}
+
 
 @dataclass
 class ContentItem:
@@ -218,13 +383,15 @@ class WordTestExtractor:
 class TestApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Word Test Extractor")
         self.geometry("1024x720")
         self.minsize(900, 600)
         self._apply_style()
 
         self.app_dir = self._get_app_data_dir()
         self.app_dir.mkdir(parents=True, exist_ok=True)
+
+        self.language = tk.StringVar(value="ru")
+        self.title(self._t("app_title"))
 
         self.selected_file = tk.StringVar()
         self.symbol = tk.StringVar()
@@ -268,18 +435,44 @@ class TestApp(tk.Tk):
     def _show_frame(self, frame: ttk.Frame) -> None:
         frame.tkraise()
 
+    def _t(self, key: str, **kwargs: object) -> str:
+        translations = TRANSLATIONS.get(self.language.get(), TRANSLATIONS["ru"])
+        template = translations.get(key, key)
+        return template.format(**kwargs)
+
+    def _rebuild_ui(self) -> None:
+        self.title(self._t("app_title"))
+        self.container.destroy()
+        self._build_ui()
+        if self.selected_test_file:
+            self.selected_test_label.config(
+                text=self._t("selected_test", name=self.selected_test_file.name)
+            )
+
     def _build_main_ui(self) -> None:
         header = ttk.Label(
             self.main_frame,
-            text="Главное меню",
+            text=self._t("main_menu"),
             font=("Segoe UI", 16, "bold"),
         )
         header.pack(anchor=tk.W, pady=5)
+        lang_frame = ttk.Frame(self.main_frame)
+        lang_frame.pack(anchor=tk.E, pady=2)
+        ttk.Label(lang_frame, text=f"{self._t('language')}:").pack(side=tk.LEFT, padx=4)
+        lang_select = ttk.Combobox(
+            lang_frame,
+            textvariable=self.language,
+            values=["ru", "uz", "en"],
+            width=8,
+            state="readonly",
+        )
+        lang_select.pack(side=tk.LEFT)
+        lang_select.bind("<<ComboboxSelected>>", lambda _e: self._rebuild_ui())
         ttk.Button(
-            self.main_frame, text="Импортировать тесты", command=self._open_import
+            self.main_frame, text=self._t("import_tests"), command=self._open_import
         ).pack(anchor=tk.E, pady=5)
         results_frame = ttk.LabelFrame(
-            self.main_frame, text="Сохранённые тесты", padding=10
+            self.main_frame, text=self._t("saved_tests"), padding=10
         )
         results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.cards_canvas = tk.Canvas(results_frame, highlightthickness=0, bg="#f7f8fa")
@@ -298,35 +491,35 @@ class TestApp(tk.Tk):
             ),
         )
         ttk.Button(
-            self.main_frame, text="Обновить список", command=self._refresh_saved_tests
+            self.main_frame, text=self._t("refresh_list"), command=self._refresh_saved_tests
         ).pack(anchor=tk.E, pady=5)
 
     def _build_import_ui(self) -> None:
         header = ttk.Label(
             self.import_frame,
-            text="Импорт тестов",
+            text=self._t("import_title"),
             font=("Segoe UI", 16, "bold"),
         )
         header.pack(anchor=tk.W, pady=5)
         ttk.Button(
-            self.import_frame, text="Назад в меню", command=self._go_to_main_menu
+            self.import_frame, text=self._t("back_to_menu"), command=self._go_to_main_menu
         ).pack(anchor=tk.E)
-        file_frame = ttk.LabelFrame(self.import_frame, text="Файл Word", padding=10)
+        file_frame = ttk.LabelFrame(self.import_frame, text=self._t("word_file"), padding=10)
         file_frame.pack(fill=tk.X, pady=5)
 
         ttk.Entry(file_frame, textvariable=self.selected_file, width=80).pack(
             side=tk.LEFT, padx=5
         )
-        ttk.Button(file_frame, text="Выбрать", command=self._choose_file).pack(
+        ttk.Button(file_frame, text=self._t("choose"), command=self._choose_file).pack(
             side=tk.LEFT, padx=5
         )
 
         settings_frame = ttk.LabelFrame(
-            self.import_frame, text="Настройки извлечения", padding=10
+            self.import_frame, text=self._t("extract_settings"), padding=10
         )
         settings_frame.pack(fill=tk.X, pady=5)
 
-        ttk.Label(settings_frame, text="Спец. символ для правильного ответа:").grid(
+        ttk.Label(settings_frame, text=self._t("correct_symbol")).grid(
             row=0, column=0, sticky=tk.W, pady=2
         )
         ttk.Entry(settings_frame, textvariable=self.symbol, width=10).grid(
@@ -334,18 +527,18 @@ class TestApp(tk.Tk):
         )
         ttk.Checkbutton(
             settings_frame,
-            text="Показывать таблицы меньше 3 строк в логах",
+            text=self._t("small_tables_log"),
             variable=self.log_small_tables,
         ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
 
         ttk.Button(
-            self.import_frame, text="Извлечь тесты", command=self._extract_tests
+            self.import_frame, text=self._t("extract_tests"), command=self._extract_tests
         ).pack(pady=10)
 
         self.extract_status = ttk.Label(self.import_frame, text="")
         self.extract_status.pack(anchor=tk.W)
 
-        log_frame = ttk.LabelFrame(self.import_frame, text="Логи", padding=10)
+        log_frame = ttk.LabelFrame(self.import_frame, text=self._t("logs"), padding=10)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.log_text = tk.Text(log_frame, height=6, state=tk.DISABLED, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
@@ -353,24 +546,24 @@ class TestApp(tk.Tk):
     def _build_settings_ui(self) -> None:
         header = ttk.Label(
             self.settings_frame,
-            text="Настройки теста",
+            text=self._t("test_settings_title"),
             font=("Segoe UI", 16, "bold"),
         )
         header.pack(anchor=tk.W, pady=5)
         info_frame = ttk.Frame(self.settings_frame)
         info_frame.pack(fill=tk.X, pady=5)
-        self.selected_test_label = ttk.Label(info_frame, text="Тест не выбран")
+        self.selected_test_label = ttk.Label(info_frame, text=self._t("test_not_selected"))
         self.selected_test_label.pack(side=tk.LEFT)
         ttk.Button(
-            info_frame, text="Назад в меню", command=self._go_to_main_menu
+            info_frame, text=self._t("back_to_menu"), command=self._go_to_main_menu
         ).pack(side=tk.RIGHT)
 
         settings_frame = ttk.LabelFrame(
-            self.settings_frame, text="Настройки перед тестированием", padding=10
+            self.settings_frame, text=self._t("pretest_settings"), padding=10
         )
         settings_frame.pack(fill=tk.X, pady=5)
 
-        ttk.Label(settings_frame, text="Количество вопросов (0 = все):").grid(
+        ttk.Label(settings_frame, text=self._t("question_count")).grid(
             row=0, column=0, sticky=tk.W, pady=2
         )
         ttk.Entry(settings_frame, textvariable=self.question_count, width=10).grid(
@@ -378,26 +571,26 @@ class TestApp(tk.Tk):
         )
         ttk.Checkbutton(
             settings_frame,
-            text="Случайный порядок вопросов",
+            text=self._t("random_questions"),
             variable=self.random_questions,
         ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
         ttk.Checkbutton(
             settings_frame,
-            text="Случайный порядок вариантов ответов",
+            text=self._t("random_options"),
             variable=self.random_options,
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=2)
         ttk.Checkbutton(
             settings_frame,
-            text="Только нерешённые вопросы",
+            text=self._t("only_unanswered"),
             variable=self.only_unanswered,
         ).grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=2)
         ttk.Checkbutton(
             settings_frame,
-            text="Показывать правильный ответ сразу",
+            text=self._t("show_answers_immediately"),
             variable=self.show_answers_immediately,
         ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=2)
 
-        ttk.Label(settings_frame, text="Макс. вариантов ответа:").grid(
+        ttk.Label(settings_frame, text=self._t("max_options")).grid(
             row=0, column=2, sticky=tk.W, padx=10, pady=2
         )
         ttk.Entry(settings_frame, textvariable=self.max_options, width=5).grid(
@@ -405,13 +598,13 @@ class TestApp(tk.Tk):
         )
 
         ttk.Button(
-            self.settings_frame, text="Начать тестирование", command=self._start_test
+            self.settings_frame, text=self._t("start_test"), command=self._start_test
         ).pack(pady=10)
 
     def _build_test_ui(self) -> None:
         header = ttk.Label(
             self.test_frame,
-            text="Тестирование",
+            text=self._t("testing"),
             font=("Segoe UI", 16, "bold"),
         )
         header.pack(anchor=tk.W, pady=5)
@@ -466,16 +659,18 @@ class TestApp(tk.Tk):
 
         nav_buttons = ttk.Frame(self.test_frame)
         nav_buttons.pack(fill=tk.X, pady=5)
-        ttk.Button(nav_buttons, text="Назад", command=self._prev_question).pack(
+        ttk.Button(nav_buttons, text=self._t("prev"), command=self._prev_question).pack(
             side=tk.LEFT, padx=5
         )
-        ttk.Button(nav_buttons, text="Дальше", command=self._next_question).pack(
+        ttk.Button(nav_buttons, text=self._t("next"), command=self._next_question).pack(
             side=tk.LEFT, padx=5
         )
-        ttk.Button(nav_buttons, text="Завершить тест", command=self._finish_test).pack(
+        ttk.Button(
+            nav_buttons, text=self._t("finish_test"), command=self._finish_test
+        ).pack(
             side=tk.LEFT, padx=5
         )
-        ttk.Button(nav_buttons, text="Выход", command=self._exit_test).pack(
+        ttk.Button(nav_buttons, text=self._t("exit"), command=self._exit_test).pack(
             side=tk.RIGHT, padx=5
         )
 
@@ -516,7 +711,7 @@ class TestApp(tk.Tk):
     def _extract_tests(self) -> None:
         path = self.selected_file.get()
         if not path:
-            messagebox.showwarning("Ошибка", "Выберите Word файл.")
+            messagebox.showwarning(self._t("error"), self._t("select_word"))
             return
         base_name = Path(path).stem
         output_dir = self.app_dir / "extracted_tests"
@@ -532,7 +727,7 @@ class TestApp(tk.Tk):
             tests = extractor.extract()
         except Exception as exc:
             extractor.cleanup()
-            messagebox.showerror("Ошибка", str(exc))
+            messagebox.showerror(self._t("error"), str(exc))
             return
 
         self.tests = tests
@@ -544,7 +739,7 @@ class TestApp(tk.Tk):
             json.dump(self._serialize_tests(tests), handle, ensure_ascii=False, indent=2)
 
         self.extract_status.config(
-            text=f"Извлечено тестов: {len(tests)}. Сохранено: {output_path}"
+            text=self._t("extracted", count=len(tests), path=output_path)
         )
         self._refresh_saved_tests()
         self._update_logs(extractor.logs)
@@ -566,10 +761,12 @@ class TestApp(tk.Tk):
             attempts = test_stats.get("attempts", 0)
             correct_total = best or 0
             learned_percent = (correct_total / questions * 100) if questions else 0
-            stats_line = (
-                f"Правильно {correct_total}/{questions} | "
-                f"Изучено {learned_percent:.1f}% | "
-                f"Попытки: {attempts}"
+            stats_line = self._t(
+                "stats_line",
+                correct=correct_total,
+                total=questions,
+                percent=learned_percent,
+                attempts=attempts,
             )
             self._create_test_card(test_file, questions, stats_line, learned_percent)
 
@@ -595,7 +792,7 @@ class TestApp(tk.Tk):
         title.pack(anchor=tk.W)
         info = tk.Label(
             card,
-            text=f"Вопросов: {questions}",
+            text=self._t("questions_label", count=questions),
             font=("Segoe UI", 10),
             bg=background,
         )
@@ -611,7 +808,7 @@ class TestApp(tk.Tk):
 
         delete_button = tk.Button(
             card,
-            text="Удалить",
+            text=self._t("delete"),
             bg="#ffebee",
             fg="#c62828",
             relief=tk.FLAT,
@@ -638,12 +835,13 @@ class TestApp(tk.Tk):
 
     def _select_test(self, test_file: Path) -> None:
         self.selected_test_file = test_file
-        self.selected_test_label.config(text=f"Выбран тест: {test_file.name}")
+        self.selected_test_label.config(text=self._t("selected_test", name=test_file.name))
         self._show_frame(self.settings_frame)
 
     def _delete_test(self, test_file: Path) -> None:
         if not messagebox.askyesno(
-            "Удаление", f"Удалить тест {test_file.name} и все связанные файлы?"
+            self._t("delete_title"),
+            self._t("delete_confirm", name=test_file.name),
         ):
             return
         try:
@@ -658,7 +856,7 @@ class TestApp(tk.Tk):
                 ) as handle:
                     json.dump(stats, handle, ensure_ascii=False, indent=2)
         except OSError as exc:
-            messagebox.showerror("Ошибка", str(exc))
+            messagebox.showerror(self._t("error"), str(exc))
         self._refresh_saved_tests()
 
     def _load_test_stats(self, output_dir: Path) -> dict[str, dict]:
@@ -693,7 +891,7 @@ class TestApp(tk.Tk):
         if logs:
             self.log_text.insert(tk.END, "\n".join(logs))
         else:
-            self.log_text.insert(tk.END, "Нет предупреждений.")
+            self.log_text.insert(tk.END, self._t("no_warnings"))
         self.log_text.config(state=tk.DISABLED)
 
     def _serialize_tests(self, tests: list[TestQuestion]) -> list[dict]:
@@ -717,11 +915,11 @@ class TestApp(tk.Tk):
 
     def _start_test(self) -> None:
         if not self.selected_test_file:
-            messagebox.showwarning("Ошибка", "Выберите тест из списка.")
+            messagebox.showwarning(self._t("error"), self._t("select_test"))
             return
         self.tests = self._load_tests_from_file(self.selected_test_file)
         if not self.tests:
-            messagebox.showwarning("Ошибка", "Тест пустой или не найден.")
+            messagebox.showwarning(self._t("error"), self._t("empty_test"))
             return
         questions = list(self.tests)
         if self.only_unanswered.get():
@@ -823,7 +1021,7 @@ class TestApp(tk.Tk):
         if not self.session:
             return
         if not self.session.questions:
-            messagebox.showinfo("Информация", "Нет вопросов для тестирования.")
+            messagebox.showinfo(self._t("info"), self._t("no_questions"))
             return
         self._clear_question()
         question = self.session.questions[self.session.current_index]
@@ -832,7 +1030,11 @@ class TestApp(tk.Tk):
 
         ttk.Label(
             self.question_container,
-            text=f"Вопрос {self.session.current_index + 1} из {len(self.session.questions)}",
+            text=self._t(
+                "question_progress",
+                current=self.session.current_index + 1,
+                total=len(self.session.questions),
+            ),
             font=("Arial", 12, "bold"),
         ).pack(anchor=tk.W, pady=5)
 
@@ -963,13 +1165,15 @@ class TestApp(tk.Tk):
         if self.show_answers_immediately.get():
             if correct_idx is None:
                 self.answer_feedback_label.config(
-                    text="Правильный ответ не указан.", foreground="#ff9800"
+                    text=self._t("answer_missing"), foreground="#ff9800"
                 )
             elif selected_idx == correct_idx:
-                self.answer_feedback_label.config(text="Верно!", foreground="#4caf50")
+                self.answer_feedback_label.config(
+                    text=self._t("answer_correct"), foreground="#4caf50"
+                )
             else:
                 self.answer_feedback_label.config(
-                    text=f"Неверно. Правильный вариант: {correct_idx + 1}",
+                    text=self._t("answer_wrong", index=correct_idx + 1),
                     foreground="#f44336",
                 )
 
@@ -1008,16 +1212,26 @@ class TestApp(tk.Tk):
                 correct += 1
         percent = (correct / total * 100) if total else 0
         self.report_label.config(
-            text=f"Результат: {correct}/{total} правильных, "
-            f"отвечено {answered}, {percent:.1f}%"
+            text=self._t(
+                "result",
+                correct=correct,
+                total=total,
+                answered=answered,
+                percent=percent,
+            )
         )
         if self.selected_test_file:
             self._save_test_stats(self.selected_test_file, correct, total)
             self._refresh_saved_tests()
         if not self.show_answers_immediately.get():
             messagebox.showinfo(
-                "Ответы",
-                f"Правильных ответов: {correct} из {total} ({percent:.1f}%)",
+                self._t("answers"),
+                self._t(
+                    "answers_count",
+                    correct=correct,
+                    total=total,
+                    percent=percent,
+                ),
             )
         self._render_question_nav()
         self._show_question()
