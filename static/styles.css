@@ -205,6 +205,16 @@ button.danger:hover {
   background: #b91c1c;
 }
 
+.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.ghost:hover {
+  background: #f3f4f6;
+}
+
 .upload-logs-panel {
   margin-top: 1rem;
 }
@@ -335,6 +345,145 @@ button.danger:hover {
   color: var(--muted);
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+
+.modal.is-open {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 1.5rem;
+  max-width: 960px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.modal-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.4fr);
+}
+
+.modal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.editor-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.editor-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #f8fafc;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.editor-card-title {
+  font-weight: 600;
+}
+
+.editor-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.editor-field textarea {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  min-height: 90px;
+}
+
+.editor-options {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.editor-options-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.editor-options-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.editor-option {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+  background: #f8fafc;
+}
+
+.editor-option textarea {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  min-height: 64px;
+}
+
+.editor-option-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
@@ -344,5 +493,9 @@ button.danger:hover {
   .question-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .modal-grid {
+    grid-template-columns: 1fr;
   }
 }

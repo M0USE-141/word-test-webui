@@ -99,6 +99,14 @@
         </div>
 
         <div class="card">
+          <h2>Редактирование вопросов</h2>
+          <p class="muted">
+            Создавайте новые вопросы или обновляйте существующие прямо в тесте.
+          </p>
+          <button id="open-editor" type="button">Открыть редактор</button>
+        </div>
+
+        <div class="card">
           <h2>Результаты</h2>
           <p id="result-summary">Ещё нет завершённых попыток.</p>
           <ul id="result-details" class="result-details"></ul>
@@ -134,5 +142,57 @@
         </div>
       </section>
     </main>
+
+    <div id="editor-modal" class="modal" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2>Редактор вопросов</h2>
+            <p class="muted" id="editor-status">
+              Выберите вопрос из списка или создайте новый.
+            </p>
+          </div>
+          <button id="close-editor" type="button" class="ghost">
+            Закрыть
+          </button>
+        </div>
+
+        <div class="modal-grid">
+          <div class="modal-panel">
+            <h3>Список вопросов</h3>
+            <div id="editor-question-list" class="editor-list"></div>
+          </div>
+
+          <div class="modal-panel">
+            <h3 id="editor-form-title">Новый вопрос</h3>
+            <form id="editor-form" class="editor-form">
+              <label class="editor-field">
+                <span>Текст вопроса</span>
+                <textarea id="editor-question-text" rows="4"></textarea>
+              </label>
+
+              <div class="editor-options">
+                <div class="editor-options-header">
+                  <h4>Варианты ответов</h4>
+                  <button id="add-option" type="button" class="ghost">
+                    Добавить вариант
+                  </button>
+                </div>
+                <div id="editor-options-list" class="editor-options-list"></div>
+              </div>
+
+              <div class="editor-actions">
+                <button id="save-question" type="submit">
+                  Сохранить
+                </button>
+                <button id="reset-editor" type="button" class="ghost">
+                  Очистить форму
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
