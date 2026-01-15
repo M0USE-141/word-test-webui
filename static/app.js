@@ -8,6 +8,7 @@ const uploadSymbolInput = document.getElementById("upload-symbol");
 const uploadLogSmallTablesInput = document.getElementById(
   "upload-log-small-tables"
 );
+const uploadLogs = document.getElementById("upload-logs");
 
 let currentTest = null;
 let currentQuestionIndex = 0;
@@ -32,6 +33,25 @@ function clearElement(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
   }
+}
+
+function renderUploadLogs(messages, isError = false) {
+  if (!uploadLogs) {
+    return;
+  }
+  clearElement(uploadLogs);
+  uploadLogs.classList.toggle("is-error", isError);
+
+  if (!messages) {
+    return;
+  }
+
+  const logItems = Array.isArray(messages) ? messages : [messages];
+  logItems.forEach((message) => {
+    const item = document.createElement("li");
+    item.textContent = message;
+    uploadLogs.appendChild(item);
+  });
 }
 
 function renderInline(parent, inline) {
@@ -169,6 +189,7 @@ uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!uploadFileInput.files?.length) {
     questionContainer.textContent = "Сначала выберите файл для импорта.";
+    renderUploadLogs("Сначала выберите файл для импорта.", true);
     return;
   }
 
@@ -185,13 +206,16 @@ uploadForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: formData,
     });
+    const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error("Не удалось импортировать тест");
+      const detail = payload?.detail || "Не удалось импортировать тест";
+      throw new Error(detail);
     }
-    const uploadResult = await response.json();
+    const uploadResult = payload ?? {};
     const tests = await fetchTests();
     const newTestId = uploadResult?.metadata?.id;
     renderTestOptions(tests, newTestId);
+    renderUploadLogs(uploadResult?.logs);
 
     if (newTestId) {
       currentTest = await fetchTest(newTestId);
@@ -204,6 +228,7 @@ uploadForm.addEventListener("submit", async (event) => {
     uploadFileInput.value = "";
   } catch (error) {
     questionContainer.textContent = error.message;
+    renderUploadLogs(error.message, true);
   }
 });
 
