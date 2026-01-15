@@ -11,6 +11,7 @@ from typing import Optional
 from docx import Document
 from lxml import etree
 
+from image_convert import convert_metafile_to_png
 from models import ContentItem, TestOption, TestQuestion
 
 log = logging.getLogger(__name__)
@@ -141,7 +142,8 @@ class WordTestExtractor:
             ext = Path(part.partname).suffix
             image_path = self.extract_dir / f"{rel_id}{ext}"
             image_path.write_bytes(part.blob)
-            image_map[rel_id] = image_path
+            converted_path = convert_metafile_to_png(image_path, self.extract_dir)
+            image_map[rel_id] = converted_path or image_path
             count += 1
         log.info("Extracted embedded images: %d", count)
         self.logs.append(f"Изображений извлечено: {count}")
