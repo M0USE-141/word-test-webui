@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 from typing import Optional
 
@@ -54,8 +56,8 @@ class WordFormulaRenderer:
         Resume works: already existing omml_*.{fmt} are skipped.
         """
         if not self.available():
-            log.info("Word COM not available -> formula rendering skipped.")
-            return []
+            log.info("Word COM not available -> trying MathJax render.")
+            return self._render_omml_mathjax(docx_path)
 
         local_copy = self._make_local_copy(docx_path)
 
@@ -67,6 +69,9 @@ class WordFormulaRenderer:
 
         out = [*omml, *ole]
         out = [p for p in out if p.exists() and p.stat().st_size > 0]
+        if not out:
+            log.info("Word rendering produced no images -> trying MathJax render.")
+            out = self._render_omml_mathjax(docx_path)
         log.info("Word rendering finished. Total formula images: %d", len(out))
         return out
 
@@ -300,6 +305,172 @@ class WordFormulaRenderer:
             return False
         except Exception as e:
             log.debug("Save as picture failed (no-clipboard path): %s", e)
+            return False
+
+    def _render_omml_mathjax(self, docx_path: Path) -> list[Path]:
+        try:
+            from lxml import etree
+        except Exception:
+            log.info("lxml not available -> MathJax render skipped.")
+            return []
+
+        if not self._mathjax_available():
+            log.info("MathJax not available -> formula rendering skipped.")
+            return []
+
+        xslt = self._load_omml_xslt()
+        if xslt is None:
+            return []
+
+        omml_nodes = self._extract_omml_nodes(docx_path, etree)
+        if not omml_nodes:
+            log.info("No OMML formulas found for MathJax render.")
+            return []
+
+        output_ext = "svg" if self.fmt == "svg" else "png"
+        if output_ext != self.fmt:
+            log.info("MathJax render outputs %s (requested %s).", output_ext, self.fmt)
+
+        rendered: list[Path] = []
+        for idx, omml in enumerate(omml_nodes, start=1):
+            out_path = self.out_dir / f"omml_{idx:06d}.{output_ext}"
+            if out_path.exists() and out_path.stat().st_size > 0:
+                rendered.append(out_path)
+                continue
+
+            try:
+                omml_tree = etree.ElementTree(etree.fromstring(etree.tostring(omml)))
+                mathml_tree = xslt(omml_tree)
+                mathml = str(mathml_tree)
+            except Exception:
+                log.exception("Failed to convert OMML to MathML for %s", out_path.name)
+                continue
+
+            svg = self._mathjax_svg_from_mathml(mathml)
+            if not svg:
+                continue
+
+            if output_ext == "svg":
+                out_path.write_text(svg, encoding="utf-8")
+            else:
+                if not self._svg_to_png(svg, out_path):
+                    continue
+
+            if out_path.exists() and out_path.stat().st_size > 0:
+                rendered.append(out_path)
+
+        log.info("MathJax formulas rendered: %d", len(rendered))
+        return rendered
+
+    def _extract_omml_nodes(self, docx_path: Path, etree) -> list[object]:
+        try:
+            with zipfile.ZipFile(docx_path) as docx:
+                xml = docx.read("word/document.xml")
+        except Exception:
+            log.exception("Failed to read document.xml from %s", docx_path)
+            return []
+
+        try:
+            root = etree.fromstring(xml)
+        except Exception:
+            log.exception("Failed to parse document.xml")
+            return []
+
+        ns = {"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+        return root.xpath(".//m:oMath", namespaces=ns)
+
+    def _load_omml_xslt(self):
+        try:
+            from lxml import etree
+        except Exception:
+            return None
+
+        xslt_path = Path(__file__).resolve().parent / "resources" / "omml2mml.xsl"
+        if not xslt_path.exists():
+            log.error("OMML XSLT not found: %s", xslt_path)
+            return None
+        try:
+            xslt_root = etree.parse(str(xslt_path))
+            return etree.XSLT(xslt_root)
+        except Exception:
+            log.exception("Failed to load OMML XSLT")
+            return None
+
+    def _mathjax_available(self) -> bool:
+        node = shutil.which("node")
+        if not node:
+            return False
+        try:
+            subprocess.run(
+                [node, "-e", "require.resolve('mathjax-full')"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=Path(__file__).resolve().parent,
+            )
+            return True
+        except Exception:
+            return False
+
+    def _mathjax_svg_from_mathml(self, mathml: str) -> Optional[str]:
+        node = shutil.which("node")
+        if not node:
+            return None
+
+        script = (
+            "const {mathjax} = require('mathjax-full/js/mathjax.js');"
+            "const {MathML} = require('mathjax-full/js/input/mathml.js');"
+            "const {SVG} = require('mathjax-full/js/output/svg.js');"
+            "const {liteAdaptor} = require('mathjax-full/js/adaptors/liteAdaptor.js');"
+            "const {RegisterHTMLHandler} = require('mathjax-full/js/handlers/html.js');"
+            "const adaptor = liteAdaptor();"
+            "RegisterHTMLHandler(adaptor);"
+            "const input = new MathML();"
+            "const output = new SVG({fontCache: 'none'});"
+            "const html = mathjax.document('', {InputJax: input, OutputJax: output});"
+            "let data='';"
+            "process.stdin.setEncoding('utf8');"
+            "process.stdin.on('data', chunk => data += chunk);"
+            "process.stdin.on('end', () => {"
+            "  const node = html.convert(data, {display: true});"
+            "  process.stdout.write(adaptor.outerHTML(node));"
+            "});"
+        )
+
+        script_path = getattr(self, "_mathjax_script_path", None)
+        if script_path is None:
+            tmp = Path(tempfile.mkdtemp(prefix="mathjax_render_"))
+            script_path = tmp / "render_mathjax.js"
+            script_path.write_text(script, encoding="utf-8")
+            self._mathjax_script_path = script_path
+
+        try:
+            result = subprocess.run(
+                [node, str(script_path)],
+                input=mathml,
+                text=True,
+                check=True,
+                capture_output=True,
+                cwd=Path(__file__).resolve().parent,
+            )
+        except Exception:
+            log.exception("MathJax render failed")
+            return None
+
+        svg = result.stdout.strip()
+        return svg or None
+
+    def _svg_to_png(self, svg: str, out_path: Path) -> bool:
+        try:
+            import cairosvg
+        except Exception:
+            log.info("cairosvg not available -> cannot convert SVG to PNG.")
+            return False
+        try:
+            cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(out_path))
+            return out_path.exists() and out_path.stat().st_size > 0
+        except Exception:
+            log.exception("Failed to convert SVG to PNG")
             return False
 
     def _looks_like_equation_ole_inline(self, inline_shape) -> bool:
