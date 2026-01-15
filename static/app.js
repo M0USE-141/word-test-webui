@@ -34,15 +34,48 @@ const settingMaxOptions = document.getElementById("setting-max-options");
 let currentTest = null;
 let testsCache = [];
 let session = null;
+const testsCacheKey = "tests-cache";
 
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
 
-async function fetchTests() {
+
+function readTestsCache() {
+  const raw = localStorage.getItem(testsCacheKey);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeTestsCache(tests) {
+  testsCache = tests;
+  localStorage.setItem(testsCacheKey, JSON.stringify(tests));
+}
+
+async function fetchTests({ force = false } = {}) {
+  if (!force) {
+    if (testsCache.length) {
+      return testsCache;
+    }
+    const cached = readTestsCache();
+    if (cached.length) {
+      testsCache = cached;
+      return cached;
+    }
+  }
+
   const response = await fetch("/api/tests");
   if (!response.ok) {
     throw new Error("Не удалось загрузить список тестов");
   }
-  return response.json();
+  const data = await response.json();
+  writeTestsCache(data);
+  return data;
 }
 
 async function fetchTest(testId) {
@@ -717,8 +750,7 @@ uploadForm.addEventListener("submit", async (event) => {
       throw new Error(detail);
     }
     const uploadResult = payload ?? {};
-    const tests = await fetchTests();
-    testsCache = tests;
+    const tests = await fetchTests({ force: true });
     const newTestId = uploadResult?.metadata?.id;
     renderUploadLogs(uploadResult?.logs);
 
@@ -735,7 +767,6 @@ uploadForm.addEventListener("submit", async (event) => {
 async function initialize() {
   try {
     const tests = await fetchTests();
-    testsCache = tests;
     if (!tests.length) {
       renderTestCards(tests);
       await selectTest(null);
