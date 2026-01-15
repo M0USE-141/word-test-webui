@@ -830,6 +830,8 @@ class TestApp(tk.Tk):
                     entry["formula_id"] = item.formula_id
                 if item.path:
                     entry["path"] = item.path
+                if item.formula_text:
+                    entry["formula_text"] = item.formula_text
                 serialized.append(entry)
             return serialized
 
@@ -893,6 +895,7 @@ class TestApp(tk.Tk):
                 value,
                 formula_id=item.get("formula_id"),
                 path=item.get("path"),
+                formula_text=item.get("formula_text"),
             )
 
         for entry in tests_data:
@@ -1116,9 +1119,15 @@ class TestApp(tk.Tk):
                 image_path = Path(item.path) if item.path else None
                 if image_path and image_path.exists():
                     if not render_image(image_path):
-                        text.insert(tk.END, self._t("formula_placeholder"))
+                        if item.formula_text:
+                            text.insert(tk.END, item.formula_text)
+                        else:
+                            text.insert(tk.END, self._t("formula_placeholder"))
                 else:
-                    text.insert(tk.END, self._t("formula_placeholder"))
+                    if item.formula_text:
+                        text.insert(tk.END, item.formula_text)
+                    else:
+                        text.insert(tk.END, self._t("formula_placeholder"))
             elif item.item_type in {"paragraph_break", "line_break"}:
                 text.insert(tk.END, "\n")
                 continue
