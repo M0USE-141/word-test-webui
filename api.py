@@ -1,4 +1,5 @@
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -6,6 +7,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from logging_setup import setup_console_logging
 from serialization import serialize_metadata, serialize_test_payload
@@ -36,6 +38,10 @@ def index() -> FileResponse:
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class TestUpdate(BaseModel):
+    title: str
 
 
 def _test_dir(test_id: str) -> Path:
@@ -116,6 +122,29 @@ def upload_test(
         "payload": payload,
         "logs": extractor.logs,
     }
+
+
+@app.patch("/api/tests/{test_id}")
+def update_test(test_id: str, update: TestUpdate) -> dict[str, object]:
+    payload_path = _payload_path(test_id)
+    if not payload_path.exists():
+        raise HTTPException(status_code=404, detail="Test not found")
+    title = update.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    payload = json_load(payload_path.read_text(encoding="utf-8"))
+    payload["title"] = title
+    payload_path.write_text(json_dump(payload), encoding="utf-8")
+    return serialize_metadata(payload)
+
+
+@app.delete("/api/tests/{test_id}")
+def delete_test(test_id: str) -> dict[str, str]:
+    test_dir = _test_dir(test_id)
+    if not test_dir.exists() or not test_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Test not found")
+    shutil.rmtree(test_dir)
+    return {"status": "deleted"}
 
 
 @app.get("/api/tests/{test_id}/assets/{asset_path:path}")
