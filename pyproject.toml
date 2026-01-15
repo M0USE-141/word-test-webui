@@ -7,4 +7,7 @@ dependencies = [
     "pillow>=12.1.0",
     "python-docx>=1.2.0",
     "pywin32>=311",
+    "fastapi>=0.115.0",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.30.0",
 ]

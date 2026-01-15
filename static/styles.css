@@ -1,0 +1,105 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #f5f6f8;
+  color: #1f2933;
+}
+
+body {
+  margin: 0;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  background: white;
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.app-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.controls select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ccd7e1;
+  font-size: 14px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.sidebar {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 16px rgba(31, 41, 51, 0.05);
+}
+
+.question-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.question-list button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.question-list button.active {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  font-weight: 600;
+}
+
+.content {
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 16px rgba(31, 41, 51, 0.05);
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.option {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.inline-image {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
