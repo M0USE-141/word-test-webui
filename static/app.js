@@ -76,6 +76,15 @@ function renderInline(parent, inline) {
     return;
   }
   if (inline.type === "formula") {
+    if (inline.mathml) {
+      const span = document.createElement("span");
+      span.innerHTML = inline.mathml;
+      parent.appendChild(span);
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise([span]);
+      }
+      return;
+    }
     if (inline.latex) {
       const span = document.createElement("span");
       span.innerHTML = `\\(${inline.latex}\\)`;

@@ -14,6 +14,11 @@ INLINE_LINE_BREAK_TYPE = "line_break"
 BLOCK_PARAGRAPH_TYPE = "paragraph"
 
 
+def _is_mathml(value: str) -> bool:
+    stripped = value.lstrip()
+    return stripped.startswith("<math") or stripped.startswith("<m:math") or stripped.startswith("<?xml")
+
+
 def _asset_src(path: str | None, assets_dir: Path | None) -> str | None:
     if not path:
         return None
@@ -68,7 +73,10 @@ def content_items_to_blocks(
             if src:
                 inline["src"] = src
             if item.formula_text:
-                inline["text"] = item.formula_text
+                if _is_mathml(item.formula_text):
+                    inline["mathml"] = item.formula_text
+                else:
+                    inline["latex"] = item.formula_text
             inlines.append(inline)
             continue
     if inlines:
