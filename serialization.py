@@ -69,9 +69,6 @@ def content_items_to_blocks(
                 "type": INLINE_FORMULA_TYPE,
                 "id": item.formula_id,
             }
-            src = _asset_src(item.path, assets_dir)
-            if src:
-                inline["src"] = src
             if item.formula_text:
                 if _is_mathml(item.formula_text):
                     inline["mathml"] = item.formula_text
