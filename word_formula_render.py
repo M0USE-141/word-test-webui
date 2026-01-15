@@ -91,6 +91,7 @@ class WordFormulaRenderer:
             pythoncom.CoInitialize()
             word_app = None
             doc = None
+            tmp_doc = None
 
             try:
                 word_app = win32com.client.DispatchEx("Word.Application")
@@ -104,6 +105,7 @@ class WordFormulaRenderer:
                     pass
 
                 doc = word_app.Documents.Open(str(Path(docx_local_path).resolve()))
+                tmp_doc = word_app.Documents.Add()
                 total = int(doc.OMaths.Count)
                 log.info("OMML total=%d, resume from=%d", total, start_i)
 
@@ -120,7 +122,7 @@ class WordFormulaRenderer:
                     except Exception:
                         pass
 
-                    ok = self._save_range_as_picture(word_app, om.Range, out_path)
+                    ok = self._save_range_as_picture(tmp_doc, om.Range, out_path)
 
                     if i % 25 == 0:
                         log.debug("Rendered OMML %d/%d (ok=%s)", i, total, ok)
@@ -145,6 +147,11 @@ class WordFormulaRenderer:
                 time.sleep(self.delay_on_fail_sec)
 
             finally:
+                try:
+                    if tmp_doc is not None:
+                        tmp_doc.Close(False)
+                except Exception:
+                    pass
                 try:
                     if doc is not None:
                         doc.Close(False)
@@ -174,6 +181,7 @@ class WordFormulaRenderer:
         pythoncom.CoInitialize()
         word_app = None
         doc = None
+        tmp_doc = None
 
         out: list[Path] = []
         idx = start_index - 1
@@ -184,6 +192,7 @@ class WordFormulaRenderer:
             word_app.DisplayAlerts = 0
 
             doc = word_app.Documents.Open(str(Path(docx_local_path).resolve()))
+            tmp_doc = word_app.Documents.Add()
             try:
                 inline_total = int(doc.InlineShapes.Count)
             except Exception:
@@ -205,7 +214,7 @@ class WordFormulaRenderer:
                 try:
                     ils.SaveAsPicture(str(out_path))
                 except Exception:
-                    self._save_range_as_picture(word_app, ils.Range, out_path)
+                    self._save_range_as_picture(tmp_doc, ils.Range, out_path)
 
                 if out_path.exists() and out_path.stat().st_size > 0:
                     out.append(out_path)
@@ -218,6 +227,11 @@ class WordFormulaRenderer:
             return out
 
         finally:
+            try:
+                if tmp_doc is not None:
+                    tmp_doc.Close(False)
+            except Exception:
+                pass
             try:
                 if doc is not None:
                     doc.Close(False)
@@ -233,36 +247,38 @@ class WordFormulaRenderer:
             except Exception:
                 pass
 
-    def _save_range_as_picture(self, word_app, rng, out_path: Path) -> bool:
+    def _save_range_as_picture(self, tmp_doc, rng, out_path: Path) -> bool:
         """
         NO-CLIPBOARD method:
-        1) create temp doc
-        2) assign tmp.Range.FormattedText = rng.FormattedText
-        3) convert tmp content to picture via CopyAsPicture + PasteSpecial inside same doc (minimal clipboard use)
+        1) assign tmp.Range.FormattedText = rng.FormattedText
+        2) convert tmp content to picture via CopyAsPicture + PasteSpecial inside same doc (minimal clipboard use)
            OR try tmp.InlineShapes.AddOLEControl? (not stable)
         """
         try:
-            tmp = word_app.Documents.Add()
+            tmp_doc.Range(0, tmp_doc.Content.End).Delete()
+
+            # вставляем содержимое без Copy/Paste в clipboard
+            tmp_rng = tmp_doc.Range(0, 0)
+            tmp_rng.FormattedText = rng.FormattedText
+
             try:
-                # вставляем содержимое без Copy/Paste в clipboard
-                tmp_rng = tmp.Range(0, 0)
-                tmp_rng.FormattedText = rng.FormattedText
+                tmp_doc.OMaths.BuildUp()
+            except Exception:
+                pass
 
-                # теперь превращаем в картинку
-                # CopyAsPicture — более “word-native” и обычно стабильнее
-                tmp_rng = tmp.Range(0, tmp.Content.End)
-                tmp_rng.CopyAsPicture()
+            # теперь превращаем в картинку
+            # CopyAsPicture — более “word-native” и обычно стабильнее
+            tmp_rng = tmp_doc.Range(0, tmp_doc.Content.End)
+            tmp_rng.CopyAsPicture()
 
-                tmp_rng.Collapse(0)  # wdCollapseStart
-                # 17 = wdPasteEnhancedMetafile
-                tmp_rng.PasteSpecial(DataType=17)
+            tmp_rng.Collapse(0)  # wdCollapseStart
+            # 17 = wdPasteEnhancedMetafile
+            tmp_rng.PasteSpecial(DataType=17)
 
-                if tmp.InlineShapes.Count >= 1:
-                    tmp.InlineShapes(1).SaveAsPicture(str(out_path))
-                    return out_path.exists() and out_path.stat().st_size > 0
-                return False
-            finally:
-                tmp.Close(False)
+            if tmp_doc.InlineShapes.Count >= 1:
+                tmp_doc.InlineShapes(1).SaveAsPicture(str(out_path))
+                return out_path.exists() and out_path.stat().st_size > 0
+            return False
         except Exception as e:
             log.debug("Save as picture failed (no-clipboard path): %s", e)
             return False
