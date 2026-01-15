@@ -2,6 +2,12 @@ const testSelect = document.getElementById("test-select");
 const questionList = document.getElementById("question-list");
 const questionContainer = document.getElementById("question-container");
 const optionsContainer = document.getElementById("options-container");
+const uploadForm = document.getElementById("upload-form");
+const uploadFileInput = document.getElementById("upload-file");
+const uploadSymbolInput = document.getElementById("upload-symbol");
+const uploadLogSmallTablesInput = document.getElementById(
+  "upload-log-small-tables"
+);
 
 let currentTest = null;
 let currentQuestionIndex = 0;
@@ -126,38 +132,92 @@ function renderQuestionList() {
   });
 }
 
+function renderTestOptions(tests, selectedId) {
+  clearElement(testSelect);
+  if (!tests.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Нет загруженных тестов";
+    testSelect.appendChild(option);
+    return;
+  }
+
+  tests.forEach((test) => {
+    const option = document.createElement("option");
+    option.value = test.id;
+    option.textContent = `${test.title} (${test.questionCount})`;
+    testSelect.appendChild(option);
+  });
+
+  if (selectedId) {
+    testSelect.value = selectedId;
+  }
+}
+
+testSelect.addEventListener("change", async (event) => {
+  const testId = event.target.value;
+  if (!testId) {
+    return;
+  }
+  currentTest = await fetchTest(testId);
+  currentQuestionIndex = 0;
+  renderQuestionList();
+  renderQuestion();
+});
+
+uploadForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!uploadFileInput.files?.length) {
+    questionContainer.textContent = "Сначала выберите файл для импорта.";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", uploadFileInput.files[0]);
+  formData.append("symbol", uploadSymbolInput.value.trim());
+  formData.append(
+    "log_small_tables",
+    uploadLogSmallTablesInput.checked ? "true" : "false"
+  );
+
+  try {
+    const response = await fetch("/api/tests/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error("Не удалось импортировать тест");
+    }
+    const uploadResult = await response.json();
+    const tests = await fetchTests();
+    const newTestId = uploadResult?.metadata?.id;
+    renderTestOptions(tests, newTestId);
+
+    if (newTestId) {
+      currentTest = await fetchTest(newTestId);
+    } else if (tests.length) {
+      currentTest = await fetchTest(tests[0].id);
+    }
+    currentQuestionIndex = 0;
+    renderQuestionList();
+    renderQuestion();
+    uploadFileInput.value = "";
+  } catch (error) {
+    questionContainer.textContent = error.message;
+  }
+});
+
 async function initialize() {
   try {
     const tests = await fetchTests();
-    clearElement(testSelect);
     if (!tests.length) {
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = "Нет загруженных тестов";
-      testSelect.appendChild(option);
+      renderTestOptions(tests);
       questionContainer.textContent = "Сначала загрузите тест через API.";
       optionsContainer.textContent = "";
       return;
     }
 
-    tests.forEach((test) => {
-      const option = document.createElement("option");
-      option.value = test.id;
-      option.textContent = `${test.title} (${test.questionCount})`;
-      testSelect.appendChild(option);
-    });
-
-    testSelect.addEventListener("change", async (event) => {
-      const testId = event.target.value;
-      if (!testId) {
-        return;
-      }
-      currentTest = await fetchTest(testId);
-      currentQuestionIndex = 0;
-      renderQuestionList();
-      renderQuestion();
-    });
-
+    renderTestOptions(tests, tests[0].id);
     currentTest = await fetchTest(tests[0].id);
     currentQuestionIndex = 0;
     renderQuestionList();

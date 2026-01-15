@@ -17,9 +17,31 @@
         <h1>Просмотр тестов</h1>
         <p>Загрузите тест через API и выберите его для просмотра.</p>
       </div>
-      <div class="controls">
-        <label for="test-select">Тест</label>
-        <select id="test-select"></select>
+      <div class="header-actions">
+        <form id="upload-form" class="upload-form">
+          <label class="upload-field" for="upload-file">
+            <span>Файл</span>
+            <input
+              type="file"
+              id="upload-file"
+              accept=".doc,.docx"
+              required
+            />
+          </label>
+          <label class="upload-field" for="upload-symbol">
+            <span>Маркер</span>
+            <input type="text" id="upload-symbol" name="symbol" />
+          </label>
+          <label class="upload-checkbox" for="upload-log-small-tables">
+            <input type="checkbox" id="upload-log-small-tables" />
+            <span>log_small_tables</span>
+          </label>
+          <button type="submit">Импортировать</button>
+        </form>
+        <div class="controls">
+          <label for="test-select">Тест</label>
+          <select id="test-select"></select>
+        </div>
       </div>
     </header>
 
