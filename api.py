@@ -92,7 +92,7 @@ def upload_test(
     assets_dir = _assets_dir(test_id)
     assets_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_name = Path(file.filename or f\"upload_{test_id}.docx\").name
+    safe_name = Path(file.filename or f"upload_{test_id}.docx").name
     file_path = test_dir / safe_name
     file_path.write_bytes(file.file.read())
 
