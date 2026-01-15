@@ -78,6 +78,7 @@ class WordTestExtractor:
         self.logs: list[str] = []  # short TK logs
         self._tmp_dirs: list[Path] = []
         self._omml_xslt = self._load_omml_xslt()
+        self._omml_xslt_missing_logged = False
 
     def cleanup(self) -> None:
         for d in self._tmp_dirs:
@@ -184,7 +185,12 @@ class WordTestExtractor:
         return None
 
     def _omml_to_mathml(self, omml_element) -> str | None:
-        if self._omml_xslt is None or omml_element is None:
+        if omml_element is None:
+            return None
+        if self._omml_xslt is None:
+            if not self._omml_xslt_missing_logged:
+                log.warning("OMML2MML XSLT is unavailable; formulas will not be converted to MathML.")
+                self._omml_xslt_missing_logged = True
             return None
         omml_xml = etree.fromstring(etree.tostring(omml_element))
         mathml = self._omml_xslt(omml_xml)
