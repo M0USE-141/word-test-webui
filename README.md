@@ -27,3 +27,22 @@ uvicorn api:app --reload
 - Ассеты: `GET /api/tests/{test_id}/assets/{path}`.
 
 Фронтенд доступен на `http://localhost:8000/` после запуска API.
+
+## Docker
+
+### Сборка и запуск
+
+```bash
+docker build -t bsu-test-master .
+docker run --rm -p 8000:8000 -v "${PWD}/data:/app/data" bsu-test-master
+```
+
+### docker-compose
+
+```bash
+docker compose up --build
+```
+
+## Ограничения контейнера
+
+В Linux-контейнере недоступен COM-рендер формул через Microsoft Word: используются плейсхолдеры или альтернативный рендер (например, через LibreOffice/MathJax), если он предусмотрен логикой сервиса.
