@@ -460,14 +460,15 @@ function renderQuestion() {
         optionButton.classList.add("is-incorrect");
       }
       optionButton.disabled = true;
-    } else if (isSelected) {
-      if (!session.settings.showAnswersImmediately) {
-        optionButton.classList.add("is-selected");
-      } else if (resolvedCorrectIndex === index) {
+    } else if (session.settings.showAnswersImmediately && selectedIndex !== -1) {
+      if (resolvedCorrectIndex === index) {
         optionButton.classList.add("is-correct");
-      } else {
+      }
+      if (isSelected && resolvedCorrectIndex !== index) {
         optionButton.classList.add("is-incorrect");
       }
+    } else if (isSelected) {
+      optionButton.classList.add("is-selected");
     }
 
     if (!session.finished) {
