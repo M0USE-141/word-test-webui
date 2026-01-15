@@ -67,6 +67,8 @@ def content_items_to_blocks(
             src = _asset_src(item.path, assets_dir)
             if src:
                 inline["src"] = src
+            if item.formula_text:
+                inline["text"] = item.formula_text
             inlines.append(inline)
             continue
     if inlines:

@@ -9,6 +9,7 @@ class ContentItem:
     value: str = ""
     formula_id: str | None = None
     path: str | None = None
+    formula_text: str | None = None
 
 
 @dataclass

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from docx import Document
+from lxml import etree
 
 from models import ContentItem, TestOption, TestQuestion
 from word_formula_render import WordFormulaRenderer
@@ -82,6 +83,7 @@ class WordTestExtractor:
         self.formula_fmt = formula_fmt
 
         self._tmp_dirs: list[Path] = []
+        self._omml_xslt = self._load_omml_xslt()
 
     def cleanup(self) -> None:
         for d in self._tmp_dirs:
@@ -194,6 +196,21 @@ class WordTestExtractor:
                 index += 1
         return formula_map
 
+    def _load_omml_xslt(self) -> etree.XSLT | None:
+        xslt_path = Path(__file__).with_name("omml2mml.xsl")
+        if not xslt_path.exists():
+            log.warning("OMML2MML XSLT not found at %s", xslt_path)
+            return None
+        xslt_doc = etree.parse(str(xslt_path))
+        return etree.XSLT(xslt_doc)
+
+    def _omml_to_mathml(self, omml_element) -> str | None:
+        if self._omml_xslt is None or omml_element is None:
+            return None
+        omml_xml = etree.fromstring(etree.tostring(omml_element))
+        mathml = self._omml_xslt(omml_xml)
+        return str(mathml)
+
     # ---- Parse cell content (text + images + formulas) ----
     def _content_from_cell(
             self,
@@ -215,7 +232,7 @@ class WordTestExtractor:
             flush_text()
             items.append(ContentItem("image", str(p)))
 
-        def push_formula(formula_id: str | None):
+        def push_formula(formula_id: str | None, formula_text: str | None):
             flush_text()
             image_path = None
             if formula_id:
@@ -225,6 +242,7 @@ class WordTestExtractor:
                     "formula",
                     formula_id=formula_id,
                     path=str(image_path) if image_path else None,
+                    formula_text=formula_text,
                 )
             )
 
@@ -240,13 +258,16 @@ class WordTestExtractor:
                 # OMML formula
                 if tag.endswith("}oMath") or tag.endswith("}oMathPara"):
                     formula_id = None
+                    omml_element = child
                     if tag.endswith("}oMathPara"):
                         child_omml = child.find(".//m:oMath", namespaces=NS)
                         if child_omml is not None:
                             formula_id = formula_id_map.get(id(child_omml))
+                            omml_element = child_omml
                     if formula_id is None:
                         formula_id = formula_id_map.get(id(child))
-                    push_formula(formula_id)
+                    formula_text = self._omml_to_mathml(omml_element)
+                    push_formula(formula_id, formula_text)
                     continue
 
                 # runs/hyperlinks
