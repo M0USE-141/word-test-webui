@@ -266,18 +266,37 @@ class WordFormulaRenderer:
             except Exception:
                 pass
 
-            # теперь превращаем в картинку
-            # CopyAsPicture — более “word-native” и обычно стабильнее
-            tmp_rng = tmp_doc.Range(0, tmp_doc.Content.End)
-            tmp_rng.CopyAsPicture()
+            app = tmp_doc.Application
+            try:
+                app.CutCopyMode = 0
+            except Exception:
+                pass
 
-            tmp_rng.Collapse(0)  # wdCollapseStart
-            # 17 = wdPasteEnhancedMetafile
-            tmp_rng.PasteSpecial(DataType=17)
+            for attempt in range(3):
+                try:
+                    # теперь превращаем в картинку
+                    # CopyAsPicture — более “word-native” и обычно стабильнее
+                    tmp_rng = tmp_doc.Range(0, tmp_doc.Content.End)
+                    tmp_doc.Activate()
+                    tmp_rng.Select()
+                    app.Selection.CopyAsPicture()
 
-            if tmp_doc.InlineShapes.Count >= 1:
-                tmp_doc.InlineShapes(1).SaveAsPicture(str(out_path))
-                return out_path.exists() and out_path.stat().st_size > 0
+                    # 17 = wdPasteEnhancedMetafile
+                    app.Selection.PasteSpecial(DataType=17)
+
+                    if tmp_doc.InlineShapes.Count >= 1:
+                        tmp_doc.InlineShapes(1).SaveAsPicture(str(out_path))
+                        return out_path.exists() and out_path.stat().st_size > 0
+                    return False
+                except Exception as e:
+                    if attempt == 2:
+                        raise
+                    log.debug("Copy/paste attempt failed: %s", e)
+                    try:
+                        app.CutCopyMode = 0
+                    except Exception:
+                        pass
+                    time.sleep(0.2)
             return False
         except Exception as e:
             log.debug("Save as picture failed (no-clipboard path): %s", e)
