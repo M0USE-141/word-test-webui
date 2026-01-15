@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import JSZip from "jszip";
 import { XMLParser, XMLBuilder } from "fast-xml-parser";
-import { xsltProcess } from "xslt-processor";
+import xsltProcessor from "xslt-processor";
 import { DOMParser } from "@xmldom/xmldom";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -14,6 +14,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const { xsltProcess } = xsltProcessor;
 const XML_PRESERVE = new XMLParser({ ignoreAttributes: false, preserveOrder: true });
 const XML_SIMPLE = new XMLParser({ ignoreAttributes: false });
 const XML_BUILD = new XMLBuilder({ ignoreAttributes: false, preserveOrder: true });
