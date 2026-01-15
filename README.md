@@ -1,13 +1,20 @@
 # BSU-test-master
 
-## Formula rendering (Word-free fallback)
+## Node.js extractor
 
-If Word COM rendering fails or is unavailable, the app can convert OMML formulas to MathML and render them with MathJax.
-To enable the fallback renderer, install the optional dependencies:
+This version runs a Node.js web server that accepts DOCX uploads and extracts text, images, and OMML formulas in order.
+Formulas are converted with XSLT (OMML → MathML) and rendered in the browser via MathJax.
+
+### Setup
 
 ```bash
-pip install lxml cairosvg
 npm install
+npm start
 ```
 
-The OMML-to-MathML transform is provided by `resources/omml2mml.xsl`.
+Open <http://localhost:3000> and upload a DOCX file.
+
+### Notes
+
+* The OMML-to-MathML transform lives in `resources/omml2mml.xsl`.
+* Extracted images are served as inline data URLs.

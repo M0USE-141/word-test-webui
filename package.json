@@ -1,8 +1,17 @@
 {
-  "name": "testmasterbsu",
+  "name": "bsu-test-master",
   "private": true,
-  "description": "Node dependencies for MathJax formula rendering.",
+  "type": "module",
+  "description": "Word document parser with OMML -> MathML -> MathJax rendering.",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "mathjax-full": "^3.2.2"
+    "@xmldom/xmldom": "^0.9.7",
+    "express": "^4.19.2",
+    "fast-xml-parser": "^4.4.1",
+    "jszip": "^3.10.1",
+    "multer": "^1.4.5-lts.1",
+    "xslt-processor": "^3.2.0"
   }
 }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BSU Test Extractor</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script>
+      window.MathJax = {
+        loader: { load: ["input/mml", "output/svg"] },
+        startup: { typeset: false }
+      };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/mml-svg.js"></script>
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>BSU Test Extractor</h1>
+        <p>Upload a DOCX file to extract text, images, and formulas in order.</p>
+      </header>
+
+      <section class="card">
+        <form id="upload-form">
+          <label class="file-input">
+            <input type="file" name="docx" accept=".docx" required />
+            <span>Select DOCX file</span>
+          </label>
+          <button type="submit">Extract</button>
+        </form>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Extracted Content</h2>
+        <div id="output" class="output"></div>
+      </section>
+    </main>
+  </body>
+</html>
