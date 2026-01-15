@@ -1,4 +1,4 @@
-const testSelect = document.getElementById("test-select");
+const testCardsContainer = document.getElementById("test-cards");
 const questionList = document.getElementById("question-nav");
 const questionContainer = document.getElementById("question-container");
 const optionsContainer = document.getElementById("options-container");
@@ -42,20 +42,56 @@ const settingOnlyUnanswered = document.getElementById(
 const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
 
+const testsCacheKey = "tests-cache";
+
+const LAST_RESULT_KEY_PREFIX = "test-last-result:";
+
 let currentTest = null;
 let testsCache = [];
 let session = null;
+
 let editorState = {
   mode: "create",
   questionId: null,
 };
 
-async function fetchTests() {
+function readTestsCache() {
+  const raw = localStorage.getItem(testsCacheKey);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeTestsCache(tests) {
+  testsCache = tests;
+  localStorage.setItem(testsCacheKey, JSON.stringify(tests));
+}
+
+async function fetchTests({ force = false } = {}) {
+  if (!force) {
+    if (testsCache.length) {
+      return testsCache;
+    }
+    const cached = readTestsCache();
+    if (cached.length) {
+      testsCache = cached;
+      return cached;
+    }
+  }
+
   const response = await fetch("/api/tests");
   if (!response.ok) {
     throw new Error("Не удалось загрузить список тестов");
   }
-  return response.json();
+  const data = await response.json();
+  writeTestsCache(data);
+  return data;
 }
 
 async function fetchTest(testId) {
@@ -207,6 +243,42 @@ function loadProgress(testId) {
   } catch (error) {
     return new Set();
   }
+}
+
+function loadLastResult(testId) {
+  if (!testId) {
+    return null;
+  }
+  const raw = localStorage.getItem(`${LAST_RESULT_KEY_PREFIX}${testId}`);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const data = JSON.parse(raw);
+    if (typeof data?.percent !== "number") {
+      return null;
+    }
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveLastResult(testId, stats) {
+  if (!testId || !stats) {
+    return;
+  }
+  localStorage.setItem(
+    `${LAST_RESULT_KEY_PREFIX}${testId}`,
+    JSON.stringify(stats)
+  );
+}
+
+function clearLastResult(testId) {
+  if (!testId) {
+    return;
+  }
+  localStorage.removeItem(`${LAST_RESULT_KEY_PREFIX}${testId}`);
 }
 
 function saveProgress(testId, answeredIds) {
@@ -490,6 +562,14 @@ function finishTest() {
   const total = session.questions.length;
   const percent = total ? (correct / total) * 100 : 0;
 
+  saveLastResult(session.testId, {
+    correct,
+    total,
+    answered,
+    percent,
+    completedAt: new Date().toISOString(),
+  });
+  renderTestCards(testsCache, session.testId);
   renderResultSummary({ correct, total, answered, percent });
   renderQuestion();
 }
@@ -511,26 +591,91 @@ function startTest() {
   renderQuestion();
 }
 
-function renderTestOptions(tests, selectedId) {
-  clearElement(testSelect);
+function renderTestCards(tests, selectedId) {
+  clearElement(testCardsContainer);
   if (!tests.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Нет загруженных тестов";
-    testSelect.appendChild(option);
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Нет загруженных тестов.";
+    testCardsContainer.appendChild(empty);
     return;
   }
 
   tests.forEach((test) => {
-    const option = document.createElement("option");
-    option.value = test.id;
-    option.textContent = `${test.title} (${test.questionCount})`;
-    testSelect.appendChild(option);
-  });
+    const card = document.createElement("div");
+    card.className = "test-card";
+    card.dataset.testId = test.id;
+    if (test.id === selectedId) {
+      card.classList.add("is-active");
+    }
 
-  if (selectedId) {
-    testSelect.value = selectedId;
-  }
+    const title = document.createElement("h3");
+    title.className = "test-card__title";
+    title.textContent = test.title;
+
+    const meta = document.createElement("div");
+    meta.className = "test-card__meta";
+    meta.textContent = `Вопросов: ${test.questionCount}`;
+
+    const stats = document.createElement("div");
+    stats.className = "test-card__stats";
+    const lastResult = loadLastResult(test.id);
+    stats.textContent = lastResult
+      ? `Последний результат: ${lastResult.correct}/${lastResult.total} (${lastResult.percent.toFixed(
+          1
+        )}%)`
+      : "Последний результат: нет данных";
+
+    const actions = document.createElement("div");
+    actions.className = "test-card__actions";
+
+    const renameButton = document.createElement("button");
+    renameButton.type = "button";
+    renameButton.className = "secondary";
+    renameButton.textContent = "Переименовать";
+    renameButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const newTitle = window.prompt(
+        "Введите новое название теста:",
+        test.title
+      );
+      if (!newTitle || newTitle.trim() === test.title) {
+        return;
+      }
+      try {
+        await renameTest(test.id, newTitle.trim());
+      } catch (error) {
+        window.alert(error.message);
+      }
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "danger";
+    deleteButton.textContent = "Удалить";
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const confirmed = window.confirm(
+        "Удалить тест и все связанные данные?"
+      );
+      if (!confirmed) {
+        return;
+      }
+      try {
+        await deleteTest(test.id);
+      } catch (error) {
+        window.alert(error.message);
+      }
+    });
+
+    actions.append(renameButton, deleteButton);
+    card.append(title, meta, stats, actions);
+    card.addEventListener("click", async () => {
+      await selectTest(test.id);
+    });
+
+    testCardsContainer.appendChild(card);
+  });
 }
 
 function openEditorModal() {
@@ -756,7 +901,16 @@ async function deleteQuestion(testId, questionId) {
 
 testSelect.addEventListener("change", async (event) => {
   const testId = event.target.value;
+  
   if (!testId) {
+    currentTest = null;
+    session = null;
+    updateProgressHint();
+    questionContainer.textContent = "Сначала загрузите тест через API.";
+    optionsContainer.textContent = "";
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(null);
     return;
   }
   currentTest = await fetchTest(testId);
@@ -767,7 +921,48 @@ testSelect.addEventListener("change", async (event) => {
   optionsContainer.textContent = "";
   questionProgress.textContent = "Вопрос 0 из 0";
   renderQuestionNav();
-});
+  renderResultSummary(null);
+  renderTestCards(testsCache, testId);
+}
+
+async function renameTest(testId, title) {
+  const response = await fetch(`/api/tests/${testId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail || "Не удалось переименовать тест";
+    throw new Error(detail);
+  }
+  const tests = await fetchTests();
+  testsCache = tests;
+  renderTestCards(tests, testId);
+  if (currentTest?.id === testId) {
+    currentTest = await fetchTest(testId);
+    updateProgressHint();
+  }
+}
+
+async function deleteTest(testId) {
+  const response = await fetch(`/api/tests/${testId}`, {
+    method: "DELETE",
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail || "Не удалось удалить тест";
+    throw new Error(detail);
+  }
+  localStorage.removeItem(`test-progress:${testId}`);
+  clearLastResult(testId);
+
+  const tests = await fetchTests();
+  testsCache = tests;
+  const nextId = tests[0]?.id || null;
+  renderTestCards(tests, nextId);
+  await selectTest(nextId);
+}
 
 openEditorButton?.addEventListener("click", () => {
   if (!currentTest) {
@@ -878,24 +1073,13 @@ uploadForm.addEventListener("submit", async (event) => {
       throw new Error(detail);
     }
     const uploadResult = payload ?? {};
-    const tests = await fetchTests();
-    testsCache = tests;
+    const tests = await fetchTests({ force: true });
     const newTestId = uploadResult?.metadata?.id;
-    renderTestOptions(tests, newTestId);
     renderUploadLogs(uploadResult?.logs);
 
-    if (newTestId) {
-      currentTest = await fetchTest(newTestId);
-    } else if (tests.length) {
-      currentTest = await fetchTest(tests[0].id);
-    }
-    session = null;
-    updateProgressHint();
-    questionContainer.textContent =
-      "Нажмите «Начать тестирование», чтобы применить настройки.";
-    optionsContainer.textContent = "";
-    questionProgress.textContent = "Вопрос 0 из 0";
-    renderQuestionNav();
+    const nextTestId = newTestId || tests[0]?.id;
+    renderTestCards(tests, nextTestId);
+    await selectTest(nextTestId);
     uploadFileInput.value = "";
   } catch (error) {
     questionContainer.textContent = error.message;
@@ -906,23 +1090,14 @@ uploadForm.addEventListener("submit", async (event) => {
 async function initialize() {
   try {
     const tests = await fetchTests();
-    testsCache = tests;
     if (!tests.length) {
-      renderTestOptions(tests);
-      questionContainer.textContent = "Сначала загрузите тест через API.";
-      optionsContainer.textContent = "";
-      questionProgress.textContent = "Вопрос 0 из 0";
+      renderTestCards(tests);
+      await selectTest(null);
       return;
     }
 
-    renderTestOptions(tests, tests[0].id);
-    currentTest = await fetchTest(tests[0].id);
-    session = null;
-    updateProgressHint();
-    questionContainer.textContent =
-      "Нажмите «Начать тестирование», чтобы применить настройки.";
-    optionsContainer.textContent = "";
-    questionProgress.textContent = "Вопрос 0 из 0";
+    renderTestCards(tests, tests[0].id);
+    await selectTest(tests[0].id);
   } catch (error) {
     questionContainer.textContent = error.message;
   }
