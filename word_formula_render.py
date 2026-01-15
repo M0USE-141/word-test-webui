@@ -48,14 +48,14 @@ class WordFormulaRenderer:
         except Exception:
             return False
 
-    def render_all(self, docx_path: Path) -> list[Path]:
+    def render_all(self, docx_path: Path) -> dict[str, Path]:
         """
-        Returns list of rendered formula images.
+        Returns mapping formula_id -> rendered image path.
         Resume works: already existing omml_*.{fmt} are skipped.
         """
         if not self.available():
             log.info("Word COM not available -> formula rendering skipped.")
-            return []
+            return {}
 
         local_copy = self._make_local_copy(docx_path)
 
@@ -67,8 +67,9 @@ class WordFormulaRenderer:
 
         out = [*omml, *ole]
         out = [p for p in out if p.exists() and p.stat().st_size > 0]
-        log.info("Word rendering finished. Total formula images: %d", len(out))
-        return out
+        formula_map = {p.stem: p for p in out}
+        log.info("Word rendering finished. Total formula images: %d", len(formula_map))
+        return formula_map
 
     # ---------------- helpers ----------------
 

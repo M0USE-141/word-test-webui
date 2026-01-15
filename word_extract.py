@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Iterator
 from typing import Optional
 
 from docx import Document
@@ -152,10 +151,10 @@ class WordTestExtractor:
         return image_map
 
     # ---- Render formulas through Word (if available) ----
-    def _render_formulas(self, docx_path: Path) -> list[Path]:
+    def _render_formulas(self, docx_path: Path) -> dict[str, Path]:
         if not self.prefer_word_render:
             self.logs.append("Формулы: рендер отключен")
-            return []
+            return {}
 
         formula_dir = self.extract_dir / "formulas_raw"
         formula_dir.mkdir(parents=True, exist_ok=True)
@@ -170,27 +169,38 @@ class WordTestExtractor:
 
         if not renderer.available():
             self.logs.append("Формулы: Word недоступен, будут плейсхолдеры")
-            return []
+            return {}
 
         self.logs.append("Формулы: рендер через Word...")
-        imgs: list[Path] = []
+        formula_map: dict[str, Path] = {}
         try:
-            imgs = renderer.render_all(docx_path)
-            if imgs:
-                self.logs.append(f"Формулы: сохранено {len(imgs)} картинок")
+            formula_map = renderer.render_all(docx_path)
+            if formula_map:
+                self.logs.append(f"Формулы: сохранено {len(formula_map)} картинок")
             else:
                 self.logs.append("Формулы: не удалось сохранить картинки (плейсхолдеры)")
         except Exception as e:
             # даже если упало — у render_all часто уже есть частичный результат, но тут исключение
             self.logs.append(f"Формулы: ошибка рендера ({e})")
-        return imgs
+        return formula_map
+
+    def _build_formula_id_map(self, doc: Document) -> dict[int, str]:
+        formula_map: dict[int, str] = {}
+        index = 1
+        for element in doc.element.body.iter():
+            tag = element.tag
+            if tag.endswith("}oMath"):
+                formula_map[id(element)] = f"omml_{index:06d}"
+                index += 1
+        return formula_map
 
     # ---- Parse cell content (text + images + formulas) ----
     def _content_from_cell(
             self,
             cell,
             image_map: dict[str, Path],
-            formula_images_iter: Optional[Iterator[Path]],
+            formula_image_map: dict[str, Path],
+            formula_id_map: dict[int, str],
             formula_placeholder: str = "[formula]",
     ) -> list[ContentItem]:
         items: list[ContentItem] = []
@@ -205,13 +215,18 @@ class WordTestExtractor:
             flush_text()
             items.append(ContentItem("image", str(p)))
 
-        def next_formula_image() -> Optional[Path]:
-            if formula_images_iter is None:
-                return None
-            try:
-                return next(formula_images_iter)
-            except StopIteration:
-                return None
+        def push_formula(formula_id: str | None):
+            flush_text()
+            image_path = None
+            if formula_id:
+                image_path = formula_image_map.get(formula_id)
+            items.append(
+                ContentItem(
+                    "formula",
+                    formula_id=formula_id,
+                    path=str(image_path) if image_path else None,
+                )
+            )
 
         # cell children: w:p, w:tbl...
         for block in cell._tc.iterchildren():
@@ -224,12 +239,14 @@ class WordTestExtractor:
 
                 # OMML formula
                 if tag.endswith("}oMath") or tag.endswith("}oMathPara"):
-                    flush_text()
-                    img = next_formula_image()
-                    if img and img.exists():
-                        push_image(img)
-                    else:
-                        items.append(ContentItem("text", formula_placeholder))
+                    formula_id = None
+                    if tag.endswith("}oMathPara"):
+                        child_omml = child.find(".//m:oMath", namespaces=NS)
+                        if child_omml is not None:
+                            formula_id = formula_id_map.get(id(child_omml))
+                    if formula_id is None:
+                        formula_id = formula_id_map.get(id(child))
+                    push_formula(formula_id)
                     continue
 
                 # runs/hyperlinks
@@ -261,20 +278,12 @@ class WordTestExtractor:
                             push_image(image_map[rid])
                         else:
                             flush_text()
-                            img = next_formula_image()
-                            if img and img.exists():
-                                push_image(img)
-                            else:
-                                items.append(ContentItem("text", formula_placeholder))
+                            items.append(ContentItem("text", formula_placeholder))
 
                     # explicit OLE object marker
                     if child.find(".//o:OLEObject", namespaces=NS) is not None:
                         flush_text()
-                        img = next_formula_image()
-                        if img and img.exists():
-                            push_image(img)
-                        else:
-                            items.append(ContentItem("text", formula_placeholder))
+                        items.append(ContentItem("text", formula_placeholder))
 
             flush_text()
             items.append(ContentItem("paragraph_break"))
@@ -318,8 +327,8 @@ class WordTestExtractor:
 
         image_map = self._extract_images(doc)
 
-        formula_images = self._render_formulas(docx_path)
-        formula_iter = iter(formula_images) if formula_images else None
+        formula_image_map = self._render_formulas(docx_path)
+        formula_id_map = self._build_formula_id_map(doc)
 
         tests: list[TestQuestion] = []
         tables_used = 0
@@ -348,7 +357,13 @@ class WordTestExtractor:
             for r_i, row in enumerate(table.rows):
                 row_items: list[ContentItem] = []
                 for c_i, cell in enumerate(row.cells):
-                    cell_items = self._content_from_cell(cell, image_map, formula_iter, formula_placeholder)
+                    cell_items = self._content_from_cell(
+                        cell,
+                        image_map,
+                        formula_image_map,
+                        formula_id_map,
+                        formula_placeholder,
+                    )
                     row_items.extend(cell_items)
                 row_contents.append(row_items)
 

@@ -823,7 +823,15 @@ class TestApp(tk.Tk):
 
     def _serialize_tests(self, tests: list[TestQuestion]) -> list[dict]:
         def serialize_content(content: list[ContentItem]) -> list[dict]:
-            return [{"type": item.item_type, "value": item.value} for item in content]
+            serialized: list[dict] = []
+            for item in content:
+                entry = {"type": item.item_type, "value": item.value}
+                if item.formula_id:
+                    entry["formula_id"] = item.formula_id
+                if item.path:
+                    entry["path"] = item.path
+                serialized.append(entry)
+            return serialized
 
         return [
             {
@@ -880,7 +888,12 @@ class TestApp(tk.Tk):
         def deserialize_item(item: dict) -> ContentItem:
             item_type = item.get("type", "text")
             value = item.get("value", "")
-            return ContentItem(item_type, value)
+            return ContentItem(
+                item_type,
+                value,
+                formula_id=item.get("formula_id"),
+                path=item.get("path"),
+            )
 
         for entry in tests_data:
             question = [deserialize_item(item) for item in entry.get("question", [])]
@@ -1067,37 +1080,50 @@ class TestApp(tk.Tk):
             font=text_font,
         )
         text.pack(fill=tk.X, anchor=tk.W)
+        def render_image(path: Path) -> bool:
+            image_path = path
+            if image_path.suffix.lower() in {".wmf", ".emf"}:
+                converted = convert_metafile_to_png(image_path, self.wmf_cache_dir)
+                if converted:
+                    image_path = converted
+                else:
+                    return False
+            try:
+                image = Image.open(image_path)
+            except OSError:
+                return False
+            if image.height > max_image_height:
+                ratio = max_image_height / image.height
+                width = max(1, int(image.width * ratio))
+                image = image.resize((width, max_image_height), Image.LANCZOS)
+            nonlocal max_used_image_height
+            max_used_image_height = max(max_used_image_height, image.height)
+            photo = ImageTk.PhotoImage(image)
+            self.image_cache.append(photo)
+            text.image_create(tk.END, image=photo)
+            return True
+
         for index, item in enumerate(content):
             if item.item_type == "text":
                 if item.value:
                     text.insert(tk.END, item.value)
-            elif item.item_type == "image" and Path(item.value).exists():
+            elif item.item_type == "image":
                 image_path = Path(item.value)
-                if image_path.suffix.lower() in {".wmf", ".emf"}:
-                    converted = convert_metafile_to_png(image_path, self.wmf_cache_dir)
-                    if converted:
-                        image_path = converted
-                    else:
+                if image_path.exists():
+                    if not render_image(image_path):
                         text.insert(tk.END, self._t("formula_placeholder"))
-                        continue
-                try:
-                    image = Image.open(image_path)
-                except OSError:
+            elif item.item_type == "formula":
+                image_path = Path(item.path) if item.path else None
+                if image_path and image_path.exists():
+                    if not render_image(image_path):
+                        text.insert(tk.END, self._t("formula_placeholder"))
+                else:
                     text.insert(tk.END, self._t("formula_placeholder"))
-                    continue
-                if image.height > max_image_height:
-                    ratio = max_image_height / image.height
-                    width = max(1, int(image.width * ratio))
-                    image = image.resize((width, max_image_height), Image.LANCZOS)
-                max_used_image_height = max(max_used_image_height, image.height)
-                photo = ImageTk.PhotoImage(image)
-                self.image_cache.append(photo)
-                text.image_create(tk.END, image=photo)
             elif item.item_type in {"paragraph_break", "line_break"}:
                 text.insert(tk.END, "\n")
                 continue
 
-            if item.item_type in {"text", "image"}:
+            if item.item_type in {"text", "image", "formula"}:
                 next_item = content[index + 1] if index + 1 < len(content) else None
                 if next_item and next_item.item_type in {"paragraph_break", "line_break"}:
                     continue
