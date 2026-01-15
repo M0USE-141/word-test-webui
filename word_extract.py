@@ -11,6 +11,7 @@ from typing import Optional
 from docx import Document
 from lxml import etree
 
+from image_convert import convert_metafile_to_png
 from models import ContentItem, TestOption, TestQuestion
 
 log = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ class WordTestExtractor:
         self.logs: list[str] = []  # short TK logs
         self._tmp_dirs: list[Path] = []
         self._omml_xslt = self._load_omml_xslt()
+        self._omml_xslt_missing_logged = False
 
     def cleanup(self) -> None:
         for d in self._tmp_dirs:
@@ -140,7 +142,8 @@ class WordTestExtractor:
             ext = Path(part.partname).suffix
             image_path = self.extract_dir / f"{rel_id}{ext}"
             image_path.write_bytes(part.blob)
-            image_map[rel_id] = image_path
+            converted_path = convert_metafile_to_png(image_path, self.extract_dir)
+            image_map[rel_id] = converted_path or image_path
             count += 1
         log.info("Extracted embedded images: %d", count)
         self.logs.append(f"Изображений извлечено: {count}")
@@ -148,14 +151,48 @@ class WordTestExtractor:
 
     def _load_omml_xslt(self) -> etree.XSLT | None:
         xslt_path = Path(__file__).with_name("omml2mml.xsl")
-        if not xslt_path.exists():
-            log.warning("OMML2MML XSLT not found at %s", xslt_path)
-            return None
-        xslt_doc = etree.parse(str(xslt_path))
-        return etree.XSLT(xslt_doc)
+        if os.name == "nt":
+            office_versions = ("Office16", "Office15", "Office14")
+            program_files_paths = [
+                Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")),
+                Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")),
+                Path(os.environ.get("PROGRAMW6432", r"C:\Program Files")),
+            ]
+            seen_bases: set[Path] = set()
+            for base in program_files_paths:
+                if base in seen_bases:
+                    continue
+                seen_bases.add(base)
+                for version in office_versions:
+                    candidates = [
+                        base / "Microsoft Office" / "root" / version / "OMML2MML.XSL",
+                        base / "Microsoft Office" / version / "OMML2MML.XSL",
+                    ]
+                    for candidate in candidates:
+                        if candidate.exists():
+                            try:
+                                xslt_doc = etree.parse(str(candidate))
+                            except Exception:
+                                log.warning("Failed to parse OMML2MML XSLT at %s", candidate)
+                                continue
+                            log.info("Loaded OMML2MML XSLT from system path: %s", candidate)
+                            return etree.XSLT(xslt_doc)
+
+        if xslt_path.exists():
+            xslt_doc = etree.parse(str(xslt_path))
+            log.info("Loaded OMML2MML XSLT from local path: %s", xslt_path)
+            return etree.XSLT(xslt_doc)
+
+        log.warning("OMML2MML XSLT not found at system locations or %s", xslt_path)
+        return None
 
     def _omml_to_mathml(self, omml_element) -> str | None:
-        if self._omml_xslt is None or omml_element is None:
+        if omml_element is None:
+            return None
+        if self._omml_xslt is None:
+            if not self._omml_xslt_missing_logged:
+                log.warning("OMML2MML XSLT is unavailable; formulas will not be converted to MathML.")
+                self._omml_xslt_missing_logged = True
             return None
         omml_xml = etree.fromstring(etree.tostring(omml_element))
         mathml = self._omml_xslt(omml_xml)
