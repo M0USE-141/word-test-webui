@@ -877,15 +877,20 @@ class TestApp(tk.Tk):
             test_id = data.get("id", test_file.stem)
             title = data.get("title", test_file.stem)
         tests: list[TestQuestion] = []
+        def deserialize_item(item: dict) -> ContentItem:
+            item_type = item.get("type", "text")
+            value = item.get("value", "")
+            return ContentItem(item_type, value)
+
         for entry in tests_data:
-            question = [ContentItem(item["type"], item["value"]) for item in entry["question"]]
-            correct = [ContentItem(item["type"], item["value"]) for item in entry["correct"]]
+            question = [deserialize_item(item) for item in entry.get("question", [])]
+            correct = [deserialize_item(item) for item in entry.get("correct", [])]
             options = [
                 TestOption(
-                    [ContentItem(item["type"], item["value"]) for item in option["content"]],
-                    option["is_correct"],
+                    [deserialize_item(item) for item in option.get("content", [])],
+                    option.get("is_correct", False),
                 )
-                for option in entry["options"]
+                for option in entry.get("options", [])
             ]
             tests.append(TestQuestion(question, correct, options))
         self.current_test_id = test_id
@@ -1062,7 +1067,7 @@ class TestApp(tk.Tk):
             font=text_font,
         )
         text.pack(fill=tk.X, anchor=tk.W)
-        for item in content:
+        for index, item in enumerate(content):
             if item.item_type == "text":
                 if item.value:
                     text.insert(tk.END, item.value)
@@ -1088,7 +1093,15 @@ class TestApp(tk.Tk):
                 photo = ImageTk.PhotoImage(image)
                 self.image_cache.append(photo)
                 text.image_create(tk.END, image=photo)
-            text.insert(tk.END, " ")
+            elif item.item_type in {"paragraph_break", "line_break"}:
+                text.insert(tk.END, "\n")
+                continue
+
+            if item.item_type in {"text", "image"}:
+                next_item = content[index + 1] if index + 1 < len(content) else None
+                if next_item and next_item.item_type in {"paragraph_break", "line_break"}:
+                    continue
+                text.insert(tk.END, " ")
         text.update_idletasks()
         lines = int(text.index("end-1c").split(".")[0])
         image_lines = math.ceil(max_used_image_height / line_height) if max_used_image_height else 1
