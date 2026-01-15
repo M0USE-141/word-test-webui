@@ -5,8 +5,8 @@ from typing import List, Dict
 
 @dataclass
 class ContentItem:
-    item_type: str  # "text" | "image"
-    value: str
+    item_type: str  # "text" | "image" | "paragraph_break" | "line_break"
+    value: str = ""
 
 
 @dataclass

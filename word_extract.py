@@ -239,6 +239,15 @@ class WordTestExtractor:
                         if t.text:
                             text_buf.append(t.text)
 
+                    # line breaks
+                    for br in child.findall(".//w:br", namespaces=NS):
+                        flush_text()
+                        items.append(ContentItem("line_break"))
+
+                    for cr in child.findall(".//w:cr", namespaces=NS):
+                        flush_text()
+                        items.append(ContentItem("line_break"))
+
                     # DrawingML images
                     for blip in child.findall(".//a:blip", namespaces=NS):
                         rid = blip.get(f"{{{NS['r']}}}embed")
@@ -268,6 +277,10 @@ class WordTestExtractor:
                             items.append(ContentItem("text", formula_placeholder))
 
             flush_text()
+            items.append(ContentItem("paragraph_break"))
+
+        while items and items[-1].item_type in {"paragraph_break", "line_break"}:
+            items.pop()
 
         if not items:
             items.append(ContentItem("text", ""))
