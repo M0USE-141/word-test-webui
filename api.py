@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -125,6 +125,146 @@ def get_asset(test_id: str, asset_path: str) -> FileResponse:
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Asset not found")
     return FileResponse(file_path)
+
+
+def _text_to_blocks(text: str) -> list[dict[str, object]]:
+    lines = text.splitlines() if text is not None else [""]
+    if not lines:
+        lines = [""]
+    blocks = []
+    for line in lines:
+        blocks.append(
+            {
+                "type": "paragraph",
+                "inlines": [{"type": "text", "text": line}],
+            }
+        )
+    return blocks
+
+
+def _load_test_payload(test_id: str) -> dict[str, object]:
+    payload_path = _payload_path(test_id)
+    if not payload_path.exists():
+        raise HTTPException(status_code=404, detail="Test not found")
+    return json_load(payload_path.read_text(encoding="utf-8"))
+
+
+def _save_test_payload(test_id: str, payload: dict[str, object]) -> None:
+    _payload_path(test_id).write_text(json_dump(payload), encoding="utf-8")
+
+
+def _find_question(
+    payload: dict[str, object], question_id: int
+) -> tuple[dict[str, object], int]:
+    questions = payload.get("questions", [])
+    if not isinstance(questions, list):
+        raise HTTPException(status_code=400, detail="Invalid test payload")
+    for index, question in enumerate(questions):
+        if isinstance(question, dict) and question.get("id") == question_id:
+            return question, index
+    raise HTTPException(status_code=404, detail="Question not found")
+
+
+@app.patch("/api/tests/{test_id}/questions/{question_id}")
+def update_question(
+    test_id: str,
+    question_id: int,
+    payload: dict[str, object] = Body(...),
+) -> dict[str, object]:
+    test_payload = _load_test_payload(test_id)
+    question, _ = _find_question(test_payload, question_id)
+
+    question_text = payload.get("questionText")
+    if question_text is not None:
+        question["question"] = {"blocks": _text_to_blocks(str(question_text))}
+
+    options_payload = payload.get("options")
+    if options_payload is not None:
+        if not isinstance(options_payload, list) or not options_payload:
+            raise HTTPException(status_code=400, detail="Options are required")
+        options = []
+        correct_text = ""
+        for index, option in enumerate(options_payload, start=1):
+            if not isinstance(option, dict):
+                raise HTTPException(
+                    status_code=400, detail="Invalid option format"
+                )
+            option_text = str(option.get("text", ""))
+            is_correct = bool(option.get("isCorrect"))
+            if is_correct and not correct_text:
+                correct_text = option_text
+            options.append(
+                {
+                    "id": index,
+                    "content": {"blocks": _text_to_blocks(option_text)},
+                    "isCorrect": is_correct,
+                }
+            )
+        question["options"] = options
+        question["correct"] = {"blocks": _text_to_blocks(correct_text)}
+
+    _save_test_payload(test_id, test_payload)
+    return {"payload": test_payload, "question": question}
+
+
+@app.post("/api/tests/{test_id}/questions")
+def add_question(
+    test_id: str,
+    payload: dict[str, object] = Body(...),
+) -> dict[str, object]:
+    test_payload = _load_test_payload(test_id)
+    questions = test_payload.get("questions", [])
+    if not isinstance(questions, list):
+        raise HTTPException(status_code=400, detail="Invalid test payload")
+
+    question_text = payload.get("questionText")
+    if not isinstance(question_text, str) or not question_text.strip():
+        raise HTTPException(status_code=400, detail="Question text is required")
+    options_payload = payload.get("options")
+    if not isinstance(options_payload, list) or not options_payload:
+        raise HTTPException(status_code=400, detail="Options are required")
+
+    next_id = max((q.get("id", 0) for q in questions if isinstance(q, dict)), default=0) + 1
+    options = []
+    correct_text = ""
+    for index, option in enumerate(options_payload, start=1):
+        if not isinstance(option, dict):
+            raise HTTPException(status_code=400, detail="Invalid option format")
+        option_text = str(option.get("text", ""))
+        is_correct = bool(option.get("isCorrect"))
+        if is_correct and not correct_text:
+            correct_text = option_text
+        options.append(
+            {
+                "id": index,
+                "content": {"blocks": _text_to_blocks(option_text)},
+                "isCorrect": is_correct,
+            }
+        )
+
+    new_question = {
+        "id": next_id,
+        "question": {"blocks": _text_to_blocks(question_text)},
+        "options": options,
+        "correct": {"blocks": _text_to_blocks(correct_text)},
+    }
+    questions.append(new_question)
+    test_payload["questions"] = questions
+    _save_test_payload(test_id, test_payload)
+    return {"payload": test_payload, "question": new_question}
+
+
+@app.delete("/api/tests/{test_id}/questions/{question_id}")
+def delete_question(test_id: str, question_id: int) -> dict[str, object]:
+    test_payload = _load_test_payload(test_id)
+    question, index = _find_question(test_payload, question_id)
+    questions = test_payload.get("questions", [])
+    if not isinstance(questions, list):
+        raise HTTPException(status_code=400, detail="Invalid test payload")
+    questions.pop(index)
+    test_payload["questions"] = questions
+    _save_test_payload(test_id, test_payload)
+    return {"payload": test_payload, "question": question}
 
 
 def json_dump(payload: dict[str, object]) -> str:

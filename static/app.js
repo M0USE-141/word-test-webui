@@ -19,6 +19,17 @@ const startTestButton = document.getElementById("start-test");
 const resultSummary = document.getElementById("result-summary");
 const resultDetails = document.getElementById("result-details");
 const progressHint = document.getElementById("progress-hint");
+const editorModal = document.getElementById("editor-modal");
+const openEditorButton = document.getElementById("open-editor");
+const closeEditorButton = document.getElementById("close-editor");
+const editorQuestionList = document.getElementById("editor-question-list");
+const editorForm = document.getElementById("editor-form");
+const editorFormTitle = document.getElementById("editor-form-title");
+const editorQuestionText = document.getElementById("editor-question-text");
+const editorOptionsList = document.getElementById("editor-options-list");
+const editorAddOption = document.getElementById("add-option");
+const editorResetButton = document.getElementById("reset-editor");
+const editorStatus = document.getElementById("editor-status");
 
 const settingQuestionCount = document.getElementById("setting-question-count");
 const settingRandomQuestions = document.getElementById(
@@ -34,6 +45,10 @@ const settingMaxOptions = document.getElementById("setting-max-options");
 let currentTest = null;
 let testsCache = [];
 let session = null;
+let editorState = {
+  mode: "create",
+  questionId: null,
+};
 
 async function fetchTests() {
   const response = await fetch("/api/tests");
@@ -138,6 +153,35 @@ function renderBlocks(container, blocks) {
   if (window.MathJax?.typesetPromise) {
     window.MathJax.typesetPromise([container]);
   }
+}
+
+function blocksToText(blocks) {
+  if (!Array.isArray(blocks)) {
+    return "";
+  }
+  const lines = blocks.map((block) => {
+    if (!block || !Array.isArray(block.inlines)) {
+      return "";
+    }
+    return block.inlines
+      .map((inline) => {
+        if (inline.type === "text") {
+          return inline.text ?? "";
+        }
+        if (inline.type === "line_break") {
+          return "\n";
+        }
+        if (inline.type === "image") {
+          return "[image]";
+        }
+        if (inline.type === "formula") {
+          return "[formula]";
+        }
+        return "";
+      })
+      .join("");
+  });
+  return lines.join("\n").trim();
 }
 
 function shuffle(items) {
@@ -489,6 +533,227 @@ function renderTestOptions(tests, selectedId) {
   }
 }
 
+function openEditorModal() {
+  if (!editorModal) {
+    return;
+  }
+  editorModal.classList.add("is-open");
+  editorModal.setAttribute("aria-hidden", "false");
+}
+
+function closeEditorModal() {
+  if (!editorModal) {
+    return;
+  }
+  editorModal.classList.remove("is-open");
+  editorModal.setAttribute("aria-hidden", "true");
+}
+
+function renderEditorOptions(options = []) {
+  clearElement(editorOptionsList);
+  if (!options.length) {
+    addOptionRow("", false);
+    return;
+  }
+  options.forEach((option) => {
+    addOptionRow(option.text || "", Boolean(option.isCorrect));
+  });
+}
+
+function setEditorState(mode, questionId = null) {
+  editorState = { mode, questionId };
+  if (editorFormTitle) {
+    editorFormTitle.textContent =
+      mode === "edit" ? `Редактирование вопроса #${questionId}` : "Новый вопрос";
+  }
+  if (editorStatus) {
+    editorStatus.textContent =
+      mode === "edit"
+        ? "Обновите текст и варианты ответов, затем сохраните."
+        : "Создайте новый вопрос и добавьте варианты ответов.";
+  }
+}
+
+function resetEditorForm() {
+  if (!editorQuestionText) {
+    return;
+  }
+  editorQuestionText.value = "";
+  renderEditorOptions([]);
+  setEditorState("create", null);
+}
+
+function addOptionRow(value = "", isCorrect = false) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "editor-option";
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.placeholder = "Текст варианта ответа";
+
+  const controls = document.createElement("div");
+  controls.className = "editor-option-controls";
+
+  const checkboxLabel = document.createElement("label");
+  checkboxLabel.className = "checkbox-row";
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = isCorrect;
+  const checkboxText = document.createElement("span");
+  checkboxText.textContent = "Правильный вариант";
+  checkboxLabel.append(checkbox, checkboxText);
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.className = "ghost";
+  removeButton.textContent = "Удалить";
+  removeButton.addEventListener("click", () => {
+    wrapper.remove();
+    if (!editorOptionsList.children.length) {
+      addOptionRow("", false);
+    }
+  });
+
+  controls.append(checkboxLabel, removeButton);
+  wrapper.append(textarea, controls);
+  editorOptionsList.appendChild(wrapper);
+}
+
+function collectEditorOptions() {
+  const options = [];
+  editorOptionsList.querySelectorAll(".editor-option").forEach((optionEl) => {
+    const textarea = optionEl.querySelector("textarea");
+    const checkbox = optionEl.querySelector("input[type='checkbox']");
+    options.push({
+      text: textarea?.value.trim() ?? "",
+      isCorrect: checkbox?.checked ?? false,
+    });
+  });
+  return options.filter((option) => option.text);
+}
+
+function renderEditorQuestionList() {
+  clearElement(editorQuestionList);
+  if (!currentTest || !currentTest.questions?.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Вопросы не найдены. Добавьте новый.";
+    editorQuestionList.appendChild(empty);
+    return;
+  }
+
+  currentTest.questions.forEach((question, index) => {
+    const card = document.createElement("div");
+    card.className = "editor-card";
+
+    const title = document.createElement("div");
+    title.className = "editor-card-title";
+    const text = blocksToText(question.question?.blocks || []);
+    title.textContent = `#${question.id ?? index + 1}: ${
+      text || "Без текста"
+    }`;
+
+    const actions = document.createElement("div");
+    actions.className = "editor-card-actions";
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "ghost";
+    editButton.textContent = "Редактировать";
+    editButton.addEventListener("click", () => {
+      setEditorState("edit", question.id);
+      editorQuestionText.value = text;
+      const options = question.options?.map((option) => ({
+        text: blocksToText(option.content?.blocks || []),
+        isCorrect: option.isCorrect,
+      }));
+      renderEditorOptions(options || []);
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "danger";
+    deleteButton.textContent = "Удалить";
+    deleteButton.addEventListener("click", async () => {
+      if (!currentTest) {
+        return;
+      }
+      const confirmed = window.confirm(
+        `Удалить вопрос #${question.id ?? index + 1}?`
+      );
+      if (!confirmed) {
+        return;
+      }
+      await deleteQuestion(currentTest.id, question.id);
+    });
+
+    actions.append(editButton, deleteButton);
+    card.append(title, actions);
+    editorQuestionList.appendChild(card);
+  });
+}
+
+async function refreshCurrentTest(testId = currentTest?.id) {
+  if (!testId) {
+    return;
+  }
+  currentTest = await fetchTest(testId);
+  testsCache = await fetchTests();
+  renderTestOptions(testsCache, currentTest.id);
+  session = null;
+  updateProgressHint();
+  questionContainer.textContent =
+    "Нажмите «Начать тестирование», чтобы применить настройки.";
+  optionsContainer.textContent = "";
+  questionProgress.textContent = "Вопрос 0 из 0";
+  renderQuestionNav();
+}
+
+async function updateQuestion(testId, questionId, payload) {
+  const response = await fetch(
+    `/api/tests/${testId}/questions/${questionId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Не удалось обновить вопрос");
+  }
+  return response.json();
+}
+
+async function addQuestion(testId, payload) {
+  const response = await fetch(`/api/tests/${testId}/questions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Не удалось добавить вопрос");
+  }
+  return response.json();
+}
+
+async function deleteQuestion(testId, questionId) {
+  const response = await fetch(
+    `/api/tests/${testId}/questions/${questionId}`,
+    {
+      method: "DELETE",
+    }
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Не удалось удалить вопрос");
+  }
+  await refreshCurrentTest(testId);
+  renderEditorQuestionList();
+  resetEditorForm();
+}
+
 testSelect.addEventListener("change", async (event) => {
   const testId = event.target.value;
   if (!testId) {
@@ -502,6 +767,61 @@ testSelect.addEventListener("change", async (event) => {
   optionsContainer.textContent = "";
   questionProgress.textContent = "Вопрос 0 из 0";
   renderQuestionNav();
+});
+
+openEditorButton?.addEventListener("click", () => {
+  if (!currentTest) {
+    return;
+  }
+  openEditorModal();
+  renderEditorQuestionList();
+  resetEditorForm();
+});
+
+closeEditorButton?.addEventListener("click", () => {
+  closeEditorModal();
+});
+
+editorModal?.addEventListener("click", (event) => {
+  if (event.target === editorModal) {
+    closeEditorModal();
+  }
+});
+
+editorAddOption?.addEventListener("click", () => {
+  addOptionRow("", false);
+});
+
+editorResetButton?.addEventListener("click", () => {
+  resetEditorForm();
+});
+
+editorForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!currentTest) {
+    return;
+  }
+  const questionText = editorQuestionText.value.trim();
+  const options = collectEditorOptions();
+  if (!questionText || !options.length) {
+    alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+    return;
+  }
+  try {
+    if (editorState.mode === "edit" && editorState.questionId) {
+      await updateQuestion(currentTest.id, editorState.questionId, {
+        questionText,
+        options,
+      });
+    } else {
+      await addQuestion(currentTest.id, { questionText, options });
+    }
+    await refreshCurrentTest(currentTest.id);
+    renderEditorQuestionList();
+    resetEditorForm();
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 prevQuestionButton.addEventListener("click", () => {
