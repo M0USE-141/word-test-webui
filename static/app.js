@@ -121,6 +121,7 @@ function renderInline(parent, inline) {
       parent.appendChild(img);
       return;
     }
+    // Формулы без src считаются штатным сценарием (MathML/LaTeX или плейсхолдер).
     parent.appendChild(document.createTextNode("[formula]"));
   }
 }
