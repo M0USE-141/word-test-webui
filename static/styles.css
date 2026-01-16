@@ -58,6 +58,10 @@ p {
   gap: 1.5rem;
 }
 
+#screen-management {
+  grid-template-columns: 1fr;
+}
+
 .panel--management {
   grid-column: 1 / -1;
   display: grid;
@@ -189,7 +193,6 @@ p {
   min-width: 180px;
 }
 
-.upload-field input[type="file"],
 .upload-field input[type="text"],
 input[type="number"],
 select {
@@ -228,6 +231,7 @@ select {
   cursor: pointer;
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   text-align: left;
+  color: var(--text);
 }
 
 .test-card:hover {
