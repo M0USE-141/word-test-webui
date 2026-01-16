@@ -252,11 +252,17 @@ select {
   align-items: start;
   background: #eef2ff;
   border-style: dashed;
+  color: var(--primary-strong);
 }
 
 .test-card--import .muted {
   color: var(--text);
   opacity: 0.75;
+}
+
+.test-card--import:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
 }
 
 .test-card__title {
@@ -558,6 +564,12 @@ button.danger:hover {
   background: #f8fafc;
   display: grid;
   gap: 0.5rem;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editor-card:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 .editor-card:hover {
@@ -571,11 +583,20 @@ button.danger:hover {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--primary-strong);
 }
 
 .editor-card--new:hover {
   background: #e0e7ff;
   transform: none;
+}
+
+.editor-card:focus,
+.editor-card:focus-visible,
+.editor-card--new:focus,
+.editor-card--new:focus-visible {
+  outline: none;
 }
 
 .editor-card.is-expanded {
@@ -728,6 +749,40 @@ button.danger:hover {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #ffffff;
+}
+
+.editor-object-toggles {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.editor-object-toggle {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #f8fafc;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  color: var(--primary-strong);
+  transition: background 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editor-object-toggle:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.editor-object-toggle:active {
+  transform: translateY(1px);
+}
+
+.editor-object-section {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .editor-object-upload {

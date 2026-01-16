@@ -187,7 +187,26 @@
                 <p class="muted">
                   Изображения и формулы в тексте вопроса или вариантов ответов.
                 </p>
-                <div class="editor-object-upload">
+                <div class="editor-object-toggles">
+                  <button
+                    id="toggle-editor-objects"
+                    type="button"
+                    class="editor-object-toggle"
+                  >
+                    Показать объекты
+                  </button>
+                  <button
+                    id="toggle-editor-object-upload"
+                    type="button"
+                    class="editor-object-toggle"
+                  >
+                    Добавить объект
+                  </button>
+                </div>
+                <div
+                  id="editor-object-upload-section"
+                  class="editor-object-section editor-object-upload is-hidden"
+                >
                   <div class="editor-object-upload__header">
                     <strong>Добавить объект</strong>
                     <p class="muted">
@@ -221,8 +240,13 @@
                   </button>
                   <p id="editor-object-status" class="muted"></p>
                 </div>
-                <div id="editor-objects" class="object-list">
-                  <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
+                <div
+                  id="editor-object-list-section"
+                  class="editor-object-section is-hidden"
+                >
+                  <div id="editor-objects" class="object-list">
+                    <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
+                  </div>
                 </div>
               </div>
             </div>
