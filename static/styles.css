@@ -619,6 +619,15 @@ button.danger:hover {
   font-size: 0.9rem;
 }
 
+.editor-field select,
+.editor-field input[type="text"],
+.editor-field input[type="file"] {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+}
+
 .editor-field textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -701,6 +710,24 @@ button.danger:hover {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #ffffff;
+}
+
+.editor-object-upload {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: #f9fafb;
+}
+
+.editor-object-upload__header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.editor-object-upload .is-error {
+  color: var(--danger);
 }
 
 .object-list {

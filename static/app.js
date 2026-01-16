@@ -38,6 +38,25 @@ const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
 const editorPanel = document.getElementById("editor-panel");
 const editorPanelHome = document.querySelector(".editor-column--form");
+const editorObjectType = document.getElementById("editor-object-type");
+const editorObjectId = document.getElementById("editor-object-id");
+const editorObjectImageFields = document.getElementById(
+  "editor-object-image-fields"
+);
+const editorObjectImageFile = document.getElementById(
+  "editor-object-image-file"
+);
+const editorObjectFormulaFields = document.getElementById(
+  "editor-object-formula-fields"
+);
+const editorObjectFormulaText = document.getElementById(
+  "editor-object-formula-text"
+);
+const editorObjectFormulaFile = document.getElementById(
+  "editor-object-formula-file"
+);
+const editorAddObjectButton = document.getElementById("editor-add-object");
+const editorObjectStatus = document.getElementById("editor-object-status");
 const screenManagement = document.getElementById("screen-management");
 const screenTesting = document.getElementById("screen-testing");
 
@@ -64,6 +83,7 @@ let session = null;
 let editorState = {
   mode: "create",
   questionId: null,
+  objects: [],
 };
 
 const uiState = {
@@ -280,7 +300,7 @@ function getInlineIdentifier(inline) {
   const candidates =
     inline.type === "image"
       ? [inline.id, inline.src, inline.alt]
-      : [inline.id, inline.latex, inline.src, inline.mathml];
+      : [inline.id];
   return (
     candidates.find(
       (value) => typeof value === "string" && value.trim().length > 0
@@ -380,10 +400,29 @@ function collectInlineObjects(question) {
   return objects;
 }
 
+function collectRegisteredObjects(question) {
+  if (!question || !Array.isArray(question.objects)) {
+    return [];
+  }
+  return question.objects.filter(
+    (item) => item && typeof item === "object" && item.type
+  );
+}
+
 function buildInlineRegistry(question) {
   const registry = new Map();
   const objects = collectInlineObjects(question);
   objects.forEach(({ inline }) => {
+    const id = getInlineIdentifier(inline);
+    if (!id) {
+      return;
+    }
+    const key = `${inline.type}:${id}`;
+    if (!registry.has(key)) {
+      registry.set(key, inline);
+    }
+  });
+  collectRegisteredObjects(question).forEach((inline) => {
     const id = getInlineIdentifier(inline);
     if (!id) {
       return;
@@ -469,6 +508,20 @@ function syncEditorFormFromQuestion(question) {
     isCorrect: option.isCorrect,
   }));
   renderEditorOptions(options || []);
+  syncEditorObjectsFromQuestion(question);
+}
+
+function syncEditorObjectsFromQuestion(question) {
+  editorState.objects = collectRegisteredObjects(question).map((object) => ({
+    ...object,
+  }));
+}
+
+function getEditorObjects(question) {
+  if (editorState.objects && editorState.objects.length) {
+    return editorState.objects;
+  }
+  return collectRegisteredObjects(question);
 }
 
 function renderEditorObjects(question = findEditorQuestion()) {
@@ -477,14 +530,33 @@ function renderEditorObjects(question = findEditorQuestion()) {
   }
   clearElement(editorObjectsList);
   if (!currentTest || !question) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Выберите вопрос, чтобы увидеть объекты.";
-    editorObjectsList.appendChild(empty);
-    return;
+    const registered = getEditorObjects(question);
+    if (!currentTest) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Выберите вопрос, чтобы увидеть объекты.";
+      editorObjectsList.appendChild(empty);
+      return;
+    }
+    if (!registered.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Объекты не найдены.";
+      editorObjectsList.appendChild(empty);
+      return;
+    }
   }
 
-  const objects = collectInlineObjects(question);
+  const inlineObjects = question ? collectInlineObjects(question) : [];
+  const registeredObjects = getEditorObjects(question);
+  const objects = [
+    ...registeredObjects.map((inline) => ({
+      inline,
+      inlines: null,
+      source: { type: "registry" },
+    })),
+    ...inlineObjects,
+  ];
   if (!objects.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
@@ -506,10 +578,13 @@ function renderEditorObjects(question = findEditorQuestion()) {
 
     const source = document.createElement("div");
     source.className = "muted";
-    source.textContent =
-      item.source.type === "question"
-        ? "Источник: вопрос"
-        : `Источник: вариант #${item.source.id}`;
+    if (item.source.type === "question") {
+      source.textContent = "Источник: вопрос";
+    } else if (item.source.type === "registry") {
+      source.textContent = "Источник: загруженный объект";
+    } else {
+      source.textContent = `Источник: вариант #${item.source.id}`;
+    }
     const controls = document.createElement("div");
     controls.className = "object-controls";
 
@@ -521,10 +596,19 @@ function renderEditorObjects(question = findEditorQuestion()) {
     const details = buildInlineDetails(item.inline);
 
     removeButton.addEventListener("click", () => {
-      const confirmed = window.confirm(
-        "Удалить объект из текста вопроса?"
-      );
+      const message =
+        item.source.type === "registry"
+          ? "Удалить объект из списка доступных?"
+          : "Удалить объект из текста вопроса?";
+      const confirmed = window.confirm(message);
       if (!confirmed) {
+        return;
+      }
+      if (item.source.type === "registry") {
+        editorState.objects = editorState.objects.filter(
+          (object) => object !== item.inline
+        );
+        renderEditorObjects(question);
         return;
       }
       const inlineIndex = item.inlines.indexOf(item.inline);
@@ -1129,6 +1213,8 @@ function resetEditorForm() {
   }
   renderEditorOptions([]);
   setEditorState("create", null);
+  editorState.objects = [];
+  setEditorObjectStatus("");
   renderEditorObjects(null);
 }
 
@@ -1391,6 +1477,110 @@ function renderEditorQuestionList() {
   }
 }
 
+function setEditorObjectStatus(message, isError = false) {
+  if (!editorObjectStatus) {
+    return;
+  }
+  editorObjectStatus.textContent = message || "";
+  editorObjectStatus.classList.toggle("is-error", isError);
+}
+
+function syncEditorObjectFields() {
+  if (!editorObjectType) {
+    return;
+  }
+  const isFormula = editorObjectType.value === "formula";
+  editorObjectFormulaFields?.classList.toggle("is-hidden", !isFormula);
+  editorObjectImageFields?.classList.toggle("is-hidden", isFormula);
+}
+
+async function uploadObjectAsset(testId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`/api/tests/${testId}/assets`, {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail || "Не удалось загрузить объект";
+    throw new Error(detail);
+  }
+  return payload;
+}
+
+async function handleAddObject() {
+  if (!currentTest) {
+    setEditorObjectStatus("Сначала выберите тест.", true);
+    return;
+  }
+  const type = editorObjectType?.value || "image";
+  const id = editorObjectId?.value.trim() ?? "";
+  if (!id) {
+    setEditorObjectStatus("Укажите ID объекта.", true);
+    return;
+  }
+  const existingKey = `${type}:${id}`;
+  const registry = buildInlineRegistry(
+    findEditorQuestion() ?? { objects: editorState.objects }
+  );
+  if (registry.has(existingKey)) {
+    setEditorObjectStatus("Объект с таким ID уже существует.", true);
+    return;
+  }
+
+  try {
+    if (type === "formula") {
+      const xmlText = editorObjectFormulaText?.value.trim() ?? "";
+      let formulaText = xmlText;
+      const file = editorObjectFormulaFile?.files?.[0];
+      if (!formulaText && file) {
+        formulaText = (await file.text()).trim();
+      }
+      if (!formulaText) {
+        setEditorObjectStatus("Добавьте XML формулы.", true);
+        return;
+      }
+      editorState.objects.push({
+        type: "formula",
+        id,
+        mathml: formulaText,
+      });
+      setEditorObjectStatus("Формула добавлена.");
+    } else {
+      const file = editorObjectImageFile?.files?.[0];
+      if (!file) {
+        setEditorObjectStatus("Выберите файл изображения.", true);
+        return;
+      }
+      setEditorObjectStatus("Загрузка файла...");
+      const asset = await uploadObjectAsset(currentTest.id, file);
+      editorState.objects.push({
+        type: "image",
+        id,
+        src: asset.src,
+        alt: file.name || id,
+      });
+      setEditorObjectStatus("Изображение добавлено.");
+    }
+    if (editorObjectId) {
+      editorObjectId.value = "";
+    }
+    if (editorObjectFormulaText) {
+      editorObjectFormulaText.value = "";
+    }
+    if (editorObjectFormulaFile) {
+      editorObjectFormulaFile.value = "";
+    }
+    if (editorObjectImageFile) {
+      editorObjectImageFile.value = "";
+    }
+    renderEditorObjects(findEditorQuestion());
+  } catch (error) {
+    setEditorObjectStatus(error.message, true);
+  }
+}
+
 async function refreshCurrentTest(testId = currentTest?.id) {
   if (!testId) {
     return;
@@ -1527,6 +1717,7 @@ async function deleteTest(testId) {
 function initializeManagementScreenEvents() {
   updateUploadFileState(uploadFileInput?.files?.[0]);
   editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
+  syncEditorObjectFields();
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
@@ -1593,6 +1784,14 @@ function initializeManagementScreenEvents() {
     resetEditorForm();
   });
 
+  editorObjectType?.addEventListener("change", () => {
+    syncEditorObjectFields();
+  });
+
+  editorAddObjectButton?.addEventListener("click", () => {
+    handleAddObject();
+  });
+
   editorForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!currentTest) {
@@ -1604,7 +1803,9 @@ function initializeManagementScreenEvents() {
       alert("Заполните текст вопроса и хотя бы один вариант ответа.");
       return;
     }
-    const inlineRegistry = buildInlineRegistry(findEditorQuestion());
+    const inlineRegistry = buildInlineRegistry(
+      findEditorQuestion() ?? { objects: editorState.objects }
+    );
     const questionParse = parseTextToBlocks(questionRaw, inlineRegistry);
     const questionField = editorQuestionText?.closest(".editor-field");
     if (questionParse.missing.length && questionField) {
@@ -1638,6 +1839,7 @@ function initializeManagementScreenEvents() {
       const payload = {
         question: { blocks: questionParse.blocks },
         options: optionPayloads.payloads,
+        objects: editorState.objects,
       };
       if (optionPayloads.correctBlocks) {
         payload.correct = { blocks: optionPayloads.correctBlocks };

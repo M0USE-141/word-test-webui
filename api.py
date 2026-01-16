@@ -63,6 +63,17 @@ def _safe_asset_path(base_dir: Path, asset_path: str) -> Path:
     return resolved
 
 
+def _save_upload_file(upload: UploadFile, target_dir: Path) -> Path:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(upload.filename or "asset").name
+    candidate = target_dir / safe_name
+    if candidate.exists():
+        suffix = candidate.suffix
+        candidate = target_dir / f"{candidate.stem}_{uuid.uuid4().hex[:8]}{suffix}"
+    candidate.write_bytes(upload.file.read())
+    return candidate
+
+
 @app.get("/api/tests")
 def list_tests() -> list[dict[str, object]]:
     tests = []
@@ -154,6 +165,19 @@ def get_asset(test_id: str, asset_path: str) -> FileResponse:
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Asset not found")
     return FileResponse(file_path)
+
+
+@app.post("/api/tests/{test_id}/assets")
+def upload_asset(test_id: str, file: UploadFile = File(...)) -> dict[str, str]:
+    assets_dir = _assets_dir(test_id)
+    if not _test_dir(test_id).exists():
+        raise HTTPException(status_code=404, detail="Test not found")
+    saved_path = _save_upload_file(file, assets_dir)
+    return {
+        "src": saved_path.relative_to(assets_dir).as_posix(),
+        "name": saved_path.name,
+        "id": saved_path.stem,
+    }
 
 
 def _text_to_blocks(text: str) -> list[dict[str, object]]:
@@ -248,6 +272,14 @@ def update_question(
             "blocks": correct_blocks or _text_to_blocks("")
         }
 
+    objects_payload = payload.get("objects")
+    if objects_payload is not None:
+        if not isinstance(objects_payload, list):
+            raise HTTPException(
+                status_code=400, detail="Invalid objects format"
+            )
+        question["objects"] = objects_payload
+
     _save_test_payload(test_id, test_payload)
     return {"payload": test_payload, "question": question}
 
@@ -301,6 +333,9 @@ def add_question(
         "options": options,
         "correct": {"blocks": correct_blocks or _text_to_blocks("")},
     }
+    objects_payload = payload.get("objects")
+    if isinstance(objects_payload, list):
+        new_question["objects"] = objects_payload
     questions.append(new_question)
     test_payload["questions"] = questions
     _save_test_payload(test_id, test_payload)
