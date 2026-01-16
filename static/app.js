@@ -44,7 +44,6 @@ const settingOnlyUnanswered = document.getElementById(
 );
 const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
-const testSelect = document.getElementById("test-select");
 
 const testsCacheKey = "tests-cache";
 
@@ -1000,32 +999,6 @@ function initializeNavigationEvents() {
 }
 
 function initializeManagementScreenEvents() {
-  testSelect?.addEventListener("change", async (event) => {
-    const testId = event.target.value;
-
-    if (!testId) {
-      currentTest = null;
-      session = null;
-      updateProgressHint();
-      questionContainer.textContent = "Сначала загрузите тест через API.";
-      optionsContainer.textContent = "";
-      questionProgress.textContent = "Вопрос 0 из 0";
-      renderQuestionNav();
-      renderResultSummary(null);
-      return;
-    }
-    currentTest = await fetchTest(testId);
-    session = null;
-    updateProgressHint();
-    questionContainer.textContent =
-      "Нажмите «Начать тестирование», чтобы применить настройки.";
-    optionsContainer.textContent = "";
-    questionProgress.textContent = "Вопрос 0 из 0";
-    renderQuestionNav();
-    renderResultSummary(null);
-    renderTestCards(testsCache, testId);
-  });
-
   openEditorButton?.addEventListener("click", () => {
     if (!currentTest) {
       return;

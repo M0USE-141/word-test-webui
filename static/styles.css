@@ -61,6 +61,7 @@ p {
 .app-nav__button {
   border: 1px solid var(--border);
   background: var(--card);
+  color: var(--text);
   padding: 0.55rem 1rem;
   border-radius: 999px;
   font-size: 0.95rem;
