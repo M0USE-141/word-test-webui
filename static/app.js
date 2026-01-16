@@ -1125,10 +1125,14 @@ function renderEditorQuestionList() {
     editButton.type = "button";
     editButton.className = "ghost";
     editButton.textContent = "Редактировать";
-    editButton.addEventListener("click", () => {
+    const handleSelectQuestion = () => {
       setEditorState("edit", question.id);
       syncEditorFormFromQuestion(question);
       renderEditorObjects(question);
+    };
+    editButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handleSelectQuestion();
     });
 
     const deleteButton = document.createElement("button");
@@ -1150,6 +1154,7 @@ function renderEditorQuestionList() {
 
     actions.append(editButton, deleteButton);
     card.append(title, actions);
+    card.addEventListener("click", handleSelectQuestion);
     editorQuestionList.appendChild(card);
   });
 }
