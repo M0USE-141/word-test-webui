@@ -16,6 +16,7 @@ const nextQuestionButton = document.getElementById("next-question");
 const finishTestButton = document.getElementById("finish-test");
 const answerFeedback = document.getElementById("answer-feedback");
 const startTestButton = document.getElementById("start-test");
+const exitTestButton = document.getElementById("exit-test");
 const resultSummary = document.getElementById("result-summary");
 const resultDetails = document.getElementById("result-details");
 const progressHint = document.getElementById("progress-hint");
@@ -23,6 +24,8 @@ const editorModal = document.getElementById("editor-modal");
 const closeEditorButton = document.getElementById("close-editor");
 const editorRenameTestButton = document.getElementById("editor-rename-test");
 const editorDeleteTestButton = document.getElementById("editor-delete-test");
+const importModal = document.getElementById("import-modal");
+const closeImportButton = document.getElementById("close-import");
 const editorQuestionList = document.getElementById("editor-question-list");
 const editorForm = document.getElementById("editor-form");
 const editorFormTitle = document.getElementById("editor-form-title");
@@ -651,6 +654,19 @@ function startTest() {
 
 function renderTestCards(tests, selectedId) {
   clearElement(testCardsContainer);
+
+  const importCard = document.createElement("button");
+  importCard.type = "button";
+  importCard.className = "test-card test-card--import";
+  importCard.innerHTML = `
+    <strong>Импорт теста</strong>
+    <span class="muted">Добавьте новую коллекцию из Word-файла.</span>
+  `;
+  importCard.addEventListener("click", () => {
+    openImportModal();
+  });
+  testCardsContainer.appendChild(importCard);
+
   if (!tests.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
@@ -733,6 +749,22 @@ function closeEditorModal() {
   }
   editorModal.classList.remove("is-open");
   editorModal.setAttribute("aria-hidden", "true");
+}
+
+function openImportModal() {
+  if (!importModal) {
+    return;
+  }
+  importModal.classList.add("is-open");
+  importModal.setAttribute("aria-hidden", "false");
+}
+
+function closeImportModal() {
+  if (!importModal) {
+    return;
+  }
+  importModal.classList.remove("is-open");
+  importModal.setAttribute("aria-hidden", "true");
 }
 
 function renderEditorOptions(options = []) {
@@ -1015,6 +1047,16 @@ function initializeManagementScreenEvents() {
     closeEditorModal();
   });
 
+  closeImportButton?.addEventListener("click", () => {
+    closeImportModal();
+  });
+
+  importModal?.addEventListener("click", (event) => {
+    if (event.target === importModal) {
+      closeImportModal();
+    }
+  });
+
   editorRenameTestButton?.addEventListener("click", async () => {
     if (!currentTest) {
       return;
@@ -1129,6 +1171,7 @@ function initializeManagementScreenEvents() {
       renderTestCards(tests, nextTestId);
       await selectTest(nextTestId);
       uploadFileInput.value = "";
+      closeImportModal();
     } catch (error) {
       questionContainer.textContent = error.message;
       renderUploadLogs(error.message, true);
@@ -1162,6 +1205,10 @@ function initializeTestingScreenEvents() {
 
   startTestButton?.addEventListener("click", () => {
     startTest();
+  });
+
+  exitTestButton?.addEventListener("click", () => {
+    setActiveScreen("management");
   });
 }
 

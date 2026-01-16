@@ -26,37 +26,8 @@
       <section id="screen-management" class="app-screen is-active">
         <section class="panel panel--management">
           <div class="card">
-            <h2>Импорт тестов</h2>
-            <form id="upload-form" class="upload-form">
-              <label class="upload-field" for="upload-file">
-                <span>Файл Word</span>
-                <input
-                  type="file"
-                  id="upload-file"
-                  accept=".doc,.docx"
-                  required
-                />
-              </label>
-              <label class="upload-field" for="upload-symbol">
-                <span>Маркер правильного ответа</span>
-                <input type="text" id="upload-symbol" name="symbol" />
-              </label>
-              <label class="upload-checkbox" for="upload-log-small-tables">
-                <input type="checkbox" id="upload-log-small-tables" />
-                <span>Логировать таблицы &lt; 3 строк</span>
-              </label>
-              <button type="submit">Импортировать</button>
-            </form>
-            <div class="upload-logs-panel">
-              <h3>Логи импорта</h3>
-              <ul id="upload-logs" class="upload-logs"></ul>
-            </div>
-          </div>
-
-          <div class="card">
             <h2>Коллекции тестов</h2>
             <div class="controls">
-              <label>Тесты</label>
               <div id="test-cards" class="test-cards"></div>
             </div>
           </div>
@@ -123,6 +94,9 @@
               <p id="question-status" class="muted"></p>
             </div>
             <div class="question-actions">
+              <button id="exit-test" type="button" class="ghost">
+                Выйти
+              </button>
               <button id="prev-question" type="button">Назад</button>
               <button id="next-question" type="button">Дальше</button>
               <button id="finish-test" type="button" class="danger">
@@ -205,6 +179,41 @@
               </div>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-modal" class="modal" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2>Импорт тестов</h2>
+            <p class="muted">Загрузите Word-файл и получите новую коллекцию.</p>
+          </div>
+          <div class="modal-actions">
+            <button id="close-import" type="button" class="ghost">
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <form id="upload-form" class="upload-form">
+          <label class="upload-field" for="upload-file">
+            <span>Файл Word</span>
+            <input type="file" id="upload-file" accept=".doc,.docx" required />
+          </label>
+          <label class="upload-field" for="upload-symbol">
+            <span>Маркер правильного ответа</span>
+            <input type="text" id="upload-symbol" name="symbol" />
+          </label>
+          <label class="upload-checkbox" for="upload-log-small-tables">
+            <input type="checkbox" id="upload-log-small-tables" />
+            <span>Логировать таблицы &lt; 3 строк</span>
+          </label>
+          <button type="submit">Импортировать</button>
+        </form>
+        <div class="upload-logs-panel">
+          <h3>Логи импорта</h3>
+          <ul id="upload-logs" class="upload-logs"></ul>
         </div>
       </div>
     </div>
