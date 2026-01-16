@@ -36,6 +36,8 @@ const editorObjectsList = document.getElementById("editor-objects");
 const editorAddOption = document.getElementById("add-option");
 const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
+const editorPanel = document.getElementById("editor-panel");
+const editorPanelHome = document.querySelector(".editor-column--form");
 const screenManagement = document.getElementById("screen-management");
 const screenTesting = document.getElementById("screen-testing");
 
@@ -66,6 +68,10 @@ let editorState = {
 const uiState = {
   activeScreen: "management",
 };
+
+const editorMobileQuery = window.matchMedia("(max-width: 720px)");
+let activeEditorCard = null;
+let activeEditorCardKey = null;
 
 function readTestsCache() {
   const raw = localStorage.getItem(testsCacheKey);
@@ -1025,6 +1031,63 @@ function setEditorState(mode, questionId = null) {
   }
 }
 
+function ensureEditorPanelInHome() {
+  if (!editorPanel || !editorPanelHome) {
+    return;
+  }
+  editorPanelHome.appendChild(editorPanel);
+}
+
+function setActiveEditorCard(card, key = null) {
+  if (activeEditorCard && activeEditorCard !== card) {
+    activeEditorCard.classList.remove("is-expanded");
+  }
+  activeEditorCard = card;
+  if (!card) {
+    return;
+  }
+  const nextKey = key ?? card.dataset.editorCardKey ?? null;
+  if (nextKey !== null) {
+    activeEditorCardKey = nextKey;
+  }
+  card.classList.add("is-expanded");
+  const expand = card.querySelector(".editor-card-expand");
+  if (expand && editorPanel) {
+    expand.appendChild(editorPanel);
+  }
+}
+
+function showEditorPanelInCard(card, key = null) {
+  if (!editorPanel) {
+    return;
+  }
+  editorPanel.classList.remove("is-hidden");
+  setActiveEditorCard(card, key);
+}
+
+function syncEditorPanelLocation() {
+  if (!editorPanel) {
+    return;
+  }
+  if (editorMobileQuery.matches) {
+    if (activeEditorCard) {
+      const expand = activeEditorCard.querySelector(".editor-card-expand");
+      if (expand) {
+        expand.appendChild(editorPanel);
+      }
+      editorPanel.classList.remove("is-hidden");
+    } else {
+      editorPanel.classList.add("is-hidden");
+    }
+  } else {
+    editorPanel.classList.remove("is-hidden");
+    ensureEditorPanelInHome();
+    if (activeEditorCard) {
+      activeEditorCard.classList.remove("is-expanded");
+    }
+  }
+}
+
 function resetEditorForm() {
   if (editorQuestionText) {
     editorQuestionText.value = "";
@@ -1085,6 +1148,35 @@ function collectEditorOptions() {
 
 function renderEditorQuestionList() {
   clearElement(editorQuestionList);
+  activeEditorCard = null;
+  const newCard = document.createElement("button");
+  newCard.type = "button";
+  newCard.className = "editor-card editor-card--new";
+  newCard.dataset.editorCardKey = "new";
+
+  const newTitle = document.createElement("div");
+  newTitle.className = "editor-card-title";
+  newTitle.textContent = "Добавить новый вопрос";
+
+  const newHint = document.createElement("div");
+  newHint.className = "muted";
+  newHint.textContent = "Раскройте форму добавления вопроса.";
+
+  const newExpand = document.createElement("div");
+  newExpand.className = "editor-card-expand";
+
+  newCard.append(newTitle, newHint, newExpand);
+  newCard.addEventListener("click", () => {
+    resetEditorForm();
+    activeEditorCardKey = "new";
+    if (editorMobileQuery.matches) {
+      showEditorPanelInCard(newCard, "new");
+    } else {
+      syncEditorPanelLocation();
+    }
+  });
+  editorQuestionList.appendChild(newCard);
+
   if (!currentTest || !currentTest.questions?.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
@@ -1096,6 +1188,7 @@ function renderEditorQuestionList() {
   currentTest.questions.forEach((question, index) => {
     const card = document.createElement("div");
     card.className = "editor-card";
+    card.dataset.editorCardKey = String(question.id ?? index + 1);
 
     const title = document.createElement("div");
     title.className = "editor-card-title";
@@ -1107,10 +1200,19 @@ function renderEditorQuestionList() {
     const actions = document.createElement("div");
     actions.className = "editor-card-actions";
 
+    const expand = document.createElement("div");
+    expand.className = "editor-card-expand";
+
     const handleSelectQuestion = () => {
       setEditorState("edit", question.id);
       syncEditorFormFromQuestion(question);
       renderEditorObjects(question);
+      activeEditorCardKey = String(question.id ?? index + 1);
+      if (editorMobileQuery.matches) {
+        showEditorPanelInCard(card, String(question.id ?? index + 1));
+      } else {
+        syncEditorPanelLocation();
+      }
     };
 
     const deleteButton = document.createElement("button");
@@ -1131,10 +1233,24 @@ function renderEditorQuestionList() {
     });
 
     actions.append(deleteButton);
-    card.append(title, actions);
+    card.append(title, actions, expand);
     card.addEventListener("click", handleSelectQuestion);
     editorQuestionList.appendChild(card);
   });
+
+  if (editorMobileQuery.matches && activeEditorCardKey) {
+    const targetCard = editorQuestionList.querySelector(
+      `[data-editor-card-key="${activeEditorCardKey}"]`
+    );
+    if (targetCard) {
+      showEditorPanelInCard(targetCard, activeEditorCardKey);
+    } else {
+      activeEditorCardKey = null;
+      syncEditorPanelLocation();
+    }
+  } else {
+    syncEditorPanelLocation();
+  }
 }
 
 async function refreshCurrentTest(testId = currentTest?.id) {
@@ -1272,6 +1388,7 @@ async function deleteTest(testId) {
 
 function initializeManagementScreenEvents() {
   updateUploadFileState(uploadFileInput?.files?.[0]);
+  editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
