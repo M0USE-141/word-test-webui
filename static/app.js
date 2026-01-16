@@ -470,9 +470,12 @@ function renderQuestion() {
   if (!session || !session.questions.length) {
     questionContainer.textContent = "Нет вопросов для отображения.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     questionStatus.textContent = "";
-    answerFeedback.textContent = "";
+    if (answerFeedback) {
+      answerFeedback.textContent = "";
+    }
     return;
   }
 
@@ -490,6 +493,7 @@ function renderQuestion() {
   renderBlocks(questionContainer, entry.question.question.blocks);
 
   clearElement(optionsContainer);
+  optionsContainer.classList.remove("is-hidden");
   const optionsTitle = document.createElement("h3");
   optionsTitle.textContent = "Варианты ответа";
   optionsContainer.appendChild(optionsTitle);
@@ -545,7 +549,7 @@ function renderQuestion() {
         progress.add(entry.questionId);
         saveProgress(session.testId, progress);
         updateProgressHint();
-        if (session.settings.showAnswersImmediately) {
+        if (session.settings.showAnswersImmediately && answerFeedback) {
           answerFeedback.textContent = getAnswerFeedback(
             index,
             resolvedCorrectIndex
@@ -560,16 +564,18 @@ function renderQuestion() {
 
   optionsContainer.appendChild(optionsList);
 
-  if (!session.settings.showAnswersImmediately || session.finished) {
-    answerFeedback.textContent = "";
-  } else if (selectedIndex !== -1) {
-    answerFeedback.textContent = getAnswerFeedback(
-      selectedIndex,
-      resolvedCorrectIndex
-    );
-  } else {
-    answerFeedback.textContent =
-      "Выберите вариант ответа, чтобы увидеть подсказку.";
+  if (answerFeedback) {
+    if (!session.settings.showAnswersImmediately || session.finished) {
+      answerFeedback.textContent = "";
+    } else if (selectedIndex !== -1) {
+      answerFeedback.textContent = getAnswerFeedback(
+        selectedIndex,
+        resolvedCorrectIndex
+      );
+    } else {
+      answerFeedback.textContent =
+        "Выберите вариант ответа, чтобы увидеть подсказку.";
+    }
   }
 
   prevQuestionButton.disabled = session.currentIndex === 0;
@@ -646,6 +652,7 @@ function startTest() {
   if (!session.questions.length) {
     questionContainer.textContent = "Нет вопросов для тестирования.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     return;
   }
@@ -934,6 +941,7 @@ async function selectTest(testId) {
     updateProgressHint();
     questionContainer.textContent = "Сначала загрузите тест через API.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     renderQuestionNav();
     renderResultSummary(null);
@@ -950,6 +958,7 @@ async function selectTest(testId) {
     questionContainer.textContent =
       "Нажмите «Начать тестирование», чтобы применить настройки.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     renderQuestionNav();
     renderResultSummary(loadLastResult(testId));
@@ -1209,6 +1218,7 @@ function initializeTestingScreenEvents() {
 
   exitTestButton?.addEventListener("click", () => {
     setActiveScreen("management");
+    optionsContainer.classList.add("is-hidden");
   });
 }
 
