@@ -380,11 +380,6 @@ function buildInlineDetails(inline) {
       placeholder.textContent = "Нет ссылки на файл изображения.";
       details.appendChild(placeholder);
     }
-    if (inline.alt || inline.id || inline.src) {
-      const meta = document.createElement("pre");
-      meta.textContent = inline.alt || inline.id || inline.src;
-      details.appendChild(meta);
-    }
   } else if (inline.type === "formula") {
     if (inline.mathml) {
       const math = document.createElement("div");
