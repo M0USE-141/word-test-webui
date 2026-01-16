@@ -57,6 +57,16 @@ const editorObjectFormulaFile = document.getElementById(
 );
 const editorAddObjectButton = document.getElementById("editor-add-object");
 const editorObjectStatus = document.getElementById("editor-object-status");
+const editorObjectsToggle = document.getElementById("toggle-editor-objects");
+const editorObjectUploadToggle = document.getElementById(
+  "toggle-editor-object-upload"
+);
+const editorObjectUploadSection = document.getElementById(
+  "editor-object-upload-section"
+);
+const editorObjectListSection = document.getElementById(
+  "editor-object-list-section"
+);
 const screenManagement = document.getElementById("screen-management");
 const screenTesting = document.getElementById("screen-testing");
 
@@ -1496,6 +1506,15 @@ function setEditorObjectStatus(message, isError = false) {
   editorObjectStatus.classList.toggle("is-error", isError);
 }
 
+function setEditorObjectSection(section) {
+  if (!editorObjectUploadSection || !editorObjectListSection) {
+    return;
+  }
+  const showUpload = section === "upload";
+  editorObjectUploadSection.classList.toggle("is-hidden", !showUpload);
+  editorObjectListSection.classList.toggle("is-hidden", showUpload);
+}
+
 function syncEditorObjectFields() {
   if (!editorObjectType) {
     return;
@@ -1789,6 +1808,14 @@ function initializeManagementScreenEvents() {
 
   editorAddOption?.addEventListener("click", () => {
     addOptionRow("", false);
+  });
+
+  editorObjectsToggle?.addEventListener("click", () => {
+    setEditorObjectSection("list");
+  });
+
+  editorObjectUploadToggle?.addEventListener("click", () => {
+    setEditorObjectSection("upload");
   });
 
   editorResetButton?.addEventListener("click", () => {

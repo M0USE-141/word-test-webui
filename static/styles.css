@@ -558,6 +558,12 @@ button.danger:hover {
   background: #f8fafc;
   display: grid;
   gap: 0.5rem;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editor-card:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 .editor-card--new {
@@ -566,6 +572,7 @@ button.danger:hover {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .editor-card--new:hover {
@@ -573,9 +580,17 @@ button.danger:hover {
   transform: none;
 }
 
+.editor-card:focus,
+.editor-card:focus-visible,
+.editor-card--new:focus,
+.editor-card--new:focus-visible {
+  outline: none;
+}
+
 .editor-card.is-expanded {
-  border-color: #c7d2fe;
-  box-shadow: 0 0 0 1px #c7d2fe;
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 2px #a5b4fc;
 }
 
 .editor-card-expand {
@@ -722,6 +737,39 @@ button.danger:hover {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #ffffff;
+}
+
+.editor-object-toggles {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.editor-object-toggle {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #f8fafc;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editor-object-toggle:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.editor-object-toggle:active {
+  transform: translateY(1px);
+}
+
+.editor-object-section {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .editor-object-upload {
