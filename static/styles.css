@@ -600,6 +600,18 @@ button.danger:hover {
   font-weight: 600;
 }
 
+.editor-card-preview {
+  max-height: 4.5rem;
+  overflow: hidden;
+  display: grid;
+  gap: 0.25rem;
+  color: #475569;
+}
+
+.editor-card-preview p {
+  margin: 0;
+}
+
 .editor-card-actions {
   display: flex;
   gap: 0.5rem;
