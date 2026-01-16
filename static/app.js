@@ -32,6 +32,7 @@ const editorForm = document.getElementById("editor-form");
 const editorFormTitle = document.getElementById("editor-form-title");
 const editorQuestionText = document.getElementById("editor-question-text");
 const editorOptionsList = document.getElementById("editor-options-list");
+const editorObjectsList = document.getElementById("editor-objects");
 const editorAddOption = document.getElementById("add-option");
 const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
@@ -292,6 +293,216 @@ function blocksToText(blocks) {
       .join("");
   });
   return lines.join("\n").trim();
+}
+
+function findEditorQuestion() {
+  if (!currentTest || !editorState.questionId) {
+    return null;
+  }
+  return (
+    currentTest.questions?.find(
+      (question) => question.id === editorState.questionId
+    ) || null
+  );
+}
+
+function createShortLabel(value, fallback) {
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  const base = raw || fallback;
+  if (base.length <= 28) {
+    return base;
+  }
+  return `${base.slice(0, 25)}…`;
+}
+
+function collectInlineObjects(question) {
+  const objects = [];
+  if (!question) {
+    return objects;
+  }
+  const addBlocks = (blocks, source) => {
+    if (!Array.isArray(blocks)) {
+      return;
+    }
+    blocks.forEach((block) => {
+      if (!block || !Array.isArray(block.inlines)) {
+        return;
+      }
+      block.inlines.forEach((inline) => {
+        if (!inline || (inline.type !== "image" && inline.type !== "formula")) {
+          return;
+        }
+        objects.push({
+          inline,
+          inlines: block.inlines,
+          source,
+        });
+      });
+    });
+  };
+  addBlocks(question.question?.blocks, { type: "question" });
+  question.options?.forEach((option, index) => {
+    addBlocks(option.content?.blocks, {
+      type: "option",
+      id: option.id ?? index + 1,
+    });
+  });
+  return objects;
+}
+
+function getInlineSummary(inline, index) {
+  const typeLabel = inline.type === "image" ? "Изображение" : "Формула";
+  const hint =
+    inline.id ||
+    inline.src ||
+    inline.alt ||
+    inline.latex ||
+    inline.mathml ||
+    `#${index + 1}`;
+  return `${typeLabel}: ${createShortLabel(hint, typeLabel)}`;
+}
+
+function buildInlineDetails(inline) {
+  const details = document.createElement("div");
+  details.className = "object-details";
+
+  if (inline.type === "image") {
+    if (inline.src) {
+      const img = document.createElement("img");
+      img.src = `${currentTest.assetsBaseUrl}/${inline.src}`;
+      img.alt = inline.alt || "image";
+      img.loading = "lazy";
+      img.className = "object-preview-image";
+      details.appendChild(img);
+    } else {
+      const placeholder = document.createElement("p");
+      placeholder.className = "muted";
+      placeholder.textContent = "Нет ссылки на файл изображения.";
+      details.appendChild(placeholder);
+    }
+  } else if (inline.type === "formula") {
+    if (inline.mathml) {
+      const math = document.createElement("div");
+      math.className = "object-preview-math";
+      math.innerHTML = inline.mathml;
+      details.appendChild(math);
+
+      const code = document.createElement("pre");
+      code.textContent = inline.mathml;
+      details.appendChild(code);
+    } else if (inline.latex) {
+      const math = document.createElement("div");
+      math.className = "object-preview-math";
+      math.innerHTML = `\\(${inline.latex}\\)`;
+      details.appendChild(math);
+
+      const code = document.createElement("pre");
+      code.textContent = inline.latex;
+      details.appendChild(code);
+    } else if (inline.src) {
+      const img = document.createElement("img");
+      img.src = `${currentTest.assetsBaseUrl}/${inline.src}`;
+      img.alt = inline.id || "formula";
+      img.className = "object-preview-image";
+      details.appendChild(img);
+    } else {
+      const placeholder = document.createElement("p");
+      placeholder.className = "muted";
+      placeholder.textContent = "Нет данных формулы.";
+      details.appendChild(placeholder);
+    }
+  }
+
+  return details;
+}
+
+function syncEditorFormFromQuestion(question) {
+  if (!question) {
+    return;
+  }
+  if (editorQuestionText) {
+    editorQuestionText.value = blocksToText(question.question?.blocks || []);
+  }
+  const options = question.options?.map((option) => ({
+    text: blocksToText(option.content?.blocks || []),
+    isCorrect: option.isCorrect,
+  }));
+  renderEditorOptions(options || []);
+}
+
+function renderEditorObjects(question = findEditorQuestion()) {
+  if (!editorObjectsList) {
+    return;
+  }
+  clearElement(editorObjectsList);
+  if (!currentTest || !question) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Выберите вопрос, чтобы увидеть объекты.";
+    editorObjectsList.appendChild(empty);
+    return;
+  }
+
+  const objects = collectInlineObjects(question);
+  if (!objects.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Объекты не найдены.";
+    editorObjectsList.appendChild(empty);
+    return;
+  }
+
+  objects.forEach((item, index) => {
+    const card = document.createElement("div");
+    card.className = "object-card";
+
+    const content = document.createElement("div");
+    content.className = "object-content";
+
+    const title = document.createElement("div");
+    title.className = "object-title";
+    title.textContent = getInlineSummary(item.inline, index);
+
+    const source = document.createElement("div");
+    source.className = "muted";
+    source.textContent =
+      item.source.type === "question"
+        ? "Источник: вопрос"
+        : `Источник: вариант #${item.source.id}`;
+    const controls = document.createElement("div");
+    controls.className = "object-controls";
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "danger";
+    removeButton.textContent = "Удалить";
+
+    const details = buildInlineDetails(item.inline);
+
+    removeButton.addEventListener("click", () => {
+      const confirmed = window.confirm(
+        "Удалить объект из текста вопроса?"
+      );
+      if (!confirmed) {
+        return;
+      }
+      const inlineIndex = item.inlines.indexOf(item.inline);
+      if (inlineIndex >= 0) {
+        item.inlines.splice(inlineIndex, 1);
+      }
+      syncEditorFormFromQuestion(question);
+      renderEditorObjects(question);
+    });
+
+    controls.append(removeButton);
+    content.append(title, source, details);
+    card.append(content, controls);
+    editorObjectsList.appendChild(card);
+
+    if (window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([details]);
+    }
+  });
 }
 
 function shuffle(items) {
@@ -762,6 +973,7 @@ function openEditorModal() {
   updateEditorTestActions();
   editorModal.classList.add("is-open");
   editorModal.setAttribute("aria-hidden", "false");
+  renderEditorObjects();
 }
 
 function closeEditorModal() {
@@ -814,12 +1026,12 @@ function setEditorState(mode, questionId = null) {
 }
 
 function resetEditorForm() {
-  if (!editorQuestionText) {
-    return;
+  if (editorQuestionText) {
+    editorQuestionText.value = "";
   }
-  editorQuestionText.value = "";
   renderEditorOptions([]);
   setEditorState("create", null);
+  renderEditorObjects(null);
 }
 
 function addOptionRow(value = "", isCorrect = false) {
@@ -895,19 +1107,11 @@ function renderEditorQuestionList() {
     const actions = document.createElement("div");
     actions.className = "editor-card-actions";
 
-    const editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.className = "ghost";
-    editButton.textContent = "Редактировать";
-    editButton.addEventListener("click", () => {
+    const handleSelectQuestion = () => {
       setEditorState("edit", question.id);
-      editorQuestionText.value = text;
-      const options = question.options?.map((option) => ({
-        text: blocksToText(option.content?.blocks || []),
-        isCorrect: option.isCorrect,
-      }));
-      renderEditorOptions(options || []);
-    });
+      syncEditorFormFromQuestion(question);
+      renderEditorObjects(question);
+    };
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -926,8 +1130,9 @@ function renderEditorQuestionList() {
       await deleteQuestion(currentTest.id, question.id);
     });
 
-    actions.append(editButton, deleteButton);
+    actions.append(deleteButton);
     card.append(title, actions);
+    card.addEventListener("click", handleSelectQuestion);
     editorQuestionList.appendChild(card);
   });
 }
@@ -1146,16 +1351,29 @@ function initializeManagementScreenEvents() {
     }
     try {
       if (editorState.mode === "edit" && editorState.questionId) {
-        await updateQuestion(currentTest.id, editorState.questionId, {
+        const editedId = editorState.questionId;
+        await updateQuestion(currentTest.id, editedId, {
           questionText,
           options,
         });
+        await refreshCurrentTest(currentTest.id);
+        renderEditorQuestionList();
+        const updatedQuestion = currentTest?.questions?.find(
+          (question) => question.id === editedId
+        );
+        if (updatedQuestion) {
+          setEditorState("edit", editedId);
+          syncEditorFormFromQuestion(updatedQuestion);
+          renderEditorObjects(updatedQuestion);
+        } else {
+          resetEditorForm();
+        }
       } else {
         await addQuestion(currentTest.id, { questionText, options });
+        await refreshCurrentTest(currentTest.id);
+        renderEditorQuestionList();
+        resetEditorForm();
       }
-      await refreshCurrentTest(currentTest.id);
-      renderEditorQuestionList();
-      resetEditorForm();
     } catch (error) {
       alert(error.message);
     }
