@@ -987,6 +987,7 @@ function openEditorModal() {
   updateEditorTestActions();
   editorModal.classList.add("is-open");
   editorModal.setAttribute("aria-hidden", "false");
+  renderEditorObjects();
 }
 
 function closeEditorModal() {
