@@ -171,6 +171,14 @@ def _text_to_blocks(text: str) -> list[dict[str, object]]:
     return blocks
 
 
+def _extract_blocks(value: object) -> list[dict[str, object]] | None:
+    if isinstance(value, dict):
+        blocks = value.get("blocks")
+        if isinstance(blocks, list):
+            return blocks
+    return None
+
+
 def _load_test_payload(test_id: str) -> dict[str, object]:
     payload_path = _payload_path(test_id)
     if not payload_path.exists():
@@ -203,8 +211,11 @@ def update_question(
     test_payload = _load_test_payload(test_id)
     question, _ = _find_question(test_payload, question_id)
 
+    question_blocks = _extract_blocks(payload.get("question"))
     question_text = payload.get("questionText")
-    if question_text is not None:
+    if question_blocks is not None:
+        question["question"] = {"blocks": question_blocks}
+    elif question_text is not None:
         question["question"] = {"blocks": _text_to_blocks(str(question_text))}
 
     options_payload = payload.get("options")
@@ -212,25 +223,30 @@ def update_question(
         if not isinstance(options_payload, list) or not options_payload:
             raise HTTPException(status_code=400, detail="Options are required")
         options = []
-        correct_text = ""
+        correct_blocks = _extract_blocks(payload.get("correct"))
         for index, option in enumerate(options_payload, start=1):
             if not isinstance(option, dict):
                 raise HTTPException(
                     status_code=400, detail="Invalid option format"
                 )
-            option_text = str(option.get("text", ""))
+            content_blocks = _extract_blocks(option.get("content"))
+            if content_blocks is None:
+                option_text = str(option.get("text", ""))
+                content_blocks = _text_to_blocks(option_text)
             is_correct = bool(option.get("isCorrect"))
-            if is_correct and not correct_text:
-                correct_text = option_text
+            if is_correct and correct_blocks is None:
+                correct_blocks = content_blocks
             options.append(
                 {
                     "id": index,
-                    "content": {"blocks": _text_to_blocks(option_text)},
+                    "content": {"blocks": content_blocks},
                     "isCorrect": is_correct,
                 }
             )
         question["options"] = options
-        question["correct"] = {"blocks": _text_to_blocks(correct_text)}
+        question["correct"] = {
+            "blocks": correct_blocks or _text_to_blocks("")
+        }
 
     _save_test_payload(test_id, test_payload)
     return {"payload": test_payload, "question": question}
@@ -246,36 +262,44 @@ def add_question(
     if not isinstance(questions, list):
         raise HTTPException(status_code=400, detail="Invalid test payload")
 
+    question_blocks = _extract_blocks(payload.get("question"))
     question_text = payload.get("questionText")
-    if not isinstance(question_text, str) or not question_text.strip():
-        raise HTTPException(status_code=400, detail="Question text is required")
+    if question_blocks is None:
+        if not isinstance(question_text, str) or not question_text.strip():
+            raise HTTPException(
+                status_code=400, detail="Question text is required"
+            )
+        question_blocks = _text_to_blocks(question_text)
     options_payload = payload.get("options")
     if not isinstance(options_payload, list) or not options_payload:
         raise HTTPException(status_code=400, detail="Options are required")
 
     next_id = max((q.get("id", 0) for q in questions if isinstance(q, dict)), default=0) + 1
     options = []
-    correct_text = ""
+    correct_blocks = _extract_blocks(payload.get("correct"))
     for index, option in enumerate(options_payload, start=1):
         if not isinstance(option, dict):
             raise HTTPException(status_code=400, detail="Invalid option format")
-        option_text = str(option.get("text", ""))
+        content_blocks = _extract_blocks(option.get("content"))
+        if content_blocks is None:
+            option_text = str(option.get("text", ""))
+            content_blocks = _text_to_blocks(option_text)
         is_correct = bool(option.get("isCorrect"))
-        if is_correct and not correct_text:
-            correct_text = option_text
+        if is_correct and correct_blocks is None:
+            correct_blocks = content_blocks
         options.append(
             {
                 "id": index,
-                "content": {"blocks": _text_to_blocks(option_text)},
+                "content": {"blocks": content_blocks},
                 "isCorrect": is_correct,
             }
         )
 
     new_question = {
         "id": next_id,
-        "question": {"blocks": _text_to_blocks(question_text)},
+        "question": {"blocks": question_blocks},
         "options": options,
-        "correct": {"blocks": _text_to_blocks(correct_text)},
+        "correct": {"blocks": correct_blocks or _text_to_blocks("")},
     }
     questions.append(new_question)
     test_payload["questions"] = questions

@@ -55,6 +55,7 @@ const settingMaxOptions = document.getElementById("setting-max-options");
 const testsCacheKey = "tests-cache";
 
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
+const INLINE_MARKER_REGEX = /{{\s*(image|formula)\s*:\s*([^}]+)\s*}}/g;
 
 let currentTest = null;
 let testsCache = [];
@@ -272,6 +273,29 @@ function renderBlocks(container, blocks) {
   }
 }
 
+function getInlineIdentifier(inline) {
+  if (!inline || typeof inline !== "object") {
+    return "";
+  }
+  const candidates =
+    inline.type === "image"
+      ? [inline.id, inline.src, inline.alt]
+      : [inline.id, inline.latex, inline.src, inline.mathml];
+  return (
+    candidates.find(
+      (value) => typeof value === "string" && value.trim().length > 0
+    ) || ""
+  ).trim();
+}
+
+function inlineToMarker(inline) {
+  const id = getInlineIdentifier(inline);
+  if (!id) {
+    return inline.type === "image" ? "[image]" : "[formula]";
+  }
+  return `{{${inline.type}:${id}}}`;
+}
+
 function blocksToText(blocks) {
   if (!Array.isArray(blocks)) {
     return "";
@@ -289,10 +313,10 @@ function blocksToText(blocks) {
           return "\n";
         }
         if (inline.type === "image") {
-          return "[image]";
+          return inlineToMarker(inline);
         }
         if (inline.type === "formula") {
-          return "[formula]";
+          return inlineToMarker(inline);
         }
         return "";
       })
@@ -356,15 +380,26 @@ function collectInlineObjects(question) {
   return objects;
 }
 
+function buildInlineRegistry(question) {
+  const registry = new Map();
+  const objects = collectInlineObjects(question);
+  objects.forEach(({ inline }) => {
+    const id = getInlineIdentifier(inline);
+    if (!id) {
+      return;
+    }
+    const key = `${inline.type}:${id}`;
+    if (!registry.has(key)) {
+      registry.set(key, inline);
+    }
+  });
+  return registry;
+}
+
 function getInlineSummary(inline, index) {
   const typeLabel = inline.type === "image" ? "Изображение" : "Формула";
   const hint =
-    inline.id ||
-    inline.src ||
-    inline.alt ||
-    inline.latex ||
-    inline.mathml ||
-    `#${index + 1}`;
+    getInlineIdentifier(inline) || `#${index + 1}`;
   return `${typeLabel}: ${createShortLabel(hint, typeLabel)}`;
 }
 
@@ -1133,17 +1168,120 @@ function addOptionRow(value = "", isCorrect = false) {
   editorOptionsList.appendChild(wrapper);
 }
 
-function collectEditorOptions() {
-  const options = [];
+function parseTextToBlocks(text, registry) {
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  const missing = [];
+
+  const addTextInline = (inlines, value) => {
+    if (value) {
+      inlines.push({ type: "text", text: value });
+    }
+  };
+
+  const appendParagraph = (inlines) => {
+    if (!inlines.length) {
+      inlines.push({ type: "text", text: "" });
+    }
+    blocks.push({ type: "paragraph", inlines });
+  };
+
+  lines.forEach((line) => {
+    const inlines = [];
+    let lastIndex = 0;
+    INLINE_MARKER_REGEX.lastIndex = 0;
+    let match;
+    while ((match = INLINE_MARKER_REGEX.exec(line))) {
+      const [fullMatch, rawType, rawId] = match;
+      addTextInline(inlines, line.slice(lastIndex, match.index));
+      const type = rawType.trim();
+      const id = rawId.trim();
+      if (!id) {
+        missing.push({ type, id: rawId });
+        addTextInline(inlines, fullMatch);
+      } else {
+        const key = `${type}:${id}`;
+        const inline = registry.get(key);
+        if (!inline) {
+          missing.push({ type, id });
+          addTextInline(inlines, fullMatch);
+        } else {
+          inlines.push({ ...inline });
+        }
+      }
+      lastIndex = match.index + fullMatch.length;
+    }
+    addTextInline(inlines, line.slice(lastIndex));
+    appendParagraph(inlines);
+  });
+
+  if (!lines.length) {
+    appendParagraph([]);
+  }
+
+  return { blocks, missing };
+}
+
+function clearEditorValidation() {
+  if (editorPanel) {
+    editorPanel.querySelectorAll(".is-error").forEach((element) => {
+      element.classList.remove("is-error");
+    });
+    editorPanel.querySelectorAll(".field-error").forEach((element) => {
+      element.remove();
+    });
+  }
+}
+
+function setFieldError(container, message) {
+  if (!container) {
+    return;
+  }
+  container.classList.add("is-error");
+  let messageEl = container.querySelector(".field-error");
+  if (!messageEl) {
+    messageEl = document.createElement("p");
+    messageEl.className = "field-error";
+    container.appendChild(messageEl);
+  }
+  messageEl.textContent = message;
+}
+
+function formatMissingMarkers(missing) {
+  const unique = new Set(
+    missing.map((item) => `${item.type}:${item.id}`)
+  );
+  return Array.from(unique).join(", ");
+}
+
+function collectEditorOptionPayloads(registry) {
+  const payloads = [];
+  const missingByOption = [];
+  let correctBlocks = null;
+
   editorOptionsList.querySelectorAll(".editor-option").forEach((optionEl) => {
     const textarea = optionEl.querySelector("textarea");
     const checkbox = optionEl.querySelector("input[type='checkbox']");
-    options.push({
-      text: textarea?.value.trim() ?? "",
-      isCorrect: checkbox?.checked ?? false,
+    const rawText = textarea?.value ?? "";
+    if (!rawText.trim()) {
+      return;
+    }
+    const { blocks, missing } = parseTextToBlocks(rawText, registry);
+    const isCorrect = checkbox?.checked ?? false;
+    if (isCorrect && !correctBlocks) {
+      correctBlocks = blocks;
+    }
+    payloads.push({
+      id: payloads.length + 1,
+      content: { blocks },
+      isCorrect,
     });
+    if (missing.length) {
+      missingByOption.push({ element: optionEl, missing });
+    }
   });
-  return options.filter((option) => option.text);
+
+  return { payloads, missingByOption, correctBlocks };
 }
 
 function renderEditorQuestionList() {
@@ -1460,19 +1598,53 @@ function initializeManagementScreenEvents() {
     if (!currentTest) {
       return;
     }
-    const questionText = editorQuestionText.value.trim();
-    const options = collectEditorOptions();
-    if (!questionText || !options.length) {
+    clearEditorValidation();
+    const questionRaw = editorQuestionText.value ?? "";
+    if (!questionRaw.trim()) {
       alert("Заполните текст вопроса и хотя бы один вариант ответа.");
       return;
     }
+    const inlineRegistry = buildInlineRegistry(findEditorQuestion());
+    const questionParse = parseTextToBlocks(questionRaw, inlineRegistry);
+    const questionField = editorQuestionText?.closest(".editor-field");
+    if (questionParse.missing.length && questionField) {
+      setFieldError(
+        questionField,
+        `Не найдены объекты: ${formatMissingMarkers(questionParse.missing)}`
+      );
+    }
+
+    const optionPayloads = collectEditorOptionPayloads(inlineRegistry);
+    if (!optionPayloads.payloads.length) {
+      alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+      return;
+    }
+    optionPayloads.missingByOption.forEach(({ element, missing }) => {
+      setFieldError(
+        element,
+        `Не найдены объекты: ${formatMissingMarkers(missing)}`
+      );
+    });
+
+    if (
+      questionParse.missing.length ||
+      optionPayloads.missingByOption.length
+    ) {
+      alert("Проверьте идентификаторы объектов в отмеченных полях.");
+      return;
+    }
+
     try {
+      const payload = {
+        question: { blocks: questionParse.blocks },
+        options: optionPayloads.payloads,
+      };
+      if (optionPayloads.correctBlocks) {
+        payload.correct = { blocks: optionPayloads.correctBlocks };
+      }
       if (editorState.mode === "edit" && editorState.questionId) {
         const editedId = editorState.questionId;
-        await updateQuestion(currentTest.id, editedId, {
-          questionText,
-          options,
-        });
+        await updateQuestion(currentTest.id, editedId, payload);
         await refreshCurrentTest(currentTest.id);
         renderEditorQuestionList();
         const updatedQuestion = currentTest?.questions?.find(
@@ -1486,7 +1658,7 @@ function initializeManagementScreenEvents() {
           resetEditorForm();
         }
       } else {
-        await addQuestion(currentTest.id, { questionText, options });
+        await addQuestion(currentTest.id, payload);
         await refreshCurrentTest(currentTest.id);
         renderEditorQuestionList();
         resetEditorForm();
