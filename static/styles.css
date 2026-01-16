@@ -560,6 +560,11 @@ button.danger:hover {
   gap: 0.5rem;
 }
 
+.editor-card:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
 .editor-card--new {
   background: #eef2ff;
   border-style: dashed;
@@ -574,8 +579,9 @@ button.danger:hover {
 }
 
 .editor-card.is-expanded {
-  border-color: #c7d2fe;
-  box-shadow: 0 0 0 1px #c7d2fe;
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 2px #a5b4fc;
 }
 
 .editor-card-expand {
