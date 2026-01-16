@@ -626,6 +626,74 @@ button.danger:hover {
   flex-wrap: wrap;
 }
 
+.editor-objects-panel {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.object-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.object-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #f8fafc;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.object-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.object-title {
+  font-weight: 600;
+}
+
+.object-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.object-details {
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.object-details pre {
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.object-preview-image {
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.object-preview-math {
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+}
+
 @media (max-width: 960px) {
   .app {
     grid-template-columns: 1fr;
