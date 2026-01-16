@@ -65,6 +65,10 @@ p {
   align-items: start;
 }
 
+.card--collections {
+  grid-column: 1 / -1;
+}
+
 .panel {
   display: flex;
   flex-direction: column;
