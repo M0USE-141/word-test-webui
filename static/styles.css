@@ -52,29 +52,6 @@ p {
   padding: 1.5rem 2.5rem 3rem;
 }
 
-.app-nav {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.app-nav__button {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  padding: 0.55rem 1rem;
-  border-radius: 999px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: border 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.app-nav__button.is-active {
-  border-color: var(--primary);
-  color: var(--primary-strong);
-  box-shadow: 0 0 0 1px var(--primary);
-}
-
 .app-screen {
   display: grid;
   grid-template-columns: minmax(320px, 380px) 1fr;
@@ -423,6 +400,14 @@ button.danger:hover {
   gap: 1rem;
   align-items: flex-start;
   margin-bottom: 1.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .modal-grid {

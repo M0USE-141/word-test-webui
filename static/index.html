@@ -23,19 +23,6 @@
     </header>
 
     <main class="app">
-      <nav class="app-nav" aria-label="Навигация по экранам">
-        <button
-          class="app-nav__button is-active"
-          type="button"
-          data-screen="management"
-        >
-          Управление тестами
-        </button>
-        <button class="app-nav__button" type="button" data-screen="testing">
-          Тестирование
-        </button>
-      </nav>
-
       <section id="screen-management" class="app-screen is-active">
         <section class="panel panel--management">
           <div class="card">
@@ -72,14 +59,6 @@
               <label>Тесты</label>
               <div id="test-cards" class="test-cards"></div>
             </div>
-          </div>
-
-          <div class="card">
-            <h2>Редактирование вопросов</h2>
-            <p class="muted">
-              Создавайте новые вопросы или обновляйте существующие прямо в тесте.
-            </p>
-            <button id="open-editor" type="button">Открыть редактор</button>
           </div>
         </section>
       </section>
@@ -179,9 +158,17 @@
               Выберите вопрос из списка или создайте новый.
             </p>
           </div>
-          <button id="close-editor" type="button" class="ghost">
-            Закрыть
-          </button>
+          <div class="modal-actions">
+            <button id="editor-rename-test" type="button" class="secondary">
+              Переименовать тест
+            </button>
+            <button id="editor-delete-test" type="button" class="danger">
+              Удалить тест
+            </button>
+            <button id="close-editor" type="button" class="ghost">
+              Закрыть
+            </button>
+          </div>
         </div>
 
         <div class="modal-grid">

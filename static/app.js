@@ -20,8 +20,9 @@ const resultSummary = document.getElementById("result-summary");
 const resultDetails = document.getElementById("result-details");
 const progressHint = document.getElementById("progress-hint");
 const editorModal = document.getElementById("editor-modal");
-const openEditorButton = document.getElementById("open-editor");
 const closeEditorButton = document.getElementById("close-editor");
+const editorRenameTestButton = document.getElementById("editor-rename-test");
+const editorDeleteTestButton = document.getElementById("editor-delete-test");
 const editorQuestionList = document.getElementById("editor-question-list");
 const editorForm = document.getElementById("editor-form");
 const editorFormTitle = document.getElementById("editor-form-title");
@@ -32,7 +33,6 @@ const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
 const screenManagement = document.getElementById("screen-management");
 const screenTesting = document.getElementById("screen-testing");
-const navButtons = document.querySelectorAll(".app-nav__button");
 
 const settingQuestionCount = document.getElementById("setting-question-count");
 const settingRandomQuestions = document.getElementById(
@@ -115,14 +115,6 @@ function clearElement(element) {
   }
 }
 
-function updateNavButtons() {
-  navButtons.forEach((button) => {
-    const isActive = button.dataset.screen === uiState.activeScreen;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  });
-}
-
 function renderManagementScreen() {
   if (screenManagement) {
     screenManagement.classList.remove("is-hidden");
@@ -132,7 +124,6 @@ function renderManagementScreen() {
     screenTesting.classList.add("is-hidden");
     screenTesting.classList.remove("is-active");
   }
-  updateNavButtons();
 }
 
 function renderTestingScreen() {
@@ -144,7 +135,6 @@ function renderTestingScreen() {
     screenManagement.classList.add("is-hidden");
     screenManagement.classList.remove("is-active");
   }
-  updateNavButtons();
 }
 
 function setActiveScreen(screen) {
@@ -156,6 +146,22 @@ function setActiveScreen(screen) {
     renderTestingScreen();
   } else {
     renderManagementScreen();
+  }
+}
+
+function updateEditorTestActions() {
+  const hasTest = Boolean(currentTest);
+  if (editorRenameTestButton) {
+    editorRenameTestButton.disabled = !hasTest;
+    editorRenameTestButton.textContent = hasTest
+      ? `Переименовать «${currentTest.title}»`
+      : "Переименовать тест";
+  }
+  if (editorDeleteTestButton) {
+    editorDeleteTestButton.disabled = !hasTest;
+    editorDeleteTestButton.textContent = hasTest
+      ? `Удалить «${currentTest.title}»`
+      : "Удалить тест";
   }
 }
 
@@ -702,46 +708,7 @@ function renderTestCards(tests, selectedId) {
       resetEditorForm();
     });
 
-    const renameButton = document.createElement("button");
-    renameButton.type = "button";
-    renameButton.className = "secondary";
-    renameButton.textContent = "Переименовать";
-    renameButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const newTitle = window.prompt(
-        "Введите новое название теста:",
-        test.title
-      );
-      if (!newTitle || newTitle.trim() === test.title) {
-        return;
-      }
-      try {
-        await renameTest(test.id, newTitle.trim());
-      } catch (error) {
-        window.alert(error.message);
-      }
-    });
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "danger";
-    deleteButton.textContent = "Удалить";
-    deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const confirmed = window.confirm(
-        "Удалить тест и все связанные данные?"
-      );
-      if (!confirmed) {
-        return;
-      }
-      try {
-        await deleteTest(test.id);
-      } catch (error) {
-        window.alert(error.message);
-      }
-    });
-
-    actions.append(testingButton, editButton, renameButton, deleteButton);
+    actions.append(testingButton, editButton);
     card.append(title, meta, stats, actions);
     card.addEventListener("click", async () => {
       await selectTest(test.id);
@@ -755,6 +722,7 @@ function openEditorModal() {
   if (!editorModal) {
     return;
   }
+  updateEditorTestActions();
   editorModal.classList.add("is-open");
   editorModal.setAttribute("aria-hidden", "false");
 }
@@ -938,6 +906,7 @@ async function selectTest(testId) {
     renderQuestionNav();
     renderResultSummary(null);
     renderTestCards(testsCache, null);
+    updateEditorTestActions();
     return;
   }
 
@@ -954,6 +923,7 @@ async function selectTest(testId) {
     renderResultSummary(loadLastResult(testId));
   }
   renderTestCards(testsCache, testId);
+  updateEditorTestActions();
 }
 
 async function updateQuestion(testId, questionId, payload) {
@@ -1040,26 +1010,46 @@ async function deleteTest(testId) {
   await selectTest(nextId);
 }
 
-function initializeNavigationEvents() {
-  navButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      setActiveScreen(button.dataset.screen);
-    });
-  });
-}
-
 function initializeManagementScreenEvents() {
-  openEditorButton?.addEventListener("click", () => {
+  closeEditorButton?.addEventListener("click", () => {
+    closeEditorModal();
+  });
+
+  editorRenameTestButton?.addEventListener("click", async () => {
     if (!currentTest) {
       return;
     }
-    openEditorModal();
-    renderEditorQuestionList();
-    resetEditorForm();
+    const newTitle = window.prompt(
+      "Введите новое название теста:",
+      currentTest.title
+    );
+    if (!newTitle || newTitle.trim() === currentTest.title) {
+      return;
+    }
+    try {
+      await renameTest(currentTest.id, newTitle.trim());
+      updateEditorTestActions();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
 
-  closeEditorButton?.addEventListener("click", () => {
-    closeEditorModal();
+  editorDeleteTestButton?.addEventListener("click", async () => {
+    if (!currentTest) {
+      return;
+    }
+    const confirmed = window.confirm(
+      "Удалить тест и все связанные данные?"
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteTest(currentTest.id);
+      closeEditorModal();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
 
   editorModal?.addEventListener("click", (event) => {
@@ -1176,7 +1166,6 @@ function initializeTestingScreenEvents() {
 }
 
 async function initialize() {
-  initializeNavigationEvents();
   initializeManagementScreenEvents();
   initializeTestingScreenEvents();
   renderManagementScreen();
