@@ -364,7 +364,7 @@ function getInlineSummary(inline, index) {
 
 function buildInlineDetails(inline) {
   const details = document.createElement("div");
-  details.className = "object-details is-hidden";
+  details.className = "object-details";
 
   if (inline.type === "image") {
     if (inline.src) {
@@ -461,8 +461,9 @@ function renderEditorObjects(question = findEditorQuestion()) {
     const card = document.createElement("div");
     card.className = "object-card";
 
-    const header = document.createElement("div");
-    header.className = "object-header";
+    const content = document.createElement("div");
+    content.className = "object-content";
+
     const title = document.createElement("div");
     title.className = "object-title";
     title.textContent = getInlineSummary(item.inline, index);
@@ -473,14 +474,8 @@ function renderEditorObjects(question = findEditorQuestion()) {
       item.source.type === "question"
         ? "Источник: вопрос"
         : `Источник: вариант #${item.source.id}`;
-
     const controls = document.createElement("div");
     controls.className = "object-controls";
-
-    const toggleButton = document.createElement("button");
-    toggleButton.type = "button";
-    toggleButton.className = "ghost";
-    toggleButton.textContent = "Показать";
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
@@ -488,14 +483,6 @@ function renderEditorObjects(question = findEditorQuestion()) {
     removeButton.textContent = "Удалить";
 
     const details = buildInlineDetails(item.inline);
-
-    toggleButton.addEventListener("click", () => {
-      const isHidden = details.classList.toggle("is-hidden");
-      toggleButton.textContent = isHidden ? "Показать" : "Скрыть";
-      if (!isHidden && window.MathJax?.typesetPromise) {
-        window.MathJax.typesetPromise([details]);
-      }
-    });
 
     removeButton.addEventListener("click", () => {
       const confirmed = window.confirm(
@@ -512,10 +499,14 @@ function renderEditorObjects(question = findEditorQuestion()) {
       renderEditorObjects(question);
     });
 
-    controls.append(toggleButton, removeButton);
-    header.append(title, source);
-    card.append(header, controls, details);
+    controls.append(removeButton);
+    content.append(title, source, details);
+    card.append(content, controls);
     editorObjectsList.appendChild(card);
+
+    if (window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([details]);
+    }
   });
 }
 
@@ -1121,19 +1112,11 @@ function renderEditorQuestionList() {
     const actions = document.createElement("div");
     actions.className = "editor-card-actions";
 
-    const editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.className = "ghost";
-    editButton.textContent = "Редактировать";
     const handleSelectQuestion = () => {
       setEditorState("edit", question.id);
       syncEditorFormFromQuestion(question);
       renderEditorObjects(question);
     };
-    editButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      handleSelectQuestion();
-    });
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -1152,7 +1135,7 @@ function renderEditorQuestionList() {
       await deleteQuestion(currentTest.id, question.id);
     });
 
-    actions.append(editButton, deleteButton);
+    actions.append(deleteButton);
     card.append(title, actions);
     card.addEventListener("click", handleSelectQuestion);
     editorQuestionList.appendChild(card);
