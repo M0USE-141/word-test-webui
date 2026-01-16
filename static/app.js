@@ -30,6 +30,9 @@ const editorOptionsList = document.getElementById("editor-options-list");
 const editorAddOption = document.getElementById("add-option");
 const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
+const screenManagement = document.getElementById("screen-management");
+const screenTesting = document.getElementById("screen-testing");
+const navButtons = document.querySelectorAll(".app-nav__button");
 
 const settingQuestionCount = document.getElementById("setting-question-count");
 const settingRandomQuestions = document.getElementById(
@@ -41,6 +44,7 @@ const settingOnlyUnanswered = document.getElementById(
 );
 const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
+const testSelect = document.getElementById("test-select");
 
 const testsCacheKey = "tests-cache";
 
@@ -53,6 +57,10 @@ let session = null;
 let editorState = {
   mode: "create",
   questionId: null,
+};
+
+const uiState = {
+  activeScreen: "management",
 };
 
 function readTestsCache() {
@@ -105,6 +113,50 @@ async function fetchTest(testId) {
 function clearElement(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
+  }
+}
+
+function updateNavButtons() {
+  navButtons.forEach((button) => {
+    const isActive = button.dataset.screen === uiState.activeScreen;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function renderManagementScreen() {
+  if (screenManagement) {
+    screenManagement.classList.remove("is-hidden");
+    screenManagement.classList.add("is-active");
+  }
+  if (screenTesting) {
+    screenTesting.classList.add("is-hidden");
+    screenTesting.classList.remove("is-active");
+  }
+  updateNavButtons();
+}
+
+function renderTestingScreen() {
+  if (screenTesting) {
+    screenTesting.classList.remove("is-hidden");
+    screenTesting.classList.add("is-active");
+  }
+  if (screenManagement) {
+    screenManagement.classList.add("is-hidden");
+    screenManagement.classList.remove("is-active");
+  }
+  updateNavButtons();
+}
+
+function setActiveScreen(screen) {
+  if (!screen || screen === uiState.activeScreen) {
+    return;
+  }
+  uiState.activeScreen = screen;
+  if (screen === "testing") {
+    renderTestingScreen();
+  } else {
+    renderManagementScreen();
   }
 }
 
@@ -900,32 +952,6 @@ async function deleteQuestion(testId, questionId) {
   resetEditorForm();
 }
 
-testSelect.addEventListener("change", async (event) => {
-  const testId = event.target.value;
-  
-  if (!testId) {
-    currentTest = null;
-    session = null;
-    updateProgressHint();
-    questionContainer.textContent = "Сначала загрузите тест через API.";
-    optionsContainer.textContent = "";
-    questionProgress.textContent = "Вопрос 0 из 0";
-    renderQuestionNav();
-    renderResultSummary(null);
-    return;
-  }
-  currentTest = await fetchTest(testId);
-  session = null;
-  updateProgressHint();
-  questionContainer.textContent =
-    "Нажмите «Начать тестирование», чтобы применить настройки.";
-  optionsContainer.textContent = "";
-  questionProgress.textContent = "Вопрос 0 из 0";
-  renderQuestionNav();
-  renderResultSummary(null);
-  renderTestCards(testsCache, testId);
-}
-
 async function renameTest(testId, title) {
   const response = await fetch(`/api/tests/${testId}`, {
     method: "PATCH",
@@ -965,130 +991,173 @@ async function deleteTest(testId) {
   await selectTest(nextId);
 }
 
-openEditorButton?.addEventListener("click", () => {
-  if (!currentTest) {
-    return;
-  }
-  openEditorModal();
-  renderEditorQuestionList();
-  resetEditorForm();
-});
+function initializeNavigationEvents() {
+  navButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setActiveScreen(button.dataset.screen);
+    });
+  });
+}
 
-closeEditorButton?.addEventListener("click", () => {
-  closeEditorModal();
-});
+function initializeManagementScreenEvents() {
+  testSelect?.addEventListener("change", async (event) => {
+    const testId = event.target.value;
 
-editorModal?.addEventListener("click", (event) => {
-  if (event.target === editorModal) {
-    closeEditorModal();
-  }
-});
-
-editorAddOption?.addEventListener("click", () => {
-  addOptionRow("", false);
-});
-
-editorResetButton?.addEventListener("click", () => {
-  resetEditorForm();
-});
-
-editorForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!currentTest) {
-    return;
-  }
-  const questionText = editorQuestionText.value.trim();
-  const options = collectEditorOptions();
-  if (!questionText || !options.length) {
-    alert("Заполните текст вопроса и хотя бы один вариант ответа.");
-    return;
-  }
-  try {
-    if (editorState.mode === "edit" && editorState.questionId) {
-      await updateQuestion(currentTest.id, editorState.questionId, {
-        questionText,
-        options,
-      });
-    } else {
-      await addQuestion(currentTest.id, { questionText, options });
+    if (!testId) {
+      currentTest = null;
+      session = null;
+      updateProgressHint();
+      questionContainer.textContent = "Сначала загрузите тест через API.";
+      optionsContainer.textContent = "";
+      questionProgress.textContent = "Вопрос 0 из 0";
+      renderQuestionNav();
+      renderResultSummary(null);
+      return;
     }
-    await refreshCurrentTest(currentTest.id);
+    currentTest = await fetchTest(testId);
+    session = null;
+    updateProgressHint();
+    questionContainer.textContent =
+      "Нажмите «Начать тестирование», чтобы применить настройки.";
+    optionsContainer.textContent = "";
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(null);
+    renderTestCards(testsCache, testId);
+  });
+
+  openEditorButton?.addEventListener("click", () => {
+    if (!currentTest) {
+      return;
+    }
+    openEditorModal();
     renderEditorQuestionList();
     resetEditorForm();
-  } catch (error) {
-    alert(error.message);
-  }
-});
+  });
 
-prevQuestionButton.addEventListener("click", () => {
-  if (!session) {
-    return;
-  }
-  session.currentIndex = Math.max(0, session.currentIndex - 1);
-  renderQuestion();
-});
+  closeEditorButton?.addEventListener("click", () => {
+    closeEditorModal();
+  });
 
-nextQuestionButton.addEventListener("click", () => {
-  if (!session) {
-    return;
-  }
-  session.currentIndex = Math.min(
-    session.questions.length - 1,
-    session.currentIndex + 1
-  );
-  renderQuestion();
-});
-
-finishTestButton.addEventListener("click", () => {
-  finishTest();
-});
-
-startTestButton.addEventListener("click", () => {
-  startTest();
-});
-
-uploadForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!uploadFileInput.files?.length) {
-    questionContainer.textContent = "Сначала выберите файл для импорта.";
-    renderUploadLogs("Сначала выберите файл для импорта.", true);
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", uploadFileInput.files[0]);
-  formData.append("symbol", uploadSymbolInput.value.trim());
-  formData.append(
-    "log_small_tables",
-    uploadLogSmallTablesInput.checked ? "true" : "false"
-  );
-
-  try {
-    const response = await fetch("/api/tests/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const detail = payload?.detail || "Не удалось импортировать тест";
-      throw new Error(detail);
+  editorModal?.addEventListener("click", (event) => {
+    if (event.target === editorModal) {
+      closeEditorModal();
     }
-    const uploadResult = payload ?? {};
-    const tests = await fetchTests({ force: true });
-    const newTestId = uploadResult?.metadata?.id;
-    renderUploadLogs(uploadResult?.logs);
+  });
 
-    const nextTestId = newTestId || tests[0]?.id;
-    renderTestCards(tests, nextTestId);
-    await selectTest(nextTestId);
-    uploadFileInput.value = "";
-  } catch (error) {
-    questionContainer.textContent = error.message;
-    renderUploadLogs(error.message, true);
-  }
-});
+  editorAddOption?.addEventListener("click", () => {
+    addOptionRow("", false);
+  });
+
+  editorResetButton?.addEventListener("click", () => {
+    resetEditorForm();
+  });
+
+  editorForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentTest) {
+      return;
+    }
+    const questionText = editorQuestionText.value.trim();
+    const options = collectEditorOptions();
+    if (!questionText || !options.length) {
+      alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+      return;
+    }
+    try {
+      if (editorState.mode === "edit" && editorState.questionId) {
+        await updateQuestion(currentTest.id, editorState.questionId, {
+          questionText,
+          options,
+        });
+      } else {
+        await addQuestion(currentTest.id, { questionText, options });
+      }
+      await refreshCurrentTest(currentTest.id);
+      renderEditorQuestionList();
+      resetEditorForm();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  uploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!uploadFileInput.files?.length) {
+      questionContainer.textContent = "Сначала выберите файл для импорта.";
+      renderUploadLogs("Сначала выберите файл для импорта.", true);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", uploadFileInput.files[0]);
+    formData.append("symbol", uploadSymbolInput.value.trim());
+    formData.append(
+      "log_small_tables",
+      uploadLogSmallTablesInput.checked ? "true" : "false"
+    );
+
+    try {
+      const response = await fetch("/api/tests/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail || "Не удалось импортировать тест";
+        throw new Error(detail);
+      }
+      const uploadResult = payload ?? {};
+      const tests = await fetchTests({ force: true });
+      const newTestId = uploadResult?.metadata?.id;
+      renderUploadLogs(uploadResult?.logs);
+
+      const nextTestId = newTestId || tests[0]?.id;
+      renderTestCards(tests, nextTestId);
+      await selectTest(nextTestId);
+      uploadFileInput.value = "";
+    } catch (error) {
+      questionContainer.textContent = error.message;
+      renderUploadLogs(error.message, true);
+    }
+  });
+}
+
+function initializeTestingScreenEvents() {
+  prevQuestionButton?.addEventListener("click", () => {
+    if (!session) {
+      return;
+    }
+    session.currentIndex = Math.max(0, session.currentIndex - 1);
+    renderQuestion();
+  });
+
+  nextQuestionButton?.addEventListener("click", () => {
+    if (!session) {
+      return;
+    }
+    session.currentIndex = Math.min(
+      session.questions.length - 1,
+      session.currentIndex + 1
+    );
+    renderQuestion();
+  });
+
+  finishTestButton?.addEventListener("click", () => {
+    finishTest();
+  });
+
+  startTestButton?.addEventListener("click", () => {
+    startTest();
+  });
+}
 
 async function initialize() {
+  initializeNavigationEvents();
+  initializeManagementScreenEvents();
+  initializeTestingScreenEvents();
+  renderManagementScreen();
+
   try {
     const tests = await fetchTests();
     if (!tests.length) {
