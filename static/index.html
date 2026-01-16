@@ -190,19 +190,40 @@
           </div>
         </div>
         <form id="upload-form" class="upload-form">
-          <label class="upload-field" for="upload-file">
-            <span>Файл Word</span>
-            <input type="file" id="upload-file" accept=".doc,.docx" required />
-          </label>
-          <label class="upload-field" for="upload-symbol">
-            <span>Маркер правильного ответа</span>
-            <input type="text" id="upload-symbol" name="symbol" />
-          </label>
-          <label class="upload-checkbox" for="upload-log-small-tables">
-            <input type="checkbox" id="upload-log-small-tables" />
-            <span>Логировать таблицы &lt; 3 строк</span>
-          </label>
-          <button type="submit">Импортировать</button>
+          <div class="upload-dropzone">
+            <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
+            <div class="upload-dropzone__content">
+              <p>Перетащите Word-файл сюда</p>
+              <p class="muted">или выберите вручную на устройстве</p>
+            </div>
+            <div class="upload-dropzone__actions">
+              <label class="upload-select-button" for="upload-file">
+                Выбрать файл
+              </label>
+              <span class="upload-hint">Форматы .doc / .docx</span>
+            </div>
+            <input
+              type="file"
+              id="upload-file"
+              class="upload-input"
+              accept=".doc,.docx"
+              required
+            />
+          </div>
+          <div id="upload-file-name" class="upload-file-name is-empty">
+            Файл не выбран
+          </div>
+          <div class="upload-actions">
+            <label class="upload-field" for="upload-symbol">
+              <span>Маркер правильного ответа</span>
+              <input type="text" id="upload-symbol" name="symbol" />
+            </label>
+            <label class="upload-checkbox" for="upload-log-small-tables">
+              <input type="checkbox" id="upload-log-small-tables" />
+              <span>Логировать таблицы &lt; 3 строк</span>
+            </label>
+            <button type="submit">Импортировать</button>
+          </div>
         </form>
         <div class="upload-logs-panel">
           <h3>Логи импорта</h3>

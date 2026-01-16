@@ -4,6 +4,7 @@ const questionContainer = document.getElementById("question-container");
 const optionsContainer = document.getElementById("options-container");
 const uploadForm = document.getElementById("upload-form");
 const uploadFileInput = document.getElementById("upload-file");
+const uploadFileName = document.getElementById("upload-file-name");
 const uploadSymbolInput = document.getElementById("upload-symbol");
 const uploadLogSmallTablesInput = document.getElementById(
   "upload-log-small-tables"
@@ -235,6 +236,19 @@ function renderInline(parent, inline) {
     // Формулы без src считаются штатным сценарием (MathML/LaTeX или плейсхолдер).
     parent.appendChild(document.createTextNode("[formula]"));
   }
+}
+
+function updateUploadFileState(file) {
+  if (!uploadFileName) {
+    return;
+  }
+  if (file) {
+    uploadFileName.textContent = file.name;
+    uploadFileName.classList.remove("is-empty");
+    return;
+  }
+  uploadFileName.textContent = "Файл не выбран";
+  uploadFileName.classList.add("is-empty");
 }
 
 function renderBlocks(container, blocks) {
@@ -1052,6 +1066,8 @@ async function deleteTest(testId) {
 }
 
 function initializeManagementScreenEvents() {
+  updateUploadFileState(uploadFileInput?.files?.[0]);
+
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
   });
@@ -1145,6 +1161,10 @@ function initializeManagementScreenEvents() {
     }
   });
 
+  uploadFileInput?.addEventListener("change", () => {
+    updateUploadFileState(uploadFileInput.files?.[0] || null);
+  });
+
   uploadForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!uploadFileInput.files?.length) {
@@ -1180,6 +1200,9 @@ function initializeManagementScreenEvents() {
       renderTestCards(tests, nextTestId);
       await selectTest(nextTestId);
       uploadFileInput.value = "";
+      uploadSymbolInput.value = "";
+      uploadLogSmallTablesInput.checked = false;
+      updateUploadFileState(null);
       closeImportModal();
     } catch (error) {
       questionContainer.textContent = error.message;

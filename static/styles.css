@@ -58,10 +58,14 @@ p {
   gap: 1.5rem;
 }
 
+#screen-management {
+  grid-template-columns: 1fr;
+}
+
 .panel--management {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
@@ -90,7 +94,7 @@ p {
 .upload-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .upload-field {
@@ -100,7 +104,95 @@ p {
   font-size: 0.9rem;
 }
 
-.upload-field input[type="file"],
+.upload-dropzone {
+  position: relative;
+  border: 1px dashed #c7d2fe;
+  background: #eef2ff;
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+  text-align: center;
+  color: var(--text);
+}
+
+.upload-dropzone__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  background: white;
+  border: 1px solid var(--border);
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.upload-dropzone__content p {
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.upload-dropzone__actions {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+}
+
+.upload-select-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.upload-select-button:hover {
+  background: var(--primary-strong);
+  transform: translateY(-1px);
+}
+
+.upload-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-file-name {
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.upload-file-name.is-empty {
+  color: var(--muted);
+}
+
+.upload-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.upload-actions button {
+  justify-self: start;
+  min-width: 180px;
+}
+
 .upload-field input[type="text"],
 input[type="number"],
 select {
@@ -128,7 +220,7 @@ select {
 .test-collections {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .test-card {
@@ -139,6 +231,7 @@ select {
   cursor: pointer;
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   text-align: left;
+  color: var(--text);
 }
 
 .test-card:hover {
