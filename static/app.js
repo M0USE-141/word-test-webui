@@ -1412,14 +1412,25 @@ function renderEditorQuestionList() {
   currentTest.questions.forEach((question, index) => {
     const card = document.createElement("div");
     card.className = "editor-card";
-    card.dataset.editorCardKey = String(question.id ?? index + 1);
+    const questionId = question.id ?? index + 1;
+    card.dataset.editorCardKey = String(questionId);
 
     const title = document.createElement("div");
     title.className = "editor-card-title";
-    const text = blocksToText(question.question?.blocks || []);
-    title.textContent = `#${question.id ?? index + 1}: ${
-      text || "Без текста"
-    }`;
+    title.textContent = `#${questionId}`;
+
+    const preview = document.createElement("div");
+    preview.className = "editor-card-preview";
+    const blocks = question.question?.blocks;
+    if (Array.isArray(blocks) && blocks.length) {
+      renderBlocks(preview, blocks);
+    } else {
+      const text = blocksToText(blocks || [])
+        .replace(INLINE_MARKER_REGEX, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      preview.textContent = text || "Без текста";
+    }
 
     const actions = document.createElement("div");
     actions.className = "editor-card-actions";
@@ -1457,7 +1468,7 @@ function renderEditorQuestionList() {
     });
 
     actions.append(deleteButton);
-    card.append(title, actions, expand);
+    card.append(title, preview, actions, expand);
     card.addEventListener("click", handleSelectQuestion);
     editorQuestionList.appendChild(card);
   });
