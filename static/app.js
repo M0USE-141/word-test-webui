@@ -16,12 +16,16 @@ const nextQuestionButton = document.getElementById("next-question");
 const finishTestButton = document.getElementById("finish-test");
 const answerFeedback = document.getElementById("answer-feedback");
 const startTestButton = document.getElementById("start-test");
+const exitTestButton = document.getElementById("exit-test");
 const resultSummary = document.getElementById("result-summary");
 const resultDetails = document.getElementById("result-details");
 const progressHint = document.getElementById("progress-hint");
 const editorModal = document.getElementById("editor-modal");
-const openEditorButton = document.getElementById("open-editor");
 const closeEditorButton = document.getElementById("close-editor");
+const editorRenameTestButton = document.getElementById("editor-rename-test");
+const editorDeleteTestButton = document.getElementById("editor-delete-test");
+const importModal = document.getElementById("import-modal");
+const closeImportButton = document.getElementById("close-import");
 const editorQuestionList = document.getElementById("editor-question-list");
 const editorForm = document.getElementById("editor-form");
 const editorFormTitle = document.getElementById("editor-form-title");
@@ -30,6 +34,8 @@ const editorOptionsList = document.getElementById("editor-options-list");
 const editorAddOption = document.getElementById("add-option");
 const editorResetButton = document.getElementById("reset-editor");
 const editorStatus = document.getElementById("editor-status");
+const screenManagement = document.getElementById("screen-management");
+const screenTesting = document.getElementById("screen-testing");
 
 const settingQuestionCount = document.getElementById("setting-question-count");
 const settingRandomQuestions = document.getElementById(
@@ -53,6 +59,10 @@ let session = null;
 let editorState = {
   mode: "create",
   questionId: null,
+};
+
+const uiState = {
+  activeScreen: "management",
 };
 
 function readTestsCache() {
@@ -105,6 +115,56 @@ async function fetchTest(testId) {
 function clearElement(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
+  }
+}
+
+function renderManagementScreen() {
+  if (screenManagement) {
+    screenManagement.classList.remove("is-hidden");
+    screenManagement.classList.add("is-active");
+  }
+  if (screenTesting) {
+    screenTesting.classList.add("is-hidden");
+    screenTesting.classList.remove("is-active");
+  }
+}
+
+function renderTestingScreen() {
+  if (screenTesting) {
+    screenTesting.classList.remove("is-hidden");
+    screenTesting.classList.add("is-active");
+  }
+  if (screenManagement) {
+    screenManagement.classList.add("is-hidden");
+    screenManagement.classList.remove("is-active");
+  }
+}
+
+function setActiveScreen(screen) {
+  if (!screen || screen === uiState.activeScreen) {
+    return;
+  }
+  uiState.activeScreen = screen;
+  if (screen === "testing") {
+    renderTestingScreen();
+  } else {
+    renderManagementScreen();
+  }
+}
+
+function updateEditorTestActions() {
+  const hasTest = Boolean(currentTest);
+  if (editorRenameTestButton) {
+    editorRenameTestButton.disabled = !hasTest;
+    editorRenameTestButton.textContent = hasTest
+      ? `Переименовать «${currentTest.title}»`
+      : "Переименовать тест";
+  }
+  if (editorDeleteTestButton) {
+    editorDeleteTestButton.disabled = !hasTest;
+    editorDeleteTestButton.textContent = hasTest
+      ? `Удалить «${currentTest.title}»`
+      : "Удалить тест";
   }
 }
 
@@ -410,9 +470,12 @@ function renderQuestion() {
   if (!session || !session.questions.length) {
     questionContainer.textContent = "Нет вопросов для отображения.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     questionStatus.textContent = "";
-    answerFeedback.textContent = "";
+    if (answerFeedback) {
+      answerFeedback.textContent = "";
+    }
     return;
   }
 
@@ -430,6 +493,7 @@ function renderQuestion() {
   renderBlocks(questionContainer, entry.question.question.blocks);
 
   clearElement(optionsContainer);
+  optionsContainer.classList.remove("is-hidden");
   const optionsTitle = document.createElement("h3");
   optionsTitle.textContent = "Варианты ответа";
   optionsContainer.appendChild(optionsTitle);
@@ -485,7 +549,7 @@ function renderQuestion() {
         progress.add(entry.questionId);
         saveProgress(session.testId, progress);
         updateProgressHint();
-        if (session.settings.showAnswersImmediately) {
+        if (session.settings.showAnswersImmediately && answerFeedback) {
           answerFeedback.textContent = getAnswerFeedback(
             index,
             resolvedCorrectIndex
@@ -500,16 +564,18 @@ function renderQuestion() {
 
   optionsContainer.appendChild(optionsList);
 
-  if (!session.settings.showAnswersImmediately || session.finished) {
-    answerFeedback.textContent = "";
-  } else if (selectedIndex !== -1) {
-    answerFeedback.textContent = getAnswerFeedback(
-      selectedIndex,
-      resolvedCorrectIndex
-    );
-  } else {
-    answerFeedback.textContent =
-      "Выберите вариант ответа, чтобы увидеть подсказку.";
+  if (answerFeedback) {
+    if (!session.settings.showAnswersImmediately || session.finished) {
+      answerFeedback.textContent = "";
+    } else if (selectedIndex !== -1) {
+      answerFeedback.textContent = getAnswerFeedback(
+        selectedIndex,
+        resolvedCorrectIndex
+      );
+    } else {
+      answerFeedback.textContent =
+        "Выберите вариант ответа, чтобы увидеть подсказку.";
+    }
   }
 
   prevQuestionButton.disabled = session.currentIndex === 0;
@@ -586,6 +652,7 @@ function startTest() {
   if (!session.questions.length) {
     questionContainer.textContent = "Нет вопросов для тестирования.";
     optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
     questionProgress.textContent = "Вопрос 0 из 0";
     return;
   }
@@ -594,6 +661,19 @@ function startTest() {
 
 function renderTestCards(tests, selectedId) {
   clearElement(testCardsContainer);
+
+  const importCard = document.createElement("button");
+  importCard.type = "button";
+  importCard.className = "test-card test-card--import";
+  importCard.innerHTML = `
+    <strong>Импорт теста</strong>
+    <span class="muted">Добавьте новую коллекцию из Word-файла.</span>
+  `;
+  importCard.addEventListener("click", () => {
+    openImportModal();
+  });
+  testCardsContainer.appendChild(importCard);
+
   if (!tests.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
@@ -630,46 +710,28 @@ function renderTestCards(tests, selectedId) {
     const actions = document.createElement("div");
     actions.className = "test-card__actions";
 
-    const renameButton = document.createElement("button");
-    renameButton.type = "button";
-    renameButton.className = "secondary";
-    renameButton.textContent = "Переименовать";
-    renameButton.addEventListener("click", async (event) => {
+    const testingButton = document.createElement("button");
+    testingButton.type = "button";
+    testingButton.textContent = "Тестирование";
+    testingButton.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const newTitle = window.prompt(
-        "Введите новое название теста:",
-        test.title
-      );
-      if (!newTitle || newTitle.trim() === test.title) {
-        return;
-      }
-      try {
-        await renameTest(test.id, newTitle.trim());
-      } catch (error) {
-        window.alert(error.message);
-      }
+      await selectTest(test.id);
+      setActiveScreen("testing");
     });
 
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "danger";
-    deleteButton.textContent = "Удалить";
-    deleteButton.addEventListener("click", async (event) => {
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "secondary";
+    editButton.textContent = "Редактирование";
+    editButton.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const confirmed = window.confirm(
-        "Удалить тест и все связанные данные?"
-      );
-      if (!confirmed) {
-        return;
-      }
-      try {
-        await deleteTest(test.id);
-      } catch (error) {
-        window.alert(error.message);
-      }
+      await selectTest(test.id);
+      openEditorModal();
+      renderEditorQuestionList();
+      resetEditorForm();
     });
 
-    actions.append(renameButton, deleteButton);
+    actions.append(testingButton, editButton);
     card.append(title, meta, stats, actions);
     card.addEventListener("click", async () => {
       await selectTest(test.id);
@@ -683,6 +745,7 @@ function openEditorModal() {
   if (!editorModal) {
     return;
   }
+  updateEditorTestActions();
   editorModal.classList.add("is-open");
   editorModal.setAttribute("aria-hidden", "false");
 }
@@ -693,6 +756,22 @@ function closeEditorModal() {
   }
   editorModal.classList.remove("is-open");
   editorModal.setAttribute("aria-hidden", "true");
+}
+
+function openImportModal() {
+  if (!importModal) {
+    return;
+  }
+  importModal.classList.add("is-open");
+  importModal.setAttribute("aria-hidden", "false");
+}
+
+function closeImportModal() {
+  if (!importModal) {
+    return;
+  }
+  importModal.classList.remove("is-open");
+  importModal.setAttribute("aria-hidden", "true");
 }
 
 function renderEditorOptions(options = []) {
@@ -845,7 +924,7 @@ async function refreshCurrentTest(testId = currentTest?.id) {
   }
   currentTest = await fetchTest(testId);
   testsCache = await fetchTests();
-  renderTestOptions(testsCache, currentTest.id);
+  renderTestCards(testsCache, currentTest.id);
   session = null;
   updateProgressHint();
   questionContainer.textContent =
@@ -853,6 +932,39 @@ async function refreshCurrentTest(testId = currentTest?.id) {
   optionsContainer.textContent = "";
   questionProgress.textContent = "Вопрос 0 из 0";
   renderQuestionNav();
+}
+
+async function selectTest(testId) {
+  if (!testId) {
+    currentTest = null;
+    session = null;
+    updateProgressHint();
+    questionContainer.textContent = "Сначала загрузите тест через API.";
+    optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(null);
+    renderTestCards(testsCache, null);
+    updateEditorTestActions();
+    return;
+  }
+
+  const isSameTest = currentTest?.id === testId;
+  currentTest = await fetchTest(testId);
+  updateProgressHint();
+  if (!isSameTest) {
+    session = null;
+    questionContainer.textContent =
+      "Нажмите «Начать тестирование», чтобы применить настройки.";
+    optionsContainer.textContent = "";
+    optionsContainer.classList.add("is-hidden");
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(loadLastResult(testId));
+  }
+  renderTestCards(testsCache, testId);
+  updateEditorTestActions();
 }
 
 async function updateQuestion(testId, questionId, payload) {
@@ -900,32 +1012,6 @@ async function deleteQuestion(testId, questionId) {
   resetEditorForm();
 }
 
-testSelect.addEventListener("change", async (event) => {
-  const testId = event.target.value;
-  
-  if (!testId) {
-    currentTest = null;
-    session = null;
-    updateProgressHint();
-    questionContainer.textContent = "Сначала загрузите тест через API.";
-    optionsContainer.textContent = "";
-    questionProgress.textContent = "Вопрос 0 из 0";
-    renderQuestionNav();
-    renderResultSummary(null);
-    return;
-  }
-  currentTest = await fetchTest(testId);
-  session = null;
-  updateProgressHint();
-  questionContainer.textContent =
-    "Нажмите «Начать тестирование», чтобы применить настройки.";
-  optionsContainer.textContent = "";
-  questionProgress.textContent = "Вопрос 0 из 0";
-  renderQuestionNav();
-  renderResultSummary(null);
-  renderTestCards(testsCache, testId);
-}
-
 async function renameTest(testId, title) {
   const response = await fetch(`/api/tests/${testId}`, {
     method: "PATCH",
@@ -965,130 +1051,182 @@ async function deleteTest(testId) {
   await selectTest(nextId);
 }
 
-openEditorButton?.addEventListener("click", () => {
-  if (!currentTest) {
-    return;
-  }
-  openEditorModal();
-  renderEditorQuestionList();
-  resetEditorForm();
-});
-
-closeEditorButton?.addEventListener("click", () => {
-  closeEditorModal();
-});
-
-editorModal?.addEventListener("click", (event) => {
-  if (event.target === editorModal) {
+function initializeManagementScreenEvents() {
+  closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
-  }
-});
+  });
 
-editorAddOption?.addEventListener("click", () => {
-  addOptionRow("", false);
-});
+  closeImportButton?.addEventListener("click", () => {
+    closeImportModal();
+  });
 
-editorResetButton?.addEventListener("click", () => {
-  resetEditorForm();
-});
-
-editorForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!currentTest) {
-    return;
-  }
-  const questionText = editorQuestionText.value.trim();
-  const options = collectEditorOptions();
-  if (!questionText || !options.length) {
-    alert("Заполните текст вопроса и хотя бы один вариант ответа.");
-    return;
-  }
-  try {
-    if (editorState.mode === "edit" && editorState.questionId) {
-      await updateQuestion(currentTest.id, editorState.questionId, {
-        questionText,
-        options,
-      });
-    } else {
-      await addQuestion(currentTest.id, { questionText, options });
+  importModal?.addEventListener("click", (event) => {
+    if (event.target === importModal) {
+      closeImportModal();
     }
-    await refreshCurrentTest(currentTest.id);
-    renderEditorQuestionList();
+  });
+
+  editorRenameTestButton?.addEventListener("click", async () => {
+    if (!currentTest) {
+      return;
+    }
+    const newTitle = window.prompt(
+      "Введите новое название теста:",
+      currentTest.title
+    );
+    if (!newTitle || newTitle.trim() === currentTest.title) {
+      return;
+    }
+    try {
+      await renameTest(currentTest.id, newTitle.trim());
+      updateEditorTestActions();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+
+  editorDeleteTestButton?.addEventListener("click", async () => {
+    if (!currentTest) {
+      return;
+    }
+    const confirmed = window.confirm(
+      "Удалить тест и все связанные данные?"
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteTest(currentTest.id);
+      closeEditorModal();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+
+  editorModal?.addEventListener("click", (event) => {
+    if (event.target === editorModal) {
+      closeEditorModal();
+    }
+  });
+
+  editorAddOption?.addEventListener("click", () => {
+    addOptionRow("", false);
+  });
+
+  editorResetButton?.addEventListener("click", () => {
     resetEditorForm();
-  } catch (error) {
-    alert(error.message);
-  }
-});
+  });
 
-prevQuestionButton.addEventListener("click", () => {
-  if (!session) {
-    return;
-  }
-  session.currentIndex = Math.max(0, session.currentIndex - 1);
-  renderQuestion();
-});
-
-nextQuestionButton.addEventListener("click", () => {
-  if (!session) {
-    return;
-  }
-  session.currentIndex = Math.min(
-    session.questions.length - 1,
-    session.currentIndex + 1
-  );
-  renderQuestion();
-});
-
-finishTestButton.addEventListener("click", () => {
-  finishTest();
-});
-
-startTestButton.addEventListener("click", () => {
-  startTest();
-});
-
-uploadForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!uploadFileInput.files?.length) {
-    questionContainer.textContent = "Сначала выберите файл для импорта.";
-    renderUploadLogs("Сначала выберите файл для импорта.", true);
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", uploadFileInput.files[0]);
-  formData.append("symbol", uploadSymbolInput.value.trim());
-  formData.append(
-    "log_small_tables",
-    uploadLogSmallTablesInput.checked ? "true" : "false"
-  );
-
-  try {
-    const response = await fetch("/api/tests/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const detail = payload?.detail || "Не удалось импортировать тест";
-      throw new Error(detail);
+  editorForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentTest) {
+      return;
     }
-    const uploadResult = payload ?? {};
-    const tests = await fetchTests({ force: true });
-    const newTestId = uploadResult?.metadata?.id;
-    renderUploadLogs(uploadResult?.logs);
+    const questionText = editorQuestionText.value.trim();
+    const options = collectEditorOptions();
+    if (!questionText || !options.length) {
+      alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+      return;
+    }
+    try {
+      if (editorState.mode === "edit" && editorState.questionId) {
+        await updateQuestion(currentTest.id, editorState.questionId, {
+          questionText,
+          options,
+        });
+      } else {
+        await addQuestion(currentTest.id, { questionText, options });
+      }
+      await refreshCurrentTest(currentTest.id);
+      renderEditorQuestionList();
+      resetEditorForm();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
 
-    const nextTestId = newTestId || tests[0]?.id;
-    renderTestCards(tests, nextTestId);
-    await selectTest(nextTestId);
-    uploadFileInput.value = "";
-  } catch (error) {
-    questionContainer.textContent = error.message;
-    renderUploadLogs(error.message, true);
-  }
-});
+  uploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!uploadFileInput.files?.length) {
+      questionContainer.textContent = "Сначала выберите файл для импорта.";
+      renderUploadLogs("Сначала выберите файл для импорта.", true);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", uploadFileInput.files[0]);
+    formData.append("symbol", uploadSymbolInput.value.trim());
+    formData.append(
+      "log_small_tables",
+      uploadLogSmallTablesInput.checked ? "true" : "false"
+    );
+
+    try {
+      const response = await fetch("/api/tests/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail || "Не удалось импортировать тест";
+        throw new Error(detail);
+      }
+      const uploadResult = payload ?? {};
+      const tests = await fetchTests({ force: true });
+      const newTestId = uploadResult?.metadata?.id;
+      renderUploadLogs(uploadResult?.logs);
+
+      const nextTestId = newTestId || tests[0]?.id;
+      renderTestCards(tests, nextTestId);
+      await selectTest(nextTestId);
+      uploadFileInput.value = "";
+      closeImportModal();
+    } catch (error) {
+      questionContainer.textContent = error.message;
+      renderUploadLogs(error.message, true);
+    }
+  });
+}
+
+function initializeTestingScreenEvents() {
+  prevQuestionButton?.addEventListener("click", () => {
+    if (!session) {
+      return;
+    }
+    session.currentIndex = Math.max(0, session.currentIndex - 1);
+    renderQuestion();
+  });
+
+  nextQuestionButton?.addEventListener("click", () => {
+    if (!session) {
+      return;
+    }
+    session.currentIndex = Math.min(
+      session.questions.length - 1,
+      session.currentIndex + 1
+    );
+    renderQuestion();
+  });
+
+  finishTestButton?.addEventListener("click", () => {
+    finishTest();
+  });
+
+  startTestButton?.addEventListener("click", () => {
+    startTest();
+  });
+
+  exitTestButton?.addEventListener("click", () => {
+    setActiveScreen("management");
+    optionsContainer.classList.add("is-hidden");
+  });
+}
 
 async function initialize() {
+  initializeManagementScreenEvents();
+  initializeTestingScreenEvents();
+  renderManagementScreen();
+
   try {
     const tests = await fetchTests();
     if (!tests.length) {

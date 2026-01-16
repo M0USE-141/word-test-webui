@@ -23,123 +23,96 @@
     </header>
 
     <main class="app">
-      <section class="panel panel--controls">
-        <div class="card">
-          <h2>Импорт тестов</h2>
-          <form id="upload-form" class="upload-form">
-            <label class="upload-field" for="upload-file">
-              <span>Файл Word</span>
-              <input
-                type="file"
-                id="upload-file"
-                accept=".doc,.docx"
-                required
-              />
-            </label>
-            <label class="upload-field" for="upload-symbol">
-              <span>Маркер правильного ответа</span>
-              <input type="text" id="upload-symbol" name="symbol" />
-            </label>
-            <label class="upload-checkbox" for="upload-log-small-tables">
-              <input type="checkbox" id="upload-log-small-tables" />
-              <span>Логировать таблицы &lt; 3 строк</span>
-            </label>
-            <button type="submit">Импортировать</button>
-          </form>
-          <div class="upload-logs-panel">
-            <h3>Логи импорта</h3>
-            <ul id="upload-logs" class="upload-logs"></ul>
+      <section id="screen-management" class="app-screen is-active">
+        <section class="panel panel--management">
+          <div class="card card--collections">
+            <h2>Коллекции тестов</h2>
+            <div class="controls">
+              <div id="test-cards" class="test-collections"></div>
+            </div>
           </div>
-        </div>
-
-        <div class="card">
-          <h2>Настройки теста</h2>
-          <div class="controls">
-            <label>Тест</label>
-            <div id="test-cards" class="test-cards"></div>
-          </div>
-          <div class="settings-grid">
-            <label for="setting-question-count">Количество вопросов (0 = все)</label>
-            <input
-              type="number"
-              id="setting-question-count"
-              min="0"
-              value="0"
-            />
-
-            <label class="checkbox-row" for="setting-random-questions">
-              <input type="checkbox" id="setting-random-questions" />
-              <span>Случайный порядок вопросов</span>
-            </label>
-            <label class="checkbox-row" for="setting-random-options">
-              <input type="checkbox" id="setting-random-options" />
-              <span>Случайный порядок вариантов ответов</span>
-            </label>
-            <label class="checkbox-row" for="setting-only-unanswered">
-              <input type="checkbox" id="setting-only-unanswered" />
-              <span>Только нерешённые вопросы</span>
-            </label>
-            <label class="checkbox-row" for="setting-show-answers">
-              <input type="checkbox" id="setting-show-answers" checked />
-              <span>Показывать правильный ответ сразу</span>
-            </label>
-
-            <label for="setting-max-options">Макс. вариантов ответа</label>
-            <input
-              type="number"
-              id="setting-max-options"
-              min="1"
-              value="4"
-            />
-          </div>
-          <button id="start-test" class="primary" type="button">
-            Начать тестирование
-          </button>
-          <p class="hint" id="progress-hint"></p>
-        </div>
-
-        <div class="card">
-          <h2>Редактирование вопросов</h2>
-          <p class="muted">
-            Создавайте новые вопросы или обновляйте существующие прямо в тесте.
-          </p>
-          <button id="open-editor" type="button">Открыть редактор</button>
-        </div>
-
-        <div class="card">
-          <h2>Результаты</h2>
-          <p id="result-summary">Ещё нет завершённых попыток.</p>
-          <ul id="result-details" class="result-details"></ul>
-        </div>
+        </section>
       </section>
 
-      <section class="panel panel--test">
-        <div class="card question-header">
-          <div>
-            <h2 id="question-progress">Вопрос 0 из 0</h2>
-            <p id="question-status" class="muted"></p>
-          </div>
-          <div class="question-actions">
-            <button id="prev-question" type="button">Назад</button>
-            <button id="next-question" type="button">Дальше</button>
-            <button id="finish-test" type="button" class="danger">
-              Завершить тест
+      <section id="screen-testing" class="app-screen is-hidden">
+        <section class="panel panel--controls">
+          <div class="card">
+            <h2>Настройки теста</h2>
+            <div class="settings-grid">
+              <label for="setting-question-count">
+                Количество вопросов (0 = все)
+              </label>
+              <input
+                type="number"
+                id="setting-question-count"
+                min="0"
+                value="0"
+              />
+
+              <label class="checkbox-row" for="setting-random-questions">
+                <input type="checkbox" id="setting-random-questions" />
+                <span>Случайный порядок вопросов</span>
+              </label>
+              <label class="checkbox-row" for="setting-random-options">
+                <input type="checkbox" id="setting-random-options" />
+                <span>Случайный порядок вариантов ответов</span>
+              </label>
+              <label class="checkbox-row" for="setting-only-unanswered">
+                <input type="checkbox" id="setting-only-unanswered" />
+                <span>Только нерешённые вопросы</span>
+              </label>
+              <label class="checkbox-row" for="setting-show-answers">
+                <input type="checkbox" id="setting-show-answers" checked />
+                <span>Показывать правильный ответ сразу</span>
+              </label>
+
+              <label for="setting-max-options">Макс. вариантов ответа</label>
+              <input
+                type="number"
+                id="setting-max-options"
+                min="1"
+                value="4"
+              />
+            </div>
+            <button id="start-test" class="primary" type="button">
+              Начать тестирование
             </button>
+            <p class="hint" id="progress-hint"></p>
           </div>
-        </div>
 
-        <div id="question-container" class="card"></div>
-        <div id="options-container" class="card"></div>
+          <div class="card">
+            <h2>Результаты</h2>
+            <p id="result-summary">Ещё нет завершённых попыток.</p>
+            <ul id="result-details" class="result-details"></ul>
+          </div>
+        </section>
 
-        <div class="card">
-          <h3>Обратная связь</h3>
-          <p id="answer-feedback">Выберите вариант ответа, чтобы увидеть подсказку.</p>
-        </div>
+        <section class="panel panel--test">
+          <div class="card question-header">
+            <div>
+              <h2 id="question-progress">Вопрос 0 из 0</h2>
+              <p id="question-status" class="muted"></p>
+            </div>
+            <div class="question-actions">
+              <button id="exit-test" type="button" class="ghost">
+                Выйти
+              </button>
+              <button id="prev-question" type="button">Назад</button>
+              <button id="next-question" type="button">Дальше</button>
+              <button id="finish-test" type="button" class="danger">
+                Завершить тест
+              </button>
+            </div>
+          </div>
 
-        <div class="card">
-          <h3>Навигация по вопросам</h3>
-          <div id="question-nav" class="question-nav"></div>
-        </div>
+          <div id="question-container" class="card"></div>
+          <div id="options-container" class="card is-hidden"></div>
+
+          <div class="card">
+            <h3>Навигация по вопросам</h3>
+            <div id="question-nav" class="question-nav"></div>
+          </div>
+        </section>
       </section>
     </main>
 
@@ -152,9 +125,17 @@
               Выберите вопрос из списка или создайте новый.
             </p>
           </div>
-          <button id="close-editor" type="button" class="ghost">
-            Закрыть
-          </button>
+          <div class="modal-actions">
+            <button id="editor-rename-test" type="button" class="secondary">
+              Переименовать тест
+            </button>
+            <button id="editor-delete-test" type="button" class="danger">
+              Удалить тест
+            </button>
+            <button id="close-editor" type="button" class="ghost">
+              Закрыть
+            </button>
+          </div>
         </div>
 
         <div class="modal-grid">
@@ -191,6 +172,41 @@
               </div>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-modal" class="modal" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2>Импорт тестов</h2>
+            <p class="muted">Загрузите Word-файл и получите новую коллекцию.</p>
+          </div>
+          <div class="modal-actions">
+            <button id="close-import" type="button" class="ghost">
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <form id="upload-form" class="upload-form">
+          <label class="upload-field" for="upload-file">
+            <span>Файл Word</span>
+            <input type="file" id="upload-file" accept=".doc,.docx" required />
+          </label>
+          <label class="upload-field" for="upload-symbol">
+            <span>Маркер правильного ответа</span>
+            <input type="text" id="upload-symbol" name="symbol" />
+          </label>
+          <label class="upload-checkbox" for="upload-log-small-tables">
+            <input type="checkbox" id="upload-log-small-tables" />
+            <span>Логировать таблицы &lt; 3 строк</span>
+          </label>
+          <button type="submit">Импортировать</button>
+        </form>
+        <div class="upload-logs-panel">
+          <h3>Логи импорта</h3>
+          <ul id="upload-logs" class="upload-logs"></ul>
         </div>
       </div>
     </div>

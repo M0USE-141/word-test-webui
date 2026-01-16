@@ -46,16 +46,37 @@ p {
 }
 
 .app {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 2.5rem 3rem;
+}
+
+.app-screen {
   display: grid;
   grid-template-columns: minmax(320px, 380px) 1fr;
   gap: 1.5rem;
-  padding: 1.5rem 2.5rem 3rem;
+}
+
+.panel--management {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: start;
+}
+
+.card--collections {
+  grid-column: 1 / -1;
 }
 
 .panel {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.is-hidden {
+  display: none !important;
 }
 
 .card {
@@ -104,9 +125,10 @@ select {
   margin-bottom: 1rem;
 }
 
-.test-cards {
+.test-collections {
   display: grid;
   gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .test-card {
@@ -116,6 +138,7 @@ select {
   background: #f8fafc;
   cursor: pointer;
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  text-align: left;
 }
 
 .test-card:hover {
@@ -128,6 +151,19 @@ select {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
   background: #eef2ff;
+}
+
+.test-card--import {
+  display: grid;
+  gap: 0.35rem;
+  align-items: start;
+  background: #eef2ff;
+  border-style: dashed;
+}
+
+.test-card--import .muted {
+  color: var(--text);
+  opacity: 0.75;
 }
 
 .test-card__title {
@@ -147,9 +183,14 @@ select {
 }
 
 .test-card__actions {
-  display: flex;
+  display: none;
   gap: 0.5rem;
   flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.test-card.is-active .test-card__actions {
+  display: flex;
 }
 
 .test-card__actions button {
@@ -378,6 +419,14 @@ button.danger:hover {
   gap: 1rem;
   align-items: flex-start;
   margin-bottom: 1.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .modal-grid {
