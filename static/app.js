@@ -681,6 +681,27 @@ function renderTestCards(tests, selectedId) {
     const actions = document.createElement("div");
     actions.className = "test-card__actions";
 
+    const testingButton = document.createElement("button");
+    testingButton.type = "button";
+    testingButton.textContent = "Тестирование";
+    testingButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await selectTest(test.id);
+      setActiveScreen("testing");
+    });
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "secondary";
+    editButton.textContent = "Редактирование";
+    editButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await selectTest(test.id);
+      openEditorModal();
+      renderEditorQuestionList();
+      resetEditorForm();
+    });
+
     const renameButton = document.createElement("button");
     renameButton.type = "button";
     renameButton.className = "secondary";
@@ -720,7 +741,7 @@ function renderTestCards(tests, selectedId) {
       }
     });
 
-    actions.append(renameButton, deleteButton);
+    actions.append(testingButton, editButton, renameButton, deleteButton);
     card.append(title, meta, stats, actions);
     card.addEventListener("click", async () => {
       await selectTest(test.id);
@@ -896,7 +917,7 @@ async function refreshCurrentTest(testId = currentTest?.id) {
   }
   currentTest = await fetchTest(testId);
   testsCache = await fetchTests();
-  renderTestOptions(testsCache, currentTest.id);
+  renderTestCards(testsCache, currentTest.id);
   session = null;
   updateProgressHint();
   questionContainer.textContent =
@@ -904,6 +925,35 @@ async function refreshCurrentTest(testId = currentTest?.id) {
   optionsContainer.textContent = "";
   questionProgress.textContent = "Вопрос 0 из 0";
   renderQuestionNav();
+}
+
+async function selectTest(testId) {
+  if (!testId) {
+    currentTest = null;
+    session = null;
+    updateProgressHint();
+    questionContainer.textContent = "Сначала загрузите тест через API.";
+    optionsContainer.textContent = "";
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(null);
+    renderTestCards(testsCache, null);
+    return;
+  }
+
+  const isSameTest = currentTest?.id === testId;
+  currentTest = await fetchTest(testId);
+  updateProgressHint();
+  if (!isSameTest) {
+    session = null;
+    questionContainer.textContent =
+      "Нажмите «Начать тестирование», чтобы применить настройки.";
+    optionsContainer.textContent = "";
+    questionProgress.textContent = "Вопрос 0 из 0";
+    renderQuestionNav();
+    renderResultSummary(loadLastResult(testId));
+  }
+  renderTestCards(testsCache, testId);
 }
 
 async function updateQuestion(testId, questionId, payload) {

@@ -83,6 +83,9 @@ p {
 
 .panel--management {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: start;
 }
 
 .panel {
@@ -184,9 +187,14 @@ select {
 }
 
 .test-card__actions {
-  display: flex;
+  display: none;
   gap: 0.5rem;
   flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.test-card.is-active .test-card__actions {
+  display: flex;
 }
 
 .test-card__actions button {
