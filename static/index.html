@@ -151,6 +151,9 @@
                 <label class="editor-field">
                   <span>Текст вопроса</span>
                   <textarea id="editor-question-text" rows="4"></textarea>
+                  <p class="hint">
+                    Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                  </p>
                 </label>
 
                 <div class="editor-options">
@@ -160,6 +163,9 @@
                       Добавить вариант
                     </button>
                   </div>
+                  <p class="hint">
+                    Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                  </p>
                   <div
                     id="editor-options-list"
                     class="editor-options-list"
@@ -181,6 +187,40 @@
                 <p class="muted">
                   Изображения и формулы в тексте вопроса или вариантов ответов.
                 </p>
+                <div class="editor-object-upload">
+                  <div class="editor-object-upload__header">
+                    <strong>Добавить объект</strong>
+                    <p class="muted">
+                      Сначала загрузите объект, затем используйте его ID в
+                      тексте.
+                    </p>
+                  </div>
+                  <label class="editor-field">
+                    <span>Тип объекта</span>
+                    <select id="editor-object-type">
+                      <option value="image">Изображение</option>
+                      <option value="formula">Формула (XML)</option>
+                    </select>
+                  </label>
+                  <label class="editor-field">
+                    <span>ID объекта</span>
+                    <input id="editor-object-id" type="text" placeholder="Например, img-1" />
+                  </label>
+                  <div id="editor-object-image-fields" class="editor-field">
+                    <span>Файл изображения (png, jpg, wmf, emf)</span>
+                    <input id="editor-object-image-file" type="file" />
+                  </div>
+                  <div id="editor-object-formula-fields" class="editor-field is-hidden">
+                    <span>XML формулы</span>
+                    <textarea id="editor-object-formula-text" rows="4" placeholder="<math>...</math>"></textarea>
+                    <span class="muted">или импортируйте XML файл</span>
+                    <input id="editor-object-formula-file" type="file" accept=".xml" />
+                  </div>
+                  <button id="editor-add-object" type="button" class="secondary">
+                    Добавить объект
+                  </button>
+                  <p id="editor-object-status" class="muted"></p>
+                </div>
                 <div id="editor-objects" class="object-list">
                   <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
                 </div>

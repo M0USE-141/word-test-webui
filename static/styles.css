@@ -619,12 +619,26 @@ button.danger:hover {
   font-size: 0.9rem;
 }
 
+.editor-field select,
+.editor-field input[type="text"],
+.editor-field input[type="file"] {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+}
+
 .editor-field textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   font-size: 0.95rem;
   min-height: 90px;
+}
+
+.editor-field.is-error textarea {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4);
 }
 
 .editor-options {
@@ -653,12 +667,27 @@ button.danger:hover {
   background: #f8fafc;
 }
 
+.editor-option.is-error {
+  border-color: var(--danger);
+}
+
 .editor-option textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.5rem 0.6rem;
   font-size: 0.9rem;
   min-height: 64px;
+}
+
+.editor-option.is-error textarea {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.8rem;
 }
 
 .editor-option-controls {
@@ -681,6 +710,24 @@ button.danger:hover {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #ffffff;
+}
+
+.editor-object-upload {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: #f9fafb;
+}
+
+.editor-object-upload__header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.editor-object-upload .is-error {
+  color: var(--danger);
 }
 
 .object-list {
