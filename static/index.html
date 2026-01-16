@@ -139,46 +139,51 @@
         </div>
 
         <div class="modal-grid">
-          <div class="modal-panel">
+          <div class="modal-panel editor-column editor-column--list">
             <h3>Список вопросов</h3>
             <div id="editor-question-list" class="editor-list"></div>
           </div>
 
-          <div class="modal-panel">
-            <h3 id="editor-form-title">Новый вопрос</h3>
-            <form id="editor-form" class="editor-form">
-              <label class="editor-field">
-                <span>Текст вопроса</span>
-                <textarea id="editor-question-text" rows="4"></textarea>
-              </label>
+          <div class="modal-panel editor-column editor-column--form">
+            <div id="editor-panel" class="editor-panel editor-panel--form">
+              <h3 id="editor-form-title">Новый вопрос</h3>
+              <form id="editor-form" class="editor-form">
+                <label class="editor-field">
+                  <span>Текст вопроса</span>
+                  <textarea id="editor-question-text" rows="4"></textarea>
+                </label>
 
-              <div class="editor-options">
-                <div class="editor-options-header">
-                  <h4>Варианты ответов</h4>
-                  <button id="add-option" type="button" class="ghost">
-                    Добавить вариант
+                <div class="editor-options">
+                  <div class="editor-options-header">
+                    <h4>Варианты ответов</h4>
+                    <button id="add-option" type="button" class="ghost">
+                      Добавить вариант
+                    </button>
+                  </div>
+                  <div
+                    id="editor-options-list"
+                    class="editor-options-list"
+                  ></div>
+                </div>
+
+                <div class="editor-actions">
+                  <button id="save-question" type="submit">
+                    Сохранить
+                  </button>
+                  <button id="reset-editor" type="button" class="ghost">
+                    Очистить форму
                   </button>
                 </div>
-                <div id="editor-options-list" class="editor-options-list"></div>
-              </div>
+              </form>
 
-              <div class="editor-actions">
-                <button id="save-question" type="submit">
-                  Сохранить
-                </button>
-                <button id="reset-editor" type="button" class="ghost">
-                  Очистить форму
-                </button>
-              </div>
-            </form>
-
-            <div class="editor-objects-panel">
-              <h4>Объекты вопроса</h4>
-              <p class="muted">
-                Изображения и формулы в тексте вопроса или вариантов ответов.
-              </p>
-              <div id="editor-objects" class="object-list">
-                <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
+              <div class="editor-objects-panel">
+                <h4>Объекты вопроса</h4>
+                <p class="muted">
+                  Изображения и формулы в тексте вопроса или вариантов ответов.
+                </p>
+                <div id="editor-objects" class="object-list">
+                  <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
+                </div>
               </div>
             </div>
           </div>
