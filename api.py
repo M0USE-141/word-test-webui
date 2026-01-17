@@ -1,8 +1,10 @@
 import os
 import shutil
 import sys
+import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
@@ -25,6 +27,16 @@ def _resource_path(relative: str) -> Path:
     return base_dir / relative
 
 
+def _parse_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 DATA_DIR = Path(os.environ.get("TEST_DATA_DIR", Path.cwd() / "data" / "tests"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 ATTEMPTS_DIR = Path(
@@ -34,6 +46,10 @@ ATTEMPTS_DIR.mkdir(parents=True, exist_ok=True)
 ATTEMPTS_INDEX_PATH = ATTEMPTS_DIR / "index.json"
 STATS_VERSION = 1
 STATIC_DIR = _resource_path("static")
+EVENTS_RETENTION_DAYS = _parse_int_env("EVENTS_RETENTION_DAYS", 30)
+EVENTS_CLEANUP_INTERVAL_SECONDS = _parse_int_env(
+    "EVENTS_CLEANUP_INTERVAL_SECONDS", 24 * 60 * 60
+)
 
 app = FastAPI(title="Test Extractor API")
 
@@ -43,6 +59,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _startup_events_cleanup() -> None:
+    _schedule_events_cleanup()
 
 
 @app.get("/")
@@ -126,6 +147,20 @@ def _attempt_stats_path(attempt_id: str) -> Path:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_iso_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
 
 
 def _validate_id(name: str, value: str) -> str:
@@ -429,6 +464,251 @@ def _iter_attempt_metas() -> list[dict[str, object]]:
         if isinstance(meta_payload, dict):
             metas.append(meta_payload)
     return metas
+
+
+def _cleanup_old_events() -> int:
+    if EVENTS_RETENTION_DAYS <= 0:
+        return 0
+    if not ATTEMPTS_DIR.exists():
+        return 0
+    cutoff = datetime.now(timezone.utc) - timedelta(days=EVENTS_RETENTION_DAYS)
+    removed = 0
+    for attempt_dir in ATTEMPTS_DIR.iterdir():
+        if not attempt_dir.is_dir():
+            continue
+        events_path = attempt_dir / "events.ndjson"
+        if not events_path.exists():
+            continue
+        try:
+            modified = datetime.fromtimestamp(
+                events_path.stat().st_mtime, timezone.utc
+            )
+        except OSError:
+            continue
+        if modified < cutoff:
+            try:
+                events_path.unlink()
+            except OSError:
+                continue
+            removed += 1
+    return removed
+
+
+def _schedule_events_cleanup() -> None:
+    if EVENTS_RETENTION_DAYS <= 0:
+        return
+
+    def _worker() -> None:
+        while True:
+            try:
+                _cleanup_old_events()
+            except Exception:
+                pass
+            time.sleep(max(60, EVENTS_CLEANUP_INTERVAL_SECONDS))
+
+    thread = threading.Thread(
+        target=_worker,
+        name="events_cleanup",
+        daemon=True,
+    )
+    thread.start()
+
+
+def _build_attempt_summary_from_events(
+    attempt_id: str,
+    attempt_meta: dict[str, object],
+    test_payload: dict[str, object],
+    events: list[dict[str, object]],
+) -> dict[str, object]:
+    questions = test_payload.get("questions", [])
+    if not isinstance(questions, list):
+        questions = []
+
+    answer_events: dict[int, dict[str, object]] = {}
+    shown_counts: dict[int, int] = {}
+    attempt_started: datetime | None = None
+    attempt_finished: datetime | None = None
+    attempt_finished_duration: int | None = None
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("eventType")
+        question_id = event.get("questionId")
+        if event_type == "question_shown" and isinstance(question_id, int):
+            shown_counts[question_id] = shown_counts.get(question_id, 0) + 1
+        if event_type in {"answer_selected", "answer_changed", "question_skipped"}:
+            if isinstance(question_id, int):
+                answer_events[question_id] = event
+        if event_type == "attempt_started":
+            attempt_started = _parse_iso_timestamp(event.get("ts"))
+        if event_type == "attempt_finished":
+            attempt_finished = _parse_iso_timestamp(event.get("ts"))
+            duration = event.get("durationMs")
+            if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+                attempt_finished_duration = int(duration)
+
+    total = len(questions)
+    answered_count = 0
+    correct_count = 0
+    per_question = []
+    durations = []
+    for index, entry in enumerate(questions):
+        if not isinstance(entry, dict):
+            continue
+        question_id = entry.get("id")
+        if not isinstance(question_id, int):
+            continue
+        event = answer_events.get(question_id)
+        is_answered = False
+        answer_id = None
+        is_correct = None
+        duration_ms = 0
+        if event:
+            event_type = event.get("eventType")
+            if event_type in {"answer_selected", "answer_changed"}:
+                is_answered = True
+                answer_id = event.get("answerId")
+                is_correct = event.get("isCorrect")
+                if not isinstance(is_correct, bool):
+                    is_correct = None
+            if event_type == "question_skipped":
+                is_answered = False
+            duration_value = event.get("durationMs")
+            if isinstance(duration_value, (int, float)) and not isinstance(
+                duration_value, bool
+            ):
+                duration_ms = int(duration_value)
+        if is_answered:
+            answered_count += 1
+            if is_correct is True:
+                correct_count += 1
+        durations.append(duration_ms)
+        per_question.append(
+            {
+                "questionId": question_id,
+                "questionIndex": index,
+                "answerId": answer_id,
+                "isCorrect": is_correct if is_answered else None,
+                "durationMs": duration_ms,
+                "shownCount": shown_counts.get(question_id, 0),
+                "isSkipped": not is_answered,
+            }
+        )
+
+    skipped_count = total - answered_count
+    percent_correct = (correct_count / total) * 100 if total else 0
+    total_duration_ms = 0
+    if attempt_finished_duration is not None:
+        total_duration_ms = attempt_finished_duration
+    else:
+        start_time = attempt_started
+        end_time = attempt_finished
+        if start_time and end_time:
+            total_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+    question_duration_total_ms = sum(durations)
+    avg_time_per_question = question_duration_total_ms / total if total else 0
+
+    def _average(values: list[int]) -> float:
+        if not values:
+            return 0.0
+        return sum(values) / len(values)
+
+    def _standard_deviation(values: list[int]) -> float:
+        if len(values) < 2:
+            return 0.0
+        mean = _average(values)
+        variance = sum((value - mean) ** 2 for value in values) / len(values)
+        return variance**0.5
+
+    third = max(1, len(durations) // 3) if durations else 1
+    first_avg = _average(durations[:third])
+    last_avg = _average(durations[-third:]) if durations else 0.0
+    fatigue_point = (last_avg - first_avg) / first_avg if first_avg else 0
+    mean = _average(durations)
+    focus_stability_index = (
+        max(0.0, 1 - _standard_deviation(durations) / mean) if mean else 0.0
+    )
+    personal_difficulty_score = (
+        max(0.0, 1 - correct_count / total) if total else 0.0
+    )
+
+    timestamps = attempt_meta.get("timestamps", {})
+    if not isinstance(timestamps, dict):
+        timestamps = {}
+    completed = bool(
+        timestamps.get("finalizedAt")
+        or attempt_finished
+        or any(event.get("eventType") == "attempt_finished" for event in events)
+    )
+    summary = {
+        "attemptId": attempt_id,
+        "testId": attempt_meta.get("testId"),
+        "clientId": attempt_meta.get("clientId"),
+        "ts": _utc_now(),
+        "timezone": "UTC",
+        "settings": attempt_meta.get("settings", {}),
+        "score": correct_count,
+        "percentCorrect": percent_correct,
+        "completed": completed,
+        "answeredCount": answered_count,
+        "skippedCount": skipped_count,
+        "totalDurationMs": total_duration_ms,
+        "avgTimePerQuestion": avg_time_per_question,
+        "perQuestion": per_question,
+        "fatiguePoint": fatigue_point,
+        "focusStabilityIndex": focus_stability_index,
+        "personalDifficultyScore": personal_difficulty_score,
+        "totalCount": total,
+    }
+    return summary
+
+
+def _write_attempt_stats_from_summary(
+    attempt_id: str,
+    test_id: str,
+    client_id: str,
+    summary: dict[str, object],
+    event_count: int,
+) -> dict[str, object]:
+    aggregates = {
+        "score": summary.get("score"),
+        "percentCorrect": summary.get("percentCorrect"),
+        "answeredCount": summary.get("answeredCount"),
+        "skippedCount": summary.get("skippedCount"),
+        "avgTimePerQuestion": summary.get("avgTimePerQuestion"),
+        "totalDurationMs": summary.get("totalDurationMs"),
+        "fatiguePoint": summary.get("fatiguePoint"),
+        "focusStabilityIndex": summary.get("focusStabilityIndex"),
+        "personalDifficultyScore": summary.get("personalDifficultyScore"),
+        "totalCount": summary.get("totalCount"),
+    }
+    stats_payload = {
+        "attemptId": attempt_id,
+        "testId": test_id,
+        "clientId": client_id,
+        "statsVersion": STATS_VERSION,
+        "aggregates": aggregates,
+        "summary": summary,
+        "perQuestion": summary.get("perQuestion", []),
+        "eventCount": event_count,
+    }
+    _write_json_file(_attempt_stats_path(attempt_id), stats_payload)
+    metrics = _extract_cached_metrics(aggregates, summary)
+    _upsert_attempt_index_entry(
+        attempt_id,
+        test_id,
+        client_id,
+        score=metrics["score"],
+        percent=metrics["percent"],
+        answered_count=metrics["answeredCount"],
+        skipped_count=metrics["skippedCount"],
+        avg_time_per_question=metrics["avgTimePerQuestion"],
+        fatigue_point=metrics["fatiguePoint"],
+        focus_stability_index=metrics["focusStabilityIndex"],
+        personal_difficulty_score=metrics["personalDifficultyScore"],
+        stats_version=STATS_VERSION,
+    )
+    return stats_payload
 
 def _safe_asset_path(base_dir: Path, asset_path: str) -> Path:
     resolved = (base_dir / asset_path).resolve()
@@ -927,6 +1207,58 @@ def list_attempt_stats(
 def rebuild_attempt_stats_index() -> dict[str, object]:
     entries = _rebuild_attempt_index()
     return {"status": "rebuilt", "count": len(entries)}
+
+
+@app.post("/api/attempts/{attempt_id}/rebuild")
+def rebuild_attempt_from_events(
+    attempt_id: str,
+    admin: bool = Query(False, alias="admin"),
+) -> dict[str, object]:
+    if not admin:
+        raise HTTPException(status_code=403, detail="Rebuild not allowed")
+    attempt_id = _validate_id("attemptId", attempt_id)
+    attempt_meta = _load_attempt_meta(attempt_id)
+    if not isinstance(attempt_meta, dict):
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    events_path = _attempt_events_path(attempt_id)
+    if not events_path.exists():
+        raise HTTPException(status_code=409, detail="Events not available")
+    test_id = attempt_meta.get("testId")
+    client_id = attempt_meta.get("clientId")
+    if not isinstance(test_id, str) or not isinstance(client_id, str):
+        raise HTTPException(status_code=400, detail="Invalid attempt metadata")
+    _validate_test_exists(test_id)
+    events = _load_attempt_events(attempt_id)
+    test_payload = _load_test_payload(test_id)
+    summary = _build_attempt_summary_from_events(
+        attempt_id, attempt_meta, test_payload, events
+    )
+    stats_payload = _write_attempt_stats_from_summary(
+        attempt_id,
+        test_id,
+        client_id,
+        summary,
+        event_count=len(events),
+    )
+    timestamps = attempt_meta.get("timestamps")
+    if not isinstance(timestamps, dict):
+        timestamps = {}
+    timestamps["updatedAt"] = _utc_now()
+    attempt_meta["timestamps"] = timestamps
+    _write_json_file(_attempt_meta_path(attempt_id), attempt_meta)
+    attempt_response = {
+        **attempt_meta,
+        "createdAt": timestamps.get("createdAt"),
+        "finalizedAt": timestamps.get("finalizedAt"),
+        "aggregates": stats_payload.get("aggregates", {}),
+        "summary": stats_payload.get("summary"),
+        "statsVersion": stats_payload.get("statsVersion"),
+    }
+    return {
+        "status": "rebuilt",
+        "attempt": attempt_response,
+        "eventCount": len(events),
+    }
 
 
 @app.get("/api/stats/attempts/{attempt_id}")
