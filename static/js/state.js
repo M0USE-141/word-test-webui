@@ -1,0 +1,224 @@
+export const dom = {
+  testCardsContainer: document.getElementById("test-cards"),
+  questionList: document.getElementById("question-nav"),
+  questionContainer: document.getElementById("question-container"),
+  optionsContainer: document.getElementById("options-container"),
+  uploadForm: document.getElementById("upload-form"),
+  uploadFileInput: document.getElementById("upload-file"),
+  uploadDropzone: document.getElementById("upload-dropzone"),
+  uploadFileName: document.getElementById("upload-file-name"),
+  uploadFileNameValue: document.querySelector(".upload-file-name__value"),
+  uploadClearButton: document.getElementById("upload-clear-file"),
+  uploadSymbolInput: document.getElementById("upload-symbol"),
+  uploadLogSmallTablesInput: document.getElementById(
+    "upload-log-small-tables"
+  ),
+  uploadLogs: document.getElementById("upload-logs"),
+  questionProgress: document.getElementById("question-progress"),
+  questionStatus: document.getElementById("question-status"),
+  prevQuestionButton: document.getElementById("prev-question"),
+  nextQuestionButton: document.getElementById("next-question"),
+  finishTestButton: document.getElementById("finish-test"),
+  answerFeedback: document.getElementById("answer-feedback"),
+  startTestButton: document.getElementById("start-test"),
+  exitTestButton: document.getElementById("exit-test"),
+  resultSummary: document.getElementById("result-summary"),
+  resultDetails: document.getElementById("result-details"),
+  progressHint: document.getElementById("progress-hint"),
+  editorModal: document.getElementById("editor-modal"),
+  closeEditorButton: document.getElementById("close-editor"),
+  editorRenameTestButton: document.getElementById("editor-rename-test"),
+  editorDeleteTestButton: document.getElementById("editor-delete-test"),
+  importModal: document.getElementById("import-modal"),
+  closeImportButton: document.getElementById("close-import"),
+  createTestModal: document.getElementById("create-test-modal"),
+  closeCreateTestButton: document.getElementById("close-create-test"),
+  cancelCreateTestButton: document.getElementById("cancel-create-test"),
+  createTestForm: document.getElementById("create-test-form"),
+  createTestTitleInput: document.getElementById("create-test-title"),
+  createTestStatus: document.getElementById("create-test-status"),
+  editorQuestionList: document.getElementById("editor-question-list"),
+  editorForm: document.getElementById("editor-form"),
+  editorFormTitle: document.getElementById("editor-form-title"),
+  editorQuestionText: document.getElementById("editor-question-text"),
+  editorOptionsList: document.getElementById("editor-options-list"),
+  editorObjectsList: document.getElementById("editor-objects"),
+  editorAddOption: document.getElementById("add-option"),
+  editorResetButton: document.getElementById("reset-editor"),
+  editorStatus: document.getElementById("editor-status"),
+  editorPanel: document.getElementById("editor-panel"),
+  editorPanelHome: document.querySelector(".editor-column--form"),
+  editorObjectType: document.getElementById("editor-object-type"),
+  editorObjectId: document.getElementById("editor-object-id"),
+  editorObjectImageFields: document.getElementById(
+    "editor-object-image-fields"
+  ),
+  editorObjectImageFile: document.getElementById(
+    "editor-object-image-file"
+  ),
+  editorObjectFormulaFields: document.getElementById(
+    "editor-object-formula-fields"
+  ),
+  editorObjectFormulaText: document.getElementById(
+    "editor-object-formula-text"
+  ),
+  editorObjectFormulaFile: document.getElementById(
+    "editor-object-formula-file"
+  ),
+  editorObjectImageDropzone: document.querySelector(
+    'label[for="editor-object-image-file"]'
+  ),
+  editorObjectFormulaDropzone: document.querySelector(
+    'label[for="editor-object-formula-file"]'
+  ),
+  editorAddObjectButton: document.getElementById("editor-add-object"),
+  editorObjectStatus: document.getElementById("editor-object-status"),
+  editorObjectsToggle: document.getElementById("toggle-editor-objects"),
+  editorObjectUploadToggle: document.getElementById(
+    "toggle-editor-object-upload"
+  ),
+  editorObjectUploadSection: document.getElementById(
+    "editor-object-upload-section"
+  ),
+  editorObjectListSection: document.getElementById(
+    "editor-object-list-section"
+  ),
+  screenManagement: document.getElementById("screen-management"),
+  screenTesting: document.getElementById("screen-testing"),
+  settingQuestionCount: document.getElementById("setting-question-count"),
+  settingRandomQuestions: document.getElementById(
+    "setting-random-questions"
+  ),
+  settingRandomOptions: document.getElementById("setting-random-options"),
+  settingOnlyUnanswered: document.getElementById(
+    "setting-only-unanswered"
+  ),
+  settingShowAnswers: document.getElementById("setting-show-answers"),
+  settingMaxOptions: document.getElementById("setting-max-options"),
+};
+
+export const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
+
+export const SUPPORTED_IMAGE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".wmf",
+  ".emf",
+];
+
+export const INLINE_MARKER_REGEX = /{{\s*(image|formula)\s*:\s*([^}]+)\s*}}/g;
+
+const TESTS_CACHE_KEY = "tests-cache";
+const LAST_RESULT_KEY_PREFIX = "test-last-result:";
+
+export const state = {
+  currentTest: null,
+  testsCache: [],
+  session: null,
+  editorState: {
+    mode: "create",
+    questionId: null,
+    objects: [],
+  },
+  uiState: {
+    activeScreen: "management",
+  },
+  activeEditorCard: null,
+  activeEditorCardKey: null,
+};
+
+export const editorMobileQuery = window.matchMedia("(max-width: 720px)");
+
+export function readTestsCache() {
+  const raw = localStorage.getItem(TESTS_CACHE_KEY);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+export function writeTestsCache(tests) {
+  state.testsCache = tests;
+  localStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(tests));
+}
+
+export function loadProgress(testId) {
+  if (!testId) {
+    return new Set();
+  }
+  const raw = localStorage.getItem(`test-progress:${testId}`);
+  if (!raw) {
+    return new Set();
+  }
+  try {
+    const data = JSON.parse(raw);
+    return new Set(Array.isArray(data) ? data : []);
+  } catch (error) {
+    return new Set();
+  }
+}
+
+export function saveProgress(testId, answeredIds) {
+  if (!testId) {
+    return;
+  }
+  const payload = Array.from(answeredIds);
+  localStorage.setItem(`test-progress:${testId}`, JSON.stringify(payload));
+}
+
+export function loadLastResult(testId) {
+  if (!testId) {
+    return null;
+  }
+  const raw = localStorage.getItem(`${LAST_RESULT_KEY_PREFIX}${testId}`);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const data = JSON.parse(raw);
+    if (typeof data?.percent !== "number") {
+      return null;
+    }
+    return data;
+  } catch (error) {
+    return null;
+  }
+}
+
+export function saveLastResult(testId, stats) {
+  if (!testId || !stats) {
+    return;
+  }
+  localStorage.setItem(
+    `${LAST_RESULT_KEY_PREFIX}${testId}`,
+    JSON.stringify(stats)
+  );
+}
+
+export function clearLastResult(testId) {
+  if (!testId) {
+    return;
+  }
+  localStorage.removeItem(`${LAST_RESULT_KEY_PREFIX}${testId}`);
+}
+
+export function getSettings() {
+  return {
+    questionCount:
+      Number.parseInt(dom.settingQuestionCount.value || "0", 10) || 0,
+    randomQuestions: dom.settingRandomQuestions.checked,
+    randomOptions: dom.settingRandomOptions.checked,
+    onlyUnanswered: dom.settingOnlyUnanswered.checked,
+    showAnswersImmediately: dom.settingShowAnswers.checked,
+    maxOptions: Math.max(
+      1,
+      Number.parseInt(dom.settingMaxOptions.value || "1", 10) || 1
+    ),
+  };
+}
