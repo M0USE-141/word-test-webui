@@ -7,6 +7,7 @@ import {
   SUPPORTED_IMAGE_EXTENSIONS,
 } from "./state.js";
 import { clearElement, renderBlocks } from "./rendering.js";
+import { formatNumber, t } from "./i18n.js";
 
 export function getInlineIdentifier(inline) {
   if (!inline || typeof inline !== "object") {
@@ -133,7 +134,9 @@ function ensureFormulaIdsForQuestion(question) {
 function inlineToMarker(inline) {
   const id = getInlineIdentifier(inline);
   if (!id) {
-    return inline.type === "image" ? "[image]" : "[formula]";
+    return inline.type === "image"
+      ? t("inlineImagePlaceholder")
+      : t("inlineFormulaPlaceholder");
   }
   return `{{${inline.type}:${id}}}`;
 }
@@ -258,13 +261,18 @@ export function buildInlineRegistry(question) {
 }
 
 function getInlineSummary(inline, index) {
-  const typeLabel = inline.type === "image" ? "Изображение" : "Формула";
+  const typeLabel =
+    inline.type === "image" ? t("inlineTypeImage") : t("inlineTypeFormula");
   if (inline.type === "formula") {
     const id = getInlineIdentifier(inline);
-    return `Формула: ${createShortLabel(id, typeLabel)}`;
+    return t("inlineFormulaSummary", {
+      label: createShortLabel(id, typeLabel),
+    });
   }
-  const hint = getInlineIdentifier(inline) || `#${index + 1}`;
-  return `${typeLabel}: ${createShortLabel(hint, typeLabel)}`;
+  const hint = getInlineIdentifier(inline) || `#${formatNumber(index + 1)}`;
+  return t("inlineImageSummary", {
+    label: createShortLabel(hint, typeLabel),
+  });
 }
 
 function buildInlineDetails(inline) {
@@ -275,14 +283,14 @@ function buildInlineDetails(inline) {
     if (inline.src) {
       const img = document.createElement("img");
       img.src = `${state.currentTest.assetsBaseUrl}/${inline.src}`;
-      img.alt = inline.alt || "image";
+      img.alt = inline.alt || t("inlineImageAlt");
       img.loading = "lazy";
       img.className = "object-preview-image";
       details.appendChild(img);
     } else {
       const placeholder = document.createElement("p");
       placeholder.className = "muted";
-      placeholder.textContent = "Нет ссылки на файл изображения.";
+      placeholder.textContent = t("noImageLink");
       details.appendChild(placeholder);
     }
   } else if (inline.type === "formula") {
@@ -294,7 +302,7 @@ function buildInlineDetails(inline) {
 
       const codeDetails = document.createElement("details");
       const codeSummary = document.createElement("summary");
-      codeSummary.textContent = "Показать MathML";
+      codeSummary.textContent = t("showMathML");
       const code = document.createElement("pre");
       code.textContent = inline.mathml;
       codeDetails.appendChild(codeSummary);
@@ -308,7 +316,7 @@ function buildInlineDetails(inline) {
 
       const codeDetails = document.createElement("details");
       const codeSummary = document.createElement("summary");
-      codeSummary.textContent = "Показать LaTeX";
+      codeSummary.textContent = t("showLatex");
       const code = document.createElement("pre");
       code.textContent = inline.latex;
       codeDetails.appendChild(codeSummary);
@@ -317,13 +325,13 @@ function buildInlineDetails(inline) {
     } else if (inline.src) {
       const img = document.createElement("img");
       img.src = `${state.currentTest.assetsBaseUrl}/${inline.src}`;
-      img.alt = inline.id || "formula";
+      img.alt = inline.id || t("inlineFormulaAlt");
       img.className = "object-preview-image";
       details.appendChild(img);
     } else {
       const placeholder = document.createElement("p");
       placeholder.className = "muted";
-      placeholder.textContent = "Нет данных формулы.";
+      placeholder.textContent = t("noFormulaData");
       details.appendChild(placeholder);
     }
   }
@@ -372,14 +380,14 @@ export function renderEditorObjects(question = findEditorQuestion()) {
     if (!state.currentTest) {
       const empty = document.createElement("p");
       empty.className = "muted";
-      empty.textContent = "Выберите вопрос, чтобы увидеть объекты.";
+      empty.textContent = t("editorObjectSelectQuestion");
       dom.editorObjectsList.appendChild(empty);
       return;
     }
     if (!registered.length) {
       const empty = document.createElement("p");
       empty.className = "muted";
-      empty.textContent = "Объекты не найдены.";
+      empty.textContent = t("editorObjectListEmpty");
       dom.editorObjectsList.appendChild(empty);
       return;
     }
@@ -398,7 +406,7 @@ export function renderEditorObjects(question = findEditorQuestion()) {
   if (!objects.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "Объекты не найдены.";
+    empty.textContent = t("editorObjectListEmpty");
     dom.editorObjectsList.appendChild(empty);
     return;
   }
@@ -417,11 +425,13 @@ export function renderEditorObjects(question = findEditorQuestion()) {
     const source = document.createElement("div");
     source.className = "muted";
     if (item.source.type === "question") {
-      source.textContent = "Источник: вопрос";
+      source.textContent = t("editorObjectSourceQuestion");
     } else if (item.source.type === "registry") {
-      source.textContent = "Источник: загруженный объект";
+      source.textContent = t("editorObjectSourceRegistry");
     } else {
-      source.textContent = `Источник: вариант #${item.source.id}`;
+      source.textContent = t("editorObjectSourceOption", {
+        id: formatNumber(item.source.id),
+      });
     }
     const controls = document.createElement("div");
     controls.className = "object-controls";
@@ -429,15 +439,15 @@ export function renderEditorObjects(question = findEditorQuestion()) {
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "danger";
-    removeButton.textContent = "Удалить";
+    removeButton.textContent = t("commonDelete");
 
     const details = buildInlineDetails(item.inline);
 
     removeButton.addEventListener("click", () => {
       const message =
         item.source.type === "registry"
-          ? "Удалить объект из списка доступных?"
-          : "Удалить объект из текста вопроса?";
+          ? t("confirmDeleteObjectRegistry")
+          : t("confirmDeleteObjectInline");
       const confirmed = window.confirm(message);
       if (!confirmed) {
         return;
@@ -483,13 +493,15 @@ export function setEditorState(mode, questionId = null) {
   state.editorState = { mode, questionId, objects: state.editorState.objects };
   if (dom.editorFormTitle) {
     dom.editorFormTitle.textContent =
-      mode === "edit" ? `Редактирование вопроса #${questionId}` : "Новый вопрос";
+      mode === "edit"
+        ? t("editorFormTitleEdit", { id: formatNumber(questionId) })
+        : t("editorFormTitleNew");
   }
   if (dom.editorStatus) {
     dom.editorStatus.textContent =
       mode === "edit"
-        ? "Обновите текст и варианты ответов, затем сохраните."
-        : "Создайте новый вопрос и добавьте варианты ответов.";
+        ? t("editorStatusEdit")
+        : t("editorStatusCreate");
   }
 }
 
@@ -569,7 +581,8 @@ export function addOptionRow(value = "", isCorrect = false) {
 
   const textarea = document.createElement("textarea");
   textarea.value = value;
-  textarea.placeholder = "Текст варианта ответа";
+  textarea.placeholder = t("editorOptionPlaceholder");
+  textarea.dataset.i18nPlaceholder = "editorOptionPlaceholder";
 
   const controls = document.createElement("div");
   controls.className = "editor-option-controls";
@@ -580,13 +593,15 @@ export function addOptionRow(value = "", isCorrect = false) {
   checkbox.type = "checkbox";
   checkbox.checked = isCorrect;
   const checkboxText = document.createElement("span");
-  checkboxText.textContent = "Правильный вариант";
+  checkboxText.textContent = t("editorOptionCorrect");
+  checkboxText.dataset.i18n = "editorOptionCorrect";
   checkboxLabel.append(checkbox, checkboxText);
 
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "ghost";
-  removeButton.textContent = "Удалить";
+  removeButton.textContent = t("commonDelete");
+  removeButton.dataset.i18n = "commonDelete";
   removeButton.addEventListener("click", () => {
     wrapper.remove();
     if (!dom.editorOptionsList.children.length) {
@@ -723,11 +738,11 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
 
   const newTitle = document.createElement("div");
   newTitle.className = "editor-card-title";
-  newTitle.textContent = "Добавить новый вопрос";
+  newTitle.textContent = t("editorQuestionAddTitle");
 
   const newHint = document.createElement("div");
   newHint.className = "muted";
-  newHint.textContent = "Раскройте форму добавления вопроса.";
+  newHint.textContent = t("editorQuestionAddHint");
 
   const newExpand = document.createElement("div");
   newExpand.className = "editor-card-expand";
@@ -747,7 +762,7 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
   if (!state.currentTest || !state.currentTest.questions?.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "Вопросы не найдены. Добавьте новый.";
+    empty.textContent = t("editorQuestionListEmpty");
     dom.editorQuestionList.appendChild(empty);
     return;
   }
@@ -760,7 +775,7 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
 
     const title = document.createElement("div");
     title.className = "editor-card-title";
-    title.textContent = `#${questionId}`;
+    title.textContent = `#${formatNumber(questionId)}`;
 
     const preview = document.createElement("div");
     preview.className = "editor-card-preview";
@@ -772,7 +787,7 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
         .replace(INLINE_MARKER_REGEX, "")
         .replace(/\s+/g, " ")
         .trim();
-      preview.textContent = text || "Без текста";
+      preview.textContent = text || t("editorQuestionNoText");
     }
 
     const actions = document.createElement("div");
@@ -804,13 +819,15 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "danger";
-    deleteButton.textContent = "Удалить";
+    deleteButton.textContent = t("commonDelete");
     deleteButton.addEventListener("click", async () => {
       if (!state.currentTest) {
         return;
       }
       const confirmed = window.confirm(
-        `Удалить вопрос #${question.id ?? index + 1}?`
+        t("confirmDeleteQuestion", {
+          id: formatNumber(question.id ?? index + 1),
+        })
       );
       if (!confirmed) {
         return;
@@ -852,13 +869,13 @@ export function setEditorObjectStatus(message, isError = false) {
 function updateEditorObjectToggles(showList, showUpload) {
   if (dom.editorObjectsToggle) {
     dom.editorObjectsToggle.textContent = showList
-      ? "Скрыть объекты"
-      : "Показать объекты";
+      ? t("editorObjectsToggleHide")
+      : t("editorObjectsToggleShow");
   }
   if (dom.editorObjectUploadToggle) {
     dom.editorObjectUploadToggle.textContent = showUpload
-      ? "Скрыть добавление"
-      : "Добавить объект";
+      ? t("editorObjectUploadToggleHide")
+      : t("editorObjectUploadToggleShow");
   }
 }
 
@@ -884,7 +901,7 @@ export function syncEditorObjectFields() {
 
 export async function handleAddObject() {
   if (!state.currentTest) {
-    setEditorObjectStatus("Сначала выберите тест.", true);
+    setEditorObjectStatus(t("objectSelectTestFirst"), true);
     return;
   }
   const type = dom.editorObjectType?.value || "image";
@@ -899,7 +916,7 @@ export async function handleAddObject() {
     }
   });
   if (!id && type !== "formula") {
-    setEditorObjectStatus("Укажите ID объекта.", true);
+    setEditorObjectStatus(t("objectIdRequired"), true);
     return;
   }
   if (!id && type === "formula") {
@@ -907,7 +924,7 @@ export async function handleAddObject() {
   }
   const existingKey = `${type}:${id}`;
   if (registry.has(existingKey)) {
-    setEditorObjectStatus("Объект с таким ID уже существует.", true);
+    setEditorObjectStatus(t("objectIdExists"), true);
     return;
   }
 
@@ -920,7 +937,7 @@ export async function handleAddObject() {
         formulaText = (await file.text()).trim();
       }
       if (!formulaText) {
-        setEditorObjectStatus("Добавьте XML формулы.", true);
+        setEditorObjectStatus(t("objectFormulaMissing"), true);
         return;
       }
       state.editorState.objects.push({
@@ -928,14 +945,14 @@ export async function handleAddObject() {
         id,
         mathml: formulaText,
       });
-      setEditorObjectStatus("Формула добавлена.");
+      setEditorObjectStatus(t("objectFormulaAdded"));
     } else {
       const file = dom.editorObjectImageFile?.files?.[0];
       if (!file) {
-        setEditorObjectStatus("Выберите файл изображения.", true);
+        setEditorObjectStatus(t("objectImageMissing"), true);
         return;
       }
-      setEditorObjectStatus("Загрузка файла...");
+      setEditorObjectStatus(t("objectUploading"));
       const asset = await uploadObjectAsset(state.currentTest.id, file);
       state.editorState.objects.push({
         type: "image",
@@ -943,7 +960,7 @@ export async function handleAddObject() {
         src: asset.src,
         alt: file.name || id,
       });
-      setEditorObjectStatus("Изображение добавлено.");
+      setEditorObjectStatus(t("objectImageAdded"));
     }
     if (dom.editorObjectId) {
       dom.editorObjectId.value = "";

@@ -5,6 +5,7 @@ import {
   saveProgress,
   state,
 } from "./state.js";
+import { formatNumber, t } from "./i18n.js";
 
 export function clearElement(element) {
   while (element.firstChild) {
@@ -51,14 +52,14 @@ export function updateEditorTestActions() {
   if (dom.editorRenameTestButton) {
     dom.editorRenameTestButton.disabled = !hasTest;
     dom.editorRenameTestButton.textContent = hasTest
-      ? `Переименовать «${state.currentTest.title}»`
-      : "Переименовать тест";
+      ? t("editorRenameTitle", { title: state.currentTest.title })
+      : t("renameTestButton");
   }
   if (dom.editorDeleteTestButton) {
     dom.editorDeleteTestButton.disabled = !hasTest;
     dom.editorDeleteTestButton.textContent = hasTest
-      ? `Удалить «${state.currentTest.title}»`
-      : "Удалить тест";
+      ? t("editorDeleteTitle", { title: state.currentTest.title })
+      : t("deleteTestButton");
   }
 }
 
@@ -96,7 +97,7 @@ export function renderInline(parent, inline) {
       ? `${state.currentTest.assetsBaseUrl}/${inline.src}`
       : "";
     img.src = src;
-    img.alt = inline.alt || "";
+    img.alt = inline.alt || t("inlineImageAlt");
     img.loading = "lazy";
     img.className = "inline-image";
     parent.appendChild(img);
@@ -121,13 +122,13 @@ export function renderInline(parent, inline) {
     if (inline.src) {
       const img = document.createElement("img");
       img.src = `${state.currentTest.assetsBaseUrl}/${inline.src}`;
-      img.alt = inline.id || "formula";
+      img.alt = inline.id || t("inlineFormulaAlt");
       img.className = "inline-image";
       parent.appendChild(img);
       return;
     }
     // Формулы без src считаются штатным сценарием (MathML/LaTeX или плейсхолдер).
-    parent.appendChild(document.createTextNode("[formula]"));
+    parent.appendChild(document.createTextNode(t("inlineFormulaPlaceholder")));
   }
 }
 
@@ -152,7 +153,10 @@ export function updateProgressHint() {
   }
   const progress = loadProgress(state.currentTest.id);
   const total = state.currentTest.questions.length;
-  dom.progressHint.textContent = `Отвечено ранее: ${progress.size} из ${total}.`;
+  dom.progressHint.textContent = t("progressHint", {
+    answered: formatNumber(progress.size),
+    total: formatNumber(total),
+  });
 }
 
 function shuffle(items) {
@@ -180,12 +184,14 @@ function getOptionsForQuestion(entry) {
 
 function getAnswerFeedback(selectedIndex, correctIndex) {
   if (correctIndex === null) {
-    return "Правильный ответ не указан.";
+    return t("answerFeedbackNoCorrect");
   }
   if (selectedIndex === correctIndex) {
-    return "Верно!";
+    return t("answerFeedbackCorrect");
   }
-  return `Неверно. Правильный вариант: ${correctIndex + 1}.`;
+  return t("answerFeedbackIncorrect", {
+    index: formatNumber(correctIndex + 1),
+  });
 }
 
 export function renderQuestionNav() {
@@ -197,7 +203,7 @@ export function renderQuestionNav() {
   state.session.questions.forEach((entry, index) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${index + 1}`;
+    button.textContent = formatNumber(index + 1);
     button.className = "nav-button";
 
     const status = state.session.answerStatus.get(entry.questionId);
@@ -232,10 +238,13 @@ export function renderQuestionNav() {
 
 export function renderQuestion() {
   if (!state.session || !state.session.questions.length) {
-    dom.questionContainer.textContent = "Нет вопросов для отображения.";
+    dom.questionContainer.textContent = t("noQuestionsToDisplay");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = "Вопрос 0 из 0";
+    dom.questionProgress.textContent = t("questionProgress", {
+      current: formatNumber(0),
+      total: formatNumber(0),
+    });
     dom.questionStatus.textContent = "";
     if (dom.answerFeedback) {
       dom.answerFeedback.textContent = "";
@@ -249,17 +258,20 @@ export function renderQuestion() {
   const correctIndex = options.findIndex((option) => option.isCorrect);
   const resolvedCorrectIndex = correctIndex === -1 ? null : correctIndex;
 
-  dom.questionProgress.textContent = `Вопрос ${state.session.currentIndex + 1} из ${
-    state.session.questions.length
-  }`;
-  dom.questionStatus.textContent = `ID вопроса: ${entry.questionId}`;
+  dom.questionProgress.textContent = t("questionProgress", {
+    current: formatNumber(state.session.currentIndex + 1),
+    total: formatNumber(state.session.questions.length),
+  });
+  dom.questionStatus.textContent = t("questionStatus", {
+    id: formatNumber(entry.questionId),
+  });
 
   renderBlocks(dom.questionContainer, entry.question.question.blocks);
 
   clearElement(dom.optionsContainer);
   dom.optionsContainer.classList.remove("is-hidden");
   const optionsTitle = document.createElement("h3");
-  optionsTitle.textContent = "Варианты ответа";
+  optionsTitle.textContent = t("optionsTitle");
   dom.optionsContainer.appendChild(optionsTitle);
 
   const optionsList = document.createElement("div");
@@ -272,7 +284,7 @@ export function renderQuestion() {
 
     const indexBadge = document.createElement("span");
     indexBadge.className = "option-index";
-    indexBadge.textContent = `${index + 1}.`;
+    indexBadge.textContent = `${formatNumber(index + 1)}.`;
 
     const content = document.createElement("div");
     content.className = "option-content";
@@ -340,8 +352,7 @@ export function renderQuestion() {
         resolvedCorrectIndex
       );
     } else {
-      dom.answerFeedback.textContent =
-        "Выберите вариант ответа, чтобы увидеть подсказку.";
+      dom.answerFeedback.textContent = t("selectAnswerHint");
     }
   }
 
@@ -355,17 +366,24 @@ export function renderQuestion() {
 export function renderResultSummary(stats) {
   clearElement(dom.resultDetails);
   if (!stats) {
-    dom.resultSummary.textContent = "Ещё нет завершённых попыток.";
+    dom.resultSummary.textContent = t("noCompletedAttempts");
     return;
   }
   const { correct, total, answered, percent } = stats;
-  dom.resultSummary.textContent = `Результат: ${correct}/${total} правильных, отвечено ${answered}, ${percent.toFixed(
-    1
-  )}%`;
+  const formattedPercent = formatNumber(percent, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  dom.resultSummary.textContent = t("resultSummary", {
+    correct: formatNumber(correct),
+    total: formatNumber(total),
+    answered: formatNumber(answered),
+    percent: formattedPercent,
+  });
   const detailItems = [
-    `Всего вопросов в попытке: ${total}`,
-    `Ответов дано: ${answered}`,
-    `Точность: ${percent.toFixed(1)}%`,
+    t("resultDetailTotal", { total: formatNumber(total) }),
+    t("resultDetailAnswered", { answered: formatNumber(answered) }),
+    t("resultDetailAccuracy", { percent: formattedPercent }),
   ];
   detailItems.forEach((text) => {
     const item = document.createElement("li");
@@ -390,10 +408,12 @@ export function renderTestCards(
   const newCard = document.createElement("button");
   newCard.type = "button";
   newCard.className = "test-card test-card--new";
-  newCard.innerHTML = `
-    <strong>Новая коллекция</strong>
-    <span class="muted">Создайте пустой тест и заполните его вручную.</span>
-  `;
+  const newCardTitle = document.createElement("strong");
+  newCardTitle.textContent = t("newCollectionTitle");
+  const newCardHint = document.createElement("span");
+  newCardHint.className = "muted";
+  newCardHint.textContent = t("newCollectionHint");
+  newCard.append(newCardTitle, newCardHint);
   newCard.addEventListener("click", () => {
     onCreateTest();
   });
@@ -402,10 +422,12 @@ export function renderTestCards(
   const importCard = document.createElement("button");
   importCard.type = "button";
   importCard.className = "test-card test-card--import";
-  importCard.innerHTML = `
-    <strong>Импорт теста</strong>
-    <span class="muted">Добавьте новую коллекцию из Word-файла. Только .docx.</span>
-  `;
+  const importCardTitle = document.createElement("strong");
+  importCardTitle.textContent = t("importTestTitle");
+  const importCardHint = document.createElement("span");
+  importCardHint.className = "muted";
+  importCardHint.textContent = t("importTestHint");
+  importCard.append(importCardTitle, importCardHint);
   importCard.addEventListener("click", () => {
     onImportTest();
   });
@@ -414,7 +436,7 @@ export function renderTestCards(
   if (!tests.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "Нет загруженных тестов.";
+    empty.textContent = t("noTestsAvailable");
     dom.testCardsContainer.appendChild(empty);
     return;
   }
@@ -433,23 +455,33 @@ export function renderTestCards(
 
     const meta = document.createElement("div");
     meta.className = "test-card__meta";
-    meta.textContent = `Вопросов: ${test.questionCount}`;
+    meta.textContent = t("testCount", {
+      count: formatNumber(test.questionCount),
+    });
 
     const stats = document.createElement("div");
     stats.className = "test-card__stats";
     const lastResult = loadLastResult(test.id);
-    stats.textContent = lastResult
-      ? `Последний результат: ${lastResult.correct}/${lastResult.total} (${lastResult.percent.toFixed(
-          1
-        )}%)`
-      : "Последний результат: нет данных";
+    if (lastResult) {
+      const formattedPercent = formatNumber(lastResult.percent, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+      stats.textContent = t("lastResult", {
+        correct: formatNumber(lastResult.correct),
+        total: formatNumber(lastResult.total),
+        percent: formattedPercent,
+      });
+    } else {
+      stats.textContent = t("lastResultEmpty");
+    }
 
     const actions = document.createElement("div");
     actions.className = "test-card__actions";
 
     const testingButton = document.createElement("button");
     testingButton.type = "button";
-    testingButton.textContent = "Тестирование";
+    testingButton.textContent = t("testingButton");
     testingButton.addEventListener("click", async (event) => {
       event.stopPropagation();
       await onStartTesting(test.id);
@@ -458,7 +490,7 @@ export function renderTestCards(
     const editButton = document.createElement("button");
     editButton.type = "button";
     editButton.className = "secondary";
-    editButton.textContent = "Редактирование";
+    editButton.textContent = t("editingButton");
     editButton.addEventListener("click", async (event) => {
       event.stopPropagation();
       await onEditTest(test.id);

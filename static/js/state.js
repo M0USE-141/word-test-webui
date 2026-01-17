@@ -1,5 +1,6 @@
 export const dom = {
   themeToggle: document.getElementById("theme-toggle"),
+  langSelect: document.getElementById("lang-select"),
   testCardsContainer: document.getElementById("test-cards"),
   questionList: document.getElementById("question-nav"),
   questionContainer: document.getElementById("question-container"),
@@ -98,8 +99,6 @@ export const dom = {
   settingMaxOptions: document.getElementById("setting-max-options"),
 };
 
-export const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
-
 export const SUPPORTED_IMAGE_EXTENSIONS = [
   ".png",
   ".jpg",
@@ -124,6 +123,7 @@ export const state = {
   },
   uiState: {
     activeScreen: "management",
+    locale: "ru",
   },
   activeEditorCard: null,
   activeEditorCardKey: null,
