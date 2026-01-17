@@ -7,6 +7,7 @@ import {
 } from "./state.js";
 import { formatNumber, t } from "./i18n.js";
 import {
+  flushQueues,
   trackAnswerEvent,
   trackQuestionShown,
   trackQuestionSkipped,
@@ -98,6 +99,7 @@ function createQuestionNavButton(entry, index) {
             state.session.currentIndex,
             durationMs
           );
+          flushQueues();
         }
       }
       updateQuestionTiming(state.session, entry.questionId);
@@ -504,6 +506,7 @@ export function renderQuestion() {
           isCorrect,
           durationMs
         );
+        flushQueues();
         if (state.session.settings.showAnswersImmediately && dom.answerFeedback) {
           dom.answerFeedback.textContent = getAnswerFeedback(
             index,

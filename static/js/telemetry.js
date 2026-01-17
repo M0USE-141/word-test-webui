@@ -34,9 +34,23 @@ function writeQueue(key, items) {
   localStorage.setItem(key, JSON.stringify(items));
 }
 
+function normalizeEventPayload(item) {
+  if (!item || typeof item !== "object") {
+    return item;
+  }
+  if (!item.eventType && item.type) {
+    return { ...item, eventType: item.type };
+  }
+  return item;
+}
+
 function enqueue(queueKey, item) {
   const queue = readQueue(queueKey);
-  queue.push(item);
+  if (queueKey === EVENT_QUEUE_KEY) {
+    queue.push(normalizeEventPayload(item));
+  } else {
+    queue.push(item);
+  }
   writeQueue(queueKey, queue);
   if (queue.length >= BATCH_SIZE) {
     flushQueues();
@@ -44,42 +58,83 @@ function enqueue(queueKey, item) {
 }
 
 async function postJson(url, payload) {
-  const response = await fetch(url, {
+  return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) {
-    throw new Error(`Telemetry request failed: ${response.status}`);
-  }
 }
 
-async function flushQueue(queueKey, url) {
+async function flushEventQueue() {
   if (!navigator.onLine) {
     return;
   }
-  const queue = readQueue(queueKey);
+  const queue = readQueue(EVENT_QUEUE_KEY);
   if (!queue.length) {
     return;
   }
-  const batch = queue.slice(0, BATCH_SIZE);
-  try {
-    await postJson(url, { items: batch });
-    const remaining = queue.slice(batch.length);
-    writeQueue(queueKey, remaining);
-    if (remaining.length) {
-      setTimeout(() => {
-        flushQueue(queueKey, url);
-      }, 0);
+  const remaining = [];
+  for (const rawEvent of queue.slice(0, BATCH_SIZE)) {
+    const event = normalizeEventPayload(rawEvent);
+    const attemptId = event?.attemptId;
+    if (!attemptId) {
+      continue;
     }
-  } catch (error) {
-    // Retry later.
+    const response = await postJson(
+      `/api/attempts/${encodeURIComponent(attemptId)}/events`,
+      event
+    );
+    if (!response.ok) {
+      if (response.status !== 400 && response.status !== 422) {
+        remaining.push(event);
+      }
+    }
+  }
+  const rest = queue.slice(BATCH_SIZE).concat(remaining);
+  writeQueue(EVENT_QUEUE_KEY, rest);
+  if (rest.length) {
+    setTimeout(() => {
+      flushEventQueue();
+    }, 0);
+  }
+}
+
+async function flushSummaryQueue() {
+  if (!navigator.onLine) {
+    return;
+  }
+  const queue = readQueue(SUMMARY_QUEUE_KEY);
+  if (!queue.length) {
+    return;
+  }
+  const remaining = [];
+  for (const summary of queue.slice(0, BATCH_SIZE)) {
+    const attemptId = summary?.attemptId;
+    if (!attemptId) {
+      continue;
+    }
+    const response = await postJson(
+      `/api/attempts/${encodeURIComponent(attemptId)}/finalize`,
+      summary
+    );
+    if (!response.ok) {
+      if (response.status !== 400 && response.status !== 422) {
+        remaining.push(summary);
+      }
+    }
+  }
+  const rest = queue.slice(BATCH_SIZE).concat(remaining);
+  writeQueue(SUMMARY_QUEUE_KEY, rest);
+  if (rest.length) {
+    setTimeout(() => {
+      flushSummaryQueue();
+    }, 0);
   }
 }
 
 export function flushQueues() {
-  flushQueue(EVENT_QUEUE_KEY, "/api/telemetry/events");
-  flushQueue(SUMMARY_QUEUE_KEY, "/api/telemetry/attempts/finalize");
+  flushEventQueue();
+  flushSummaryQueue();
 }
 
 export function initTelemetry() {
@@ -139,7 +194,7 @@ export function trackEvent(
   } = {}
 ) {
   const payload = {
-    type,
+    eventType: type,
     ...basePayload(session),
     questionId: questionEntry?.questionId ?? null,
     questionIndex,
@@ -148,6 +203,9 @@ export function trackEvent(
     durationMs,
     isSkipped,
   };
+  if (!payload.attemptId || !payload.testId || !payload.clientId) {
+    return;
+  }
   enqueue(EVENT_QUEUE_KEY, payload);
 }
 

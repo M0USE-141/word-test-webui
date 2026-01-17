@@ -36,6 +36,66 @@ python cli.py path/to/test.docx --output data/tests
 - JSON теста: `GET /api/tests/{test_id}`.
 - Ассеты: `GET /api/tests/{test_id}/assets/{path}`.
 
+### Телеметрия попыток (JSON-контракт)
+
+Все поля и их типы используются одинаково на фронтенде и бэкенде.
+
+#### Событие попытки
+
+`POST /api/attempts/{attemptId}/events`
+
+```json
+{
+  "attemptId": "string",
+  "testId": "string",
+  "clientId": "string",
+  "ts": "2024-01-01T12:00:00.000Z",
+  "timezone": "Europe/Minsk",
+  "settings": {},
+  "questionId": 1,
+  "questionIndex": 0,
+  "answerId": 2,
+  "isCorrect": true,
+  "durationMs": 1234,
+  "isSkipped": false,
+  "eventType": "question_answered"
+}
+```
+
+#### Финализация попытки
+
+`POST /api/attempts/{attemptId}/finalize`
+
+```json
+{
+  "attemptId": "string",
+  "testId": "string",
+  "clientId": "string",
+  "ts": "2024-01-01T12:00:00.000Z",
+  "timezone": "Europe/Minsk",
+  "settings": {},
+  "aggregates": {},
+  "summary": {}
+}
+```
+
+Ответ:
+
+```json
+{
+  "status": "finalized",
+  "attempt": {
+    "attemptId": "string",
+    "testId": "string",
+    "clientId": "string",
+    "createdAt": "2024-01-01T12:00:00+00:00",
+    "finalizedAt": "2024-01-01T12:30:00+00:00",
+    "aggregates": {},
+    "summary": {}
+  }
+}
+```
+
 ## Docker
 
 ### Сборка и запуск
