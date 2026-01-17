@@ -7,6 +7,118 @@ import {
 } from "./state.js";
 import { formatNumber, t } from "./i18n.js";
 
+const MATHJAX_IDLE_TIMEOUT_MS = 120;
+const NAV_RENDER_BATCH_SIZE = 60;
+const NAV_IDLE_TIMEOUT_MS = 120;
+const mathJaxQueue = new Set();
+let mathJaxScheduled = false;
+let lastQuestionNavSession = null;
+let questionNavRenderToken = 0;
+
+function queueMathJaxTypeset(container) {
+  if (!container || !window.MathJax?.typesetPromise) {
+    return;
+  }
+  mathJaxQueue.add(container);
+  if (mathJaxScheduled) {
+    return;
+  }
+  mathJaxScheduled = true;
+  const runTypeset = () => {
+    mathJaxScheduled = false;
+    if (!mathJaxQueue.size) {
+      return;
+    }
+    const targets = Array.from(mathJaxQueue);
+    mathJaxQueue.clear();
+    window.MathJax.typesetPromise(targets);
+  };
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(runTypeset, { timeout: MATHJAX_IDLE_TIMEOUT_MS });
+  } else {
+    window.requestAnimationFrame(runTypeset);
+  }
+}
+
+function updateQuestionNavButtonState(button, entry, index) {
+  button.classList.remove(
+    "is-correct",
+    "is-incorrect",
+    "is-neutral",
+    "is-current"
+  );
+  const status = state.session.answerStatus.get(entry.questionId);
+  if (state.session.finished) {
+    if (status === "correct") {
+      button.classList.add("is-correct");
+    } else if (status === "incorrect") {
+      button.classList.add("is-incorrect");
+    }
+  } else if (state.session.settings.showAnswersImmediately) {
+    if (status === "correct") {
+      button.classList.add("is-correct");
+    } else if (status === "incorrect") {
+      button.classList.add("is-incorrect");
+    }
+  } else {
+    button.classList.add("is-neutral");
+  }
+
+  if (index === state.session.currentIndex) {
+    button.classList.add("is-current");
+  }
+}
+
+function createQuestionNavButton(entry, index) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = formatNumber(index + 1);
+  button.className = "nav-button";
+  updateQuestionNavButtonState(button, entry, index);
+  button.addEventListener("click", () => {
+    state.session.currentIndex = index;
+    renderQuestion();
+  });
+  return button;
+}
+
+function scheduleQuestionNavRender(entries) {
+  questionNavRenderToken += 1;
+  const token = questionNavRenderToken;
+  clearElement(dom.questionList);
+  dom.questionList.dataset.navCount = String(entries.length);
+  let currentIndex = 0;
+
+  const renderChunk = () => {
+    if (token !== questionNavRenderToken) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    let rendered = 0;
+    while (currentIndex < entries.length && rendered < NAV_RENDER_BATCH_SIZE) {
+      fragment.appendChild(
+        createQuestionNavButton(entries[currentIndex], currentIndex)
+      );
+      currentIndex += 1;
+      rendered += 1;
+    }
+    dom.questionList.appendChild(fragment);
+    if (currentIndex < entries.length) {
+      scheduleNextChunk();
+    }
+  };
+
+  const scheduleNextChunk = () => {
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(renderChunk, { timeout: NAV_IDLE_TIMEOUT_MS });
+    } else {
+      window.requestAnimationFrame(renderChunk);
+    }
+  };
+
+  scheduleNextChunk();
+}
+
 export function clearElement(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
@@ -82,7 +194,7 @@ export function renderUploadLogs(messages, isError = false) {
   });
 }
 
-export function renderInline(parent, inline) {
+export function renderInline(parent, inline, { onFormula } = {}) {
   if (inline.type === "text") {
     parent.appendChild(document.createTextNode(inline.text ?? ""));
     return;
@@ -108,15 +220,14 @@ export function renderInline(parent, inline) {
       const span = document.createElement("span");
       span.innerHTML = inline.mathml;
       parent.appendChild(span);
-      if (window.MathJax?.typesetPromise) {
-        window.MathJax.typesetPromise([span]);
-      }
+      onFormula?.();
       return;
     }
     if (inline.latex) {
       const span = document.createElement("span");
       span.innerHTML = `\\(${inline.latex}\\)`;
       parent.appendChild(span);
+      onFormula?.();
       return;
     }
     if (inline.src) {
@@ -134,15 +245,21 @@ export function renderInline(parent, inline) {
 
 export function renderBlocks(container, blocks) {
   clearElement(container);
+  let hasFormula = false;
+  const markFormula = () => {
+    hasFormula = true;
+  };
   blocks.forEach((block) => {
     if (block.type === "paragraph") {
       const p = document.createElement("p");
-      block.inlines.forEach((inline) => renderInline(p, inline));
+      block.inlines.forEach((inline) =>
+        renderInline(p, inline, { onFormula: markFormula })
+      );
       container.appendChild(p);
     }
   });
-  if (window.MathJax?.typesetPromise) {
-    window.MathJax.typesetPromise([container]);
+  if (hasFormula) {
+    queueMathJaxTypeset(container);
   }
 }
 
@@ -195,44 +312,28 @@ function getAnswerFeedback(selectedIndex, correctIndex) {
 }
 
 export function renderQuestionNav() {
-  clearElement(dom.questionList);
   if (!state.session) {
     return;
   }
 
-  state.session.questions.forEach((entry, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = formatNumber(index + 1);
-    button.className = "nav-button";
+  const shouldRebuild =
+    state.session !== lastQuestionNavSession ||
+    dom.questionList.dataset.navCount !==
+      String(state.session.questions.length);
 
-    const status = state.session.answerStatus.get(entry.questionId);
-    if (state.session.finished) {
-      if (status === "correct") {
-        button.classList.add("is-correct");
-      } else if (status === "incorrect") {
-        button.classList.add("is-incorrect");
-      }
-    } else if (state.session.settings.showAnswersImmediately) {
-      if (status === "correct") {
-        button.classList.add("is-correct");
-      } else if (status === "incorrect") {
-        button.classList.add("is-incorrect");
-      }
-    } else {
-      button.classList.add("is-neutral");
+  if (shouldRebuild) {
+    lastQuestionNavSession = state.session;
+    scheduleQuestionNavRender(state.session.questions);
+    return;
+  }
+
+  const buttons = dom.questionList.querySelectorAll("button.nav-button");
+  buttons.forEach((button, index) => {
+    const entry = state.session.questions[index];
+    if (!entry) {
+      return;
     }
-
-    if (index === state.session.currentIndex) {
-      button.classList.add("is-current");
-    }
-
-    button.addEventListener("click", () => {
-      state.session.currentIndex = index;
-      renderQuestion();
-    });
-
-    dom.questionList.appendChild(button);
+    updateQuestionNavButtonState(button, entry, index);
   });
 }
 
