@@ -32,6 +32,7 @@ ATTEMPTS_DIR = Path(
 )
 ATTEMPTS_DIR.mkdir(parents=True, exist_ok=True)
 ATTEMPTS_INDEX_PATH = ATTEMPTS_DIR / "index.json"
+STATS_VERSION = 1
 STATIC_DIR = _resource_path("static")
 
 app = FastAPI(title="Test Extractor API")
@@ -285,6 +286,34 @@ def _resolve_metric(
     return None
 
 
+def _extract_cached_metrics(
+    aggregates: dict[str, object] | None,
+    summary: dict[str, object] | None,
+) -> dict[str, float | int | None]:
+    return {
+        "score": _resolve_metric(aggregates, ["score", "correct"])
+        or _resolve_metric(summary, ["score", "correct"]),
+        "percent": _resolve_metric(aggregates, ["percent", "percentCorrect", "accuracy"])
+        or _resolve_metric(summary, ["percent", "percentCorrect", "accuracy"]),
+        "answeredCount": _resolve_metric(aggregates, ["answeredCount", "answered"])
+        or _resolve_metric(summary, ["answeredCount", "answered"]),
+        "skippedCount": _resolve_metric(aggregates, ["skippedCount", "skipped"])
+        or _resolve_metric(summary, ["skippedCount", "skipped"]),
+        "avgTimePerQuestion": _resolve_metric(
+            aggregates, ["avgTimePerQuestion", "avgTime"]
+        )
+        or _resolve_metric(summary, ["avgTimePerQuestion", "avgTime"]),
+        "fatiguePoint": _resolve_metric(aggregates, ["fatiguePoint"])
+        or _resolve_metric(summary, ["fatiguePoint"]),
+        "focusStabilityIndex": _resolve_metric(aggregates, ["focusStabilityIndex"])
+        or _resolve_metric(summary, ["focusStabilityIndex"]),
+        "personalDifficultyScore": _resolve_metric(
+            aggregates, ["personalDifficultyScore"]
+        )
+        or _resolve_metric(summary, ["personalDifficultyScore"]),
+    }
+
+
 def _upsert_attempt_index_entry(
     attempt_id: str,
     test_id: str,
@@ -293,6 +322,13 @@ def _upsert_attempt_index_entry(
     completed_at: str | None = None,
     score: float | int | None = None,
     percent: float | int | None = None,
+    answered_count: float | int | None = None,
+    skipped_count: float | int | None = None,
+    avg_time_per_question: float | int | None = None,
+    fatigue_point: float | int | None = None,
+    focus_stability_index: float | int | None = None,
+    personal_difficulty_score: float | int | None = None,
+    stats_version: int | None = None,
 ) -> dict[str, object]:
     entries = _load_attempt_index()
     entry = next(
@@ -308,6 +344,13 @@ def _upsert_attempt_index_entry(
             "completedAt": completed_at,
             "score": score,
             "percent": percent,
+            "answeredCount": answered_count,
+            "skippedCount": skipped_count,
+            "avgTimePerQuestion": avg_time_per_question,
+            "fatiguePoint": fatigue_point,
+            "focusStabilityIndex": focus_stability_index,
+            "personalDifficultyScore": personal_difficulty_score,
+            "statsVersion": stats_version,
         }
         entries.append(entry)
         _write_attempt_index(entries)
@@ -320,6 +363,20 @@ def _upsert_attempt_index_entry(
         entry["score"] = score
     if percent is not None:
         entry["percent"] = percent
+    if answered_count is not None:
+        entry["answeredCount"] = answered_count
+    if skipped_count is not None:
+        entry["skippedCount"] = skipped_count
+    if avg_time_per_question is not None:
+        entry["avgTimePerQuestion"] = avg_time_per_question
+    if fatigue_point is not None:
+        entry["fatiguePoint"] = fatigue_point
+    if focus_stability_index is not None:
+        entry["focusStabilityIndex"] = focus_stability_index
+    if personal_difficulty_score is not None:
+        entry["personalDifficultyScore"] = personal_difficulty_score
+    if stats_version is not None:
+        entry["statsVersion"] = stats_version
     _write_attempt_index(entries)
     return entry
 
@@ -335,12 +392,7 @@ def _rebuild_attempt_index() -> list[dict[str, object]]:
         stats_payload = _load_attempt_stats(str(attempt_id))
         aggregates = stats_payload.get("aggregates")
         summary = stats_payload.get("summary")
-        score = _resolve_metric(
-            aggregates, ["score", "correct"]
-        ) or _resolve_metric(summary, ["score", "correct"])
-        percent = _resolve_metric(
-            aggregates, ["percentCorrect", "accuracy"]
-        ) or _resolve_metric(summary, ["percentCorrect", "accuracy"])
+        metrics = _extract_cached_metrics(aggregates, summary)
         timestamps = attempt_payload.get("timestamps", {})
         if not isinstance(timestamps, dict):
             timestamps = {}
@@ -351,8 +403,15 @@ def _rebuild_attempt_index() -> list[dict[str, object]]:
                 "clientId": client_id,
                 "startedAt": timestamps.get("createdAt"),
                 "completedAt": timestamps.get("finalizedAt"),
-                "score": score,
-                "percent": percent,
+                "score": metrics["score"],
+                "percent": metrics["percent"],
+                "answeredCount": metrics["answeredCount"],
+                "skippedCount": metrics["skippedCount"],
+                "avgTimePerQuestion": metrics["avgTimePerQuestion"],
+                "fatiguePoint": metrics["fatiguePoint"],
+                "focusStabilityIndex": metrics["focusStabilityIndex"],
+                "personalDifficultyScore": metrics["personalDifficultyScore"],
+                "statsVersion": stats_payload.get("statsVersion"),
             }
         )
     _write_attempt_index(entries)
@@ -749,17 +808,17 @@ def finalize_attempt(
     if summary and isinstance(summary.get("perQuestion"), list):
         per_question = summary.get("perQuestion")
     event_count = sum(1 for _ in _iter_attempt_events(attempt_id))
-    score = _resolve_metric(
-        aggregates, ["score", "correct"]
-    ) or _resolve_metric(summary, ["score", "correct"])
-    percent = _resolve_metric(
-        aggregates, ["percentCorrect", "accuracy"]
-    ) or _resolve_metric(summary, ["percentCorrect", "accuracy"])
+    metrics = _extract_cached_metrics(aggregates, summary)
+    normalized_aggregates = dict(aggregates)
+    for key, value in metrics.items():
+        if value is not None:
+            normalized_aggregates[key] = value
     stats_payload = {
         "attemptId": attempt_id,
         "testId": test_id,
         "clientId": client_id,
-        "aggregates": aggregates,
+        "statsVersion": STATS_VERSION,
+        "aggregates": normalized_aggregates,
         "summary": summary,
         "perQuestion": per_question,
         "eventCount": event_count,
@@ -770,8 +829,15 @@ def finalize_attempt(
         test_id,
         client_id,
         completed_at=payload.ts,
-        score=score,
-        percent=percent,
+        score=metrics["score"],
+        percent=metrics["percent"],
+        answered_count=metrics["answeredCount"],
+        skipped_count=metrics["skippedCount"],
+        avg_time_per_question=metrics["avgTimePerQuestion"],
+        fatigue_point=metrics["fatiguePoint"],
+        focus_stability_index=metrics["focusStabilityIndex"],
+        personal_difficulty_score=metrics["personalDifficultyScore"],
+        stats_version=STATS_VERSION,
     )
     timestamps = attempt_payload.get("timestamps")
     if not isinstance(timestamps, dict):
@@ -785,8 +851,9 @@ def finalize_attempt(
         **attempt_payload,
         "createdAt": timestamps.get("createdAt"),
         "finalizedAt": timestamps.get("finalizedAt"),
-        "aggregates": aggregates,
+        "aggregates": normalized_aggregates,
         "summary": summary,
+        "statsVersion": STATS_VERSION,
     }
     return {"status": "finalized", "attempt": attempt_response}
 
@@ -806,10 +873,40 @@ def list_attempt_stats(
         summary = {}
         score = entry.get("score")
         percent = entry.get("percent")
+        answered_count = entry.get("answeredCount")
+        skipped_count = entry.get("skippedCount")
+        avg_time_per_question = entry.get("avgTimePerQuestion")
+        fatigue_point = entry.get("fatiguePoint")
+        focus_stability_index = entry.get("focusStabilityIndex")
+        personal_difficulty_score = entry.get("personalDifficultyScore")
         if isinstance(score, (int, float)) and not isinstance(score, bool):
             summary["score"] = score
         if isinstance(percent, (int, float)) and not isinstance(percent, bool):
             summary["percentCorrect"] = percent
+        if isinstance(answered_count, (int, float)) and not isinstance(
+            answered_count, bool
+        ):
+            summary["answeredCount"] = answered_count
+        if isinstance(skipped_count, (int, float)) and not isinstance(
+            skipped_count, bool
+        ):
+            summary["skippedCount"] = skipped_count
+        if isinstance(avg_time_per_question, (int, float)) and not isinstance(
+            avg_time_per_question, bool
+        ):
+            summary["avgTimePerQuestion"] = avg_time_per_question
+        if isinstance(fatigue_point, (int, float)) and not isinstance(
+            fatigue_point, bool
+        ):
+            summary["fatiguePoint"] = fatigue_point
+        if isinstance(focus_stability_index, (int, float)) and not isinstance(
+            focus_stability_index, bool
+        ):
+            summary["focusStabilityIndex"] = focus_stability_index
+        if isinstance(personal_difficulty_score, (int, float)) and not isinstance(
+            personal_difficulty_score, bool
+        ):
+            summary["personalDifficultyScore"] = personal_difficulty_score
         results.append(
             {
                 "attemptId": entry.get("attemptId"),
@@ -819,6 +916,7 @@ def list_attempt_stats(
                 "completedAt": entry.get("completedAt"),
                 "createdAt": entry.get("startedAt"),
                 "finalizedAt": entry.get("completedAt"),
+                "statsVersion": entry.get("statsVersion"),
                 "summary": summary or None,
             }
         )
@@ -852,6 +950,7 @@ def get_attempt_stats(
         "finalizedAt": timestamps.get("finalizedAt"),
         "aggregates": stats_payload.get("aggregates", {}),
         "summary": stats_payload.get("summary"),
+        "statsVersion": stats_payload.get("statsVersion"),
     }
     return {
         "attempt": attempt_response,
