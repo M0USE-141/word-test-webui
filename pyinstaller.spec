@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules
+
 block_cipher = None
 
 project_root = Path.cwd()
@@ -12,13 +14,20 @@ datas = [
     (str(project_root / "data"), "data"),
 ]
 
+hiddenimports = []
+hiddenimports += collect_submodules("fastapi")
+hiddenimports += collect_submodules("uvicorn")
+hiddenimports += collect_submodules("python_multipart")
+hiddenimports += collect_submodules("starlette")
+hiddenimports += collect_submodules("pydantic")
+
 
 a = Analysis(
     ["main.py"],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
