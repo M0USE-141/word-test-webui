@@ -61,7 +61,7 @@ function applyThemePreference(theme) {
   const nextTheme = theme === "dark" ? "dark" : DEFAULT_THEME;
   document.documentElement.dataset.theme = nextTheme;
   if (dom.themeToggle) {
-    dom.themeToggle.value = nextTheme;
+    dom.themeToggle.checked = nextTheme === "dark";
   }
   return nextTheme;
 }
@@ -76,7 +76,9 @@ function setupThemeToggle() {
     return;
   }
   dom.themeToggle.addEventListener("change", (event) => {
-    const nextTheme = applyThemePreference(event.target.value);
+    const nextTheme = applyThemePreference(
+      event.target.checked ? "dark" : "light"
+    );
     localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
   });
 }
