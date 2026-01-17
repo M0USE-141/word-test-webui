@@ -476,10 +476,6 @@ function buildInlineDetails(inline) {
       math.className = "object-preview-math";
       math.innerHTML = inline.mathml;
       details.appendChild(math);
-
-      const code = document.createElement("pre");
-      code.textContent = inline.mathml;
-      details.appendChild(code);
     } else if (inline.latex) {
       const math = document.createElement("div");
       math.className = "object-preview-math";
