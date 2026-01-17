@@ -269,16 +269,30 @@
           </div>
         </div>
         <form id="upload-form" class="upload-form">
-          <div class="upload-dropzone">
-            <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
-            <div class="upload-dropzone__content">
-              <p>Перетащите Word-файл сюда</p>
-              <p class="muted">или выберите вручную на устройстве</p>
+          <div id="upload-dropzone" class="upload-dropzone is-empty">
+            <div class="upload-dropzone__area">
+              <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
+              <div class="upload-dropzone__content">
+                <p>Перетащите Word-файл сюда</p>
+                <p class="muted">или выберите вручную на устройстве</p>
+              </div>
+            </div>
+            <div id="upload-file-name" class="upload-file-name is-empty">
+              <span class="upload-file-name__label">Выбранный файл</span>
+              <span class="upload-file-name__value">Файл не выбран</span>
             </div>
             <div class="upload-dropzone__actions">
               <label class="upload-select-button" for="upload-file">
                 Выбрать файл
               </label>
+              <button
+                id="upload-clear-file"
+                type="button"
+                class="upload-clear-button"
+                disabled
+              >
+                Очистить
+              </button>
               <span class="upload-hint">Форматы .doc / .docx</span>
             </div>
             <input
@@ -288,9 +302,6 @@
               accept=".doc,.docx"
               required
             />
-          </div>
-          <div id="upload-file-name" class="upload-file-name is-empty">
-            Файл не выбран
           </div>
           <div class="upload-actions">
             <label class="upload-field" for="upload-symbol">

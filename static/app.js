@@ -4,7 +4,10 @@ const questionContainer = document.getElementById("question-container");
 const optionsContainer = document.getElementById("options-container");
 const uploadForm = document.getElementById("upload-form");
 const uploadFileInput = document.getElementById("upload-file");
+const uploadDropzone = document.getElementById("upload-dropzone");
 const uploadFileName = document.getElementById("upload-file-name");
+const uploadFileNameValue = document.querySelector(".upload-file-name__value");
+const uploadClearButton = document.getElementById("upload-clear-file");
 const uploadSymbolInput = document.getElementById("upload-symbol");
 const uploadLogSmallTablesInput = document.getElementById(
   "upload-log-small-tables"
@@ -281,12 +284,28 @@ function updateUploadFileState(file) {
     return;
   }
   if (file) {
-    uploadFileName.textContent = file.name;
+    if (uploadFileNameValue) {
+      uploadFileNameValue.textContent = file.name;
+    } else {
+      uploadFileName.textContent = file.name;
+    }
     uploadFileName.classList.remove("is-empty");
+    uploadDropzone?.classList.remove("is-empty");
+    if (uploadClearButton) {
+      uploadClearButton.disabled = false;
+    }
     return;
   }
-  uploadFileName.textContent = "Файл не выбран";
+  if (uploadFileNameValue) {
+    uploadFileNameValue.textContent = "Файл не выбран";
+  } else {
+    uploadFileName.textContent = "Файл не выбран";
+  }
   uploadFileName.classList.add("is-empty");
+  uploadDropzone?.classList.add("is-empty");
+  if (uploadClearButton) {
+    uploadClearButton.disabled = true;
+  }
 }
 
 function renderBlocks(container, blocks) {
@@ -1918,6 +1937,12 @@ function initializeManagementScreenEvents() {
 
   uploadFileInput?.addEventListener("change", () => {
     updateUploadFileState(uploadFileInput.files?.[0] || null);
+  });
+  uploadClearButton?.addEventListener("click", () => {
+    if (uploadFileInput) {
+      uploadFileInput.value = "";
+    }
+    updateUploadFileState(null);
   });
 
   uploadForm?.addEventListener("submit", async (event) => {
