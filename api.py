@@ -27,7 +27,9 @@ def _resource_path(relative: str) -> Path:
 
 DATA_DIR = Path(os.environ.get("TEST_DATA_DIR", Path.cwd() / "data" / "tests"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-ATTEMPTS_DIR = DATA_DIR / "attempts"
+ATTEMPTS_DIR = Path(
+    os.environ.get("TEST_ATTEMPTS_DIR", Path.cwd() / "data" / "attempts")
+)
 ATTEMPTS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR = _resource_path("static")
 
@@ -104,16 +106,20 @@ def _assets_dir(test_id: str) -> Path:
     return _test_dir(test_id) / "assets"
 
 
-def _attempt_dir(test_id: str, attempt_id: str) -> Path:
-    return _test_dir(test_id) / "attempts" / attempt_id
+def _attempt_dir(attempt_id: str) -> Path:
+    return ATTEMPTS_DIR / attempt_id
 
 
-def _attempt_payload_path(test_id: str, attempt_id: str) -> Path:
-    return _attempt_dir(test_id, attempt_id) / "attempt.json"
+def _attempt_meta_path(attempt_id: str) -> Path:
+    return _attempt_dir(attempt_id) / "meta.json"
 
 
-def _attempt_events_path(test_id: str, attempt_id: str) -> Path:
-    return _attempt_dir(test_id, attempt_id) / "attempt_events.json"
+def _attempt_events_path(attempt_id: str) -> Path:
+    return _attempt_dir(attempt_id) / "events.ndjson"
+
+
+def _attempt_stats_path(attempt_id: str) -> Path:
+    return _attempt_dir(attempt_id) / "stats.json"
 
 
 def _utc_now() -> str:
@@ -158,116 +164,93 @@ def _event_dedupe_key(event: dict[str, object]) -> str:
 
 
 def _ensure_attempt_metadata(
-    attempt_id: str, test_id: str, client_id: str
+    attempt_id: str,
+    test_id: str,
+    client_id: str,
+    settings: dict[str, object] | None = None,
+    event_ts: str | None = None,
 ) -> dict[str, object]:
-    attempt_path = _attempt_payload_path(test_id, attempt_id)
-    existing = _read_json_file(attempt_path, None)
+    meta_path = _attempt_meta_path(attempt_id)
+    existing = _read_json_file(meta_path, None)
     if isinstance(existing, dict):
         if existing.get("testId") != test_id:
             raise HTTPException(status_code=400, detail="Mismatched testId")
         if existing.get("clientId") != client_id:
             raise HTTPException(status_code=400, detail="Mismatched clientId")
+        if settings and not existing.get("settings"):
+            existing["settings"] = settings
+        timestamps = existing.get("timestamps")
+        if not isinstance(timestamps, dict):
+            timestamps = {}
+        timestamps["updatedAt"] = _utc_now()
+        if event_ts:
+            timestamps["lastEventAt"] = event_ts
+        existing["timestamps"] = timestamps
+        _write_json_file(meta_path, existing)
         return existing
+    timestamps = {
+        "createdAt": _utc_now(),
+        "updatedAt": _utc_now(),
+    }
+    if event_ts:
+        timestamps["lastEventAt"] = event_ts
     payload = {
         "attemptId": attempt_id,
         "testId": test_id,
         "clientId": client_id,
-        "createdAt": _utc_now(),
-        "aggregates": {},
+        "settings": settings or {},
+        "timestamps": timestamps,
     }
-    _write_json_file(attempt_path, payload)
+    _write_json_file(meta_path, payload)
     return payload
 
 
-def _load_attempt_events(test_id: str, attempt_id: str) -> list[dict[str, object]]:
-    data = _read_json_file(
-        _attempt_events_path(test_id, attempt_id), {"events": []}
-    )
-    if isinstance(data, dict):
-        events = data.get("events", [])
-        if isinstance(events, list):
-            return [event for event in events if isinstance(event, dict)]
-    return []
-
-
-def _save_attempt_events(
-    test_id: str, attempt_id: str, events: list[dict[str, object]]
-) -> None:
-    _write_json_file(
-        _attempt_events_path(test_id, attempt_id),
-        {"attemptId": attempt_id, "events": events},
-    )
-
-
-def _legacy_attempt_dir(attempt_id: str) -> Path:
-    return ATTEMPTS_DIR / attempt_id
-
-
-def _legacy_attempt_payload_path(attempt_id: str) -> Path:
-    return _legacy_attempt_dir(attempt_id) / "attempt.json"
-
-
-def _legacy_attempt_events_path(attempt_id: str) -> Path:
-    return _legacy_attempt_dir(attempt_id) / "attempt_events.json"
-
-
-def _load_attempt_payload(
-    attempt_id: str, test_id: str | None = None
-) -> dict[str, object] | None:
-    if test_id:
-        payload = _read_json_file(_attempt_payload_path(test_id, attempt_id), None)
+def _load_attempt_events(attempt_id: str) -> list[dict[str, object]]:
+    events_path = _attempt_events_path(attempt_id)
+    if not events_path.exists():
+        return []
+    events: list[dict[str, object]] = []
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json_load(line)
+        except ValueError:
+            continue
         if isinstance(payload, dict):
-            return payload
-    payload = _read_json_file(_legacy_attempt_payload_path(attempt_id), None)
-    if isinstance(payload, dict):
-        return payload
-    return None
+            events.append(payload)
+    return events
 
 
-def _load_attempt_events_any(
-    attempt_id: str, test_id: str | None = None
-) -> list[dict[str, object]]:
-    if test_id:
-        events = _load_attempt_events(test_id, attempt_id)
-        if events:
-            return events
-    data = _read_json_file(_legacy_attempt_events_path(attempt_id), {"events": []})
-    if isinstance(data, dict):
-        events = data.get("events", [])
-        if isinstance(events, list):
-            return [event for event in events if isinstance(event, dict)]
-    return []
+def _append_attempt_event(attempt_id: str, event: dict[str, object]) -> None:
+    events_path = _attempt_events_path(attempt_id)
+    events_path.parent.mkdir(parents=True, exist_ok=True)
+    line = ndjson_dump(event)
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(f"{line}\n")
 
 
-def _iter_attempt_payloads() -> list[tuple[str | None, dict[str, object]]]:
-    attempts: list[tuple[str | None, dict[str, object]]] = []
-    for test_dir in sorted(DATA_DIR.iterdir()):
-        if not test_dir.is_dir():
-            continue
-        if (test_dir / "test.json").exists():
-            attempts_root = test_dir / "attempts"
-            if not attempts_root.exists():
-                continue
-            for attempt_dir in sorted(attempts_root.iterdir()):
-                if not attempt_dir.is_dir():
-                    continue
-                attempt_path = attempt_dir / "attempt.json"
-                attempt_payload = _read_json_file(attempt_path, None)
-                if isinstance(attempt_payload, dict):
-                    attempts.append(
-                        (attempt_payload.get("testId") or test_dir.name, attempt_payload)
-                    )
-            continue
-        if test_dir == ATTEMPTS_DIR:
-            continue
+def _load_attempt_stats(attempt_id: str) -> dict[str, object]:
+    data = _read_json_file(_attempt_stats_path(attempt_id), {})
+    return data if isinstance(data, dict) else {}
+
+
+def _load_attempt_meta(attempt_id: str) -> dict[str, object] | None:
+    payload = _read_json_file(_attempt_meta_path(attempt_id), None)
+    return payload if isinstance(payload, dict) else None
+
+
+def _iter_attempt_metas() -> list[dict[str, object]]:
+    metas: list[dict[str, object]] = []
+    if not ATTEMPTS_DIR.exists():
+        return metas
     for attempt_dir in sorted(ATTEMPTS_DIR.iterdir()):
         if not attempt_dir.is_dir():
             continue
-        attempt_path = attempt_dir / "attempt.json"
-        attempt_payload = _read_json_file(attempt_path, None)
-        if isinstance(attempt_payload, dict):
-            attempts.append((attempt_payload.get("testId"), attempt_payload))
-    return attempts
+        meta_payload = _read_json_file(attempt_dir / "meta.json", None)
+        if isinstance(meta_payload, dict):
+            metas.append(meta_payload)
+    return metas
 
 def _safe_asset_path(base_dir: Path, asset_path: str) -> Path:
     resolved = (base_dir / asset_path).resolve()
@@ -604,8 +587,10 @@ def record_attempt_event(
     if event.get("clientId") != client_id:
         raise HTTPException(status_code=400, detail="Mismatched clientId")
 
-    _ensure_attempt_metadata(attempt_id, test_id, client_id)
-    events = _load_attempt_events(test_id, attempt_id)
+    _ensure_attempt_metadata(
+        attempt_id, test_id, client_id, payload.settings, payload.ts
+    )
+    events = _load_attempt_events(attempt_id)
     dedupe_key = _event_dedupe_key(event)
     existing_keys = {_event_dedupe_key(item) for item in events}
     if dedupe_key in existing_keys:
@@ -615,8 +600,7 @@ def record_attempt_event(
     stored_event["attemptId"] = attempt_id
     stored_event["testId"] = test_id
     stored_event["clientId"] = client_id
-    events.append(stored_event)
-    _save_attempt_events(test_id, attempt_id, events)
+    _append_attempt_event(attempt_id, stored_event)
     return {"status": "recorded", "attemptId": attempt_id, "event": stored_event}
 
 
@@ -632,16 +616,43 @@ def finalize_attempt(
     if payload.attemptId and payload.attemptId != attempt_id:
         raise HTTPException(status_code=400, detail="Mismatched attemptId")
 
-    attempt_payload = _ensure_attempt_metadata(attempt_id, test_id, client_id)
+    attempt_payload = _ensure_attempt_metadata(
+        attempt_id, test_id, client_id, payload.settings, payload.ts
+    )
     aggregates = payload.aggregates or {}
     if not isinstance(aggregates, dict):
         raise HTTPException(status_code=400, detail="aggregates must be an object")
-    attempt_payload["aggregates"] = aggregates
-    if isinstance(payload.summary, dict):
-        attempt_payload["summary"] = payload.summary
-    attempt_payload["finalizedAt"] = _utc_now()
-    _write_json_file(_attempt_payload_path(test_id, attempt_id), attempt_payload)
-    return {"status": "finalized", "attempt": attempt_payload}
+    summary = payload.summary if isinstance(payload.summary, dict) else None
+    per_question = []
+    if summary and isinstance(summary.get("perQuestion"), list):
+        per_question = summary.get("perQuestion")
+    events = _load_attempt_events(attempt_id)
+    stats_payload = {
+        "attemptId": attempt_id,
+        "testId": test_id,
+        "clientId": client_id,
+        "aggregates": aggregates,
+        "summary": summary,
+        "perQuestion": per_question,
+        "eventCount": len(events),
+    }
+    _write_json_file(_attempt_stats_path(attempt_id), stats_payload)
+    timestamps = attempt_payload.get("timestamps")
+    if not isinstance(timestamps, dict):
+        timestamps = {}
+    timestamps["finalizedAt"] = _utc_now()
+    timestamps["updatedAt"] = _utc_now()
+    attempt_payload["timestamps"] = timestamps
+    _write_json_file(_attempt_meta_path(attempt_id), attempt_payload)
+    timestamps = attempt_payload.get("timestamps", {})
+    attempt_response = {
+        **attempt_payload,
+        "createdAt": timestamps.get("createdAt"),
+        "finalizedAt": timestamps.get("finalizedAt"),
+        "aggregates": aggregates,
+        "summary": summary,
+    }
+    return {"status": "finalized", "attempt": attempt_response}
 
 
 @app.get("/api/stats/attempts")
@@ -650,23 +661,26 @@ def list_attempt_stats(
 ) -> list[dict[str, object]]:
     client_id = _validate_id("clientId", client_id)
     results = []
-    for test_id, attempt_payload in _iter_attempt_payloads():
+    for attempt_payload in _iter_attempt_metas():
         if attempt_payload.get("clientId") != client_id:
             continue
         attempt_id = attempt_payload.get("attemptId")
         if not attempt_id:
             continue
-        events = _load_attempt_events_any(str(attempt_id), test_id)
+        stats_payload = _load_attempt_stats(str(attempt_id))
+        timestamps = attempt_payload.get("timestamps", {})
+        if not isinstance(timestamps, dict):
+            timestamps = {}
         results.append(
             {
                 "attemptId": attempt_payload.get("attemptId"),
                 "testId": attempt_payload.get("testId"),
                 "clientId": attempt_payload.get("clientId"),
-                "createdAt": attempt_payload.get("createdAt"),
-                "finalizedAt": attempt_payload.get("finalizedAt"),
-                "eventCount": len(events),
-                "aggregates": attempt_payload.get("aggregates", {}),
-                "summary": attempt_payload.get("summary"),
+                "createdAt": timestamps.get("createdAt"),
+                "finalizedAt": timestamps.get("finalizedAt"),
+                "eventCount": stats_payload.get("eventCount", 0),
+                "aggregates": stats_payload.get("aggregates", {}),
+                "summary": stats_payload.get("summary"),
             }
         )
     return results
@@ -679,14 +693,23 @@ def get_attempt_stats(
 ) -> dict[str, object]:
     attempt_id = _validate_id("attemptId", attempt_id)
     client_id = _validate_id("clientId", client_id)
-    attempt_payload = _load_attempt_payload(attempt_id)
+    attempt_payload = _load_attempt_meta(attempt_id)
     if not isinstance(attempt_payload, dict):
         raise HTTPException(status_code=404, detail="Attempt not found")
     if attempt_payload.get("clientId") != client_id:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    events = _load_attempt_events_any(attempt_id, attempt_payload.get("testId"))
+    events = _load_attempt_events(attempt_id)
+    stats_payload = _load_attempt_stats(attempt_id)
+    timestamps = attempt_payload.get("timestamps", {})
+    attempt_response = {
+        **attempt_payload,
+        "createdAt": timestamps.get("createdAt"),
+        "finalizedAt": timestamps.get("finalizedAt"),
+        "aggregates": stats_payload.get("aggregates", {}),
+        "summary": stats_payload.get("summary"),
+    }
     return {
-        "attempt": attempt_payload,
+        "attempt": attempt_response,
         "eventCount": len(events),
         "events": events,
     }
@@ -696,6 +719,12 @@ def json_dump(payload: object) -> str:
     import json
 
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def ndjson_dump(payload: object) -> str:
+    import json
+
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def json_load(data: str) -> object:
