@@ -34,9 +34,23 @@ function writeQueue(key, items) {
   localStorage.setItem(key, JSON.stringify(items));
 }
 
+function normalizeEventPayload(item) {
+  if (!item || typeof item !== "object") {
+    return item;
+  }
+  if (!item.eventType && item.type) {
+    return { ...item, eventType: item.type };
+  }
+  return item;
+}
+
 function enqueue(queueKey, item) {
   const queue = readQueue(queueKey);
-  queue.push(item);
+  if (queueKey === EVENT_QUEUE_KEY) {
+    queue.push(normalizeEventPayload(item));
+  } else {
+    queue.push(item);
+  }
   writeQueue(queueKey, queue);
   if (queue.length >= BATCH_SIZE) {
     flushQueues();
@@ -60,7 +74,8 @@ async function flushEventQueue() {
     return;
   }
   const remaining = [];
-  for (const event of queue.slice(0, BATCH_SIZE)) {
+  for (const rawEvent of queue.slice(0, BATCH_SIZE)) {
+    const event = normalizeEventPayload(rawEvent);
     const attemptId = event?.attemptId;
     if (!attemptId) {
       continue;
