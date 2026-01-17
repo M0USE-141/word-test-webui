@@ -496,18 +496,28 @@ function buildInlineDetails(inline) {
       math.innerHTML = inline.mathml;
       details.appendChild(math);
 
+      const codeDetails = document.createElement("details");
+      const codeSummary = document.createElement("summary");
+      codeSummary.textContent = "Показать MathML";
       const code = document.createElement("pre");
       code.textContent = inline.mathml;
-      details.appendChild(code);
+      codeDetails.appendChild(codeSummary);
+      codeDetails.appendChild(code);
+      details.appendChild(codeDetails);
     } else if (inline.latex) {
       const math = document.createElement("div");
       math.className = "object-preview-math";
       math.innerHTML = `\\(${inline.latex}\\)`;
       details.appendChild(math);
 
+      const codeDetails = document.createElement("details");
+      const codeSummary = document.createElement("summary");
+      codeSummary.textContent = "Показать LaTeX";
       const code = document.createElement("pre");
       code.textContent = inline.latex;
-      details.appendChild(code);
+      codeDetails.appendChild(codeSummary);
+      codeDetails.appendChild(code);
+      details.appendChild(codeDetails);
     } else if (inline.src) {
       const img = document.createElement("img");
       img.src = `${currentTest.assetsBaseUrl}/${inline.src}`;
