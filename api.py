@@ -597,6 +597,23 @@ def _build_attempt_summary_from_events(
 
     skipped_count = total - answered_count
     percent_correct = (correct_count / total) * 100 if total else 0
+    accuracy_by_index: list[float | None] = []
+    time_by_index: list[int] = []
+    for item in per_question:
+        if not isinstance(item, dict):
+            continue
+        is_correct = item.get("isCorrect")
+        if isinstance(is_correct, bool):
+            accuracy_by_index.append(100.0 if is_correct else 0.0)
+        else:
+            accuracy_by_index.append(None)
+        duration_value = item.get("durationMs")
+        if isinstance(duration_value, (int, float)) and not isinstance(
+            duration_value, bool
+        ):
+            time_by_index.append(int(duration_value))
+        else:
+            time_by_index.append(0)
     total_duration_ms = 0
     if attempt_finished_duration is not None:
         total_duration_ms = attempt_finished_duration
@@ -649,6 +666,7 @@ def _build_attempt_summary_from_events(
         "settings": attempt_meta.get("settings", {}),
         "score": correct_count,
         "percentCorrect": percent_correct,
+        "accuracy": percent_correct,
         "completed": completed,
         "answeredCount": answered_count,
         "skippedCount": skipped_count,
@@ -658,6 +676,8 @@ def _build_attempt_summary_from_events(
         "fatiguePoint": fatigue_point,
         "focusStabilityIndex": focus_stability_index,
         "personalDifficultyScore": personal_difficulty_score,
+        "accuracyByIndex": accuracy_by_index,
+        "timeByIndex": time_by_index,
         "totalCount": total,
     }
     return summary
@@ -673,6 +693,7 @@ def _write_attempt_stats_from_summary(
     aggregates = {
         "score": summary.get("score"),
         "percentCorrect": summary.get("percentCorrect"),
+        "accuracy": summary.get("accuracy"),
         "answeredCount": summary.get("answeredCount"),
         "skippedCount": summary.get("skippedCount"),
         "avgTimePerQuestion": summary.get("avgTimePerQuestion"),
@@ -680,6 +701,8 @@ def _write_attempt_stats_from_summary(
         "fatiguePoint": summary.get("fatiguePoint"),
         "focusStabilityIndex": summary.get("focusStabilityIndex"),
         "personalDifficultyScore": summary.get("personalDifficultyScore"),
+        "accuracyByIndex": summary.get("accuracyByIndex"),
+        "timeByIndex": summary.get("timeByIndex"),
         "totalCount": summary.get("totalCount"),
     }
     stats_payload = {
@@ -1080,44 +1103,24 @@ def finalize_attempt(
     attempt_payload = _ensure_attempt_metadata(
         attempt_id, test_id, client_id, payload.settings, payload.ts
     )
-    aggregates = payload.aggregates or {}
-    if not isinstance(aggregates, dict):
-        raise HTTPException(status_code=400, detail="aggregates must be an object")
-    summary = payload.summary if isinstance(payload.summary, dict) else None
-    per_question = []
-    if summary and isinstance(summary.get("perQuestion"), list):
-        per_question = summary.get("perQuestion")
-    event_count = sum(1 for _ in _iter_attempt_events(attempt_id))
-    metrics = _extract_cached_metrics(aggregates, summary)
-    normalized_aggregates = dict(aggregates)
-    for key, value in metrics.items():
-        if value is not None:
-            normalized_aggregates[key] = value
-    stats_payload = {
-        "attemptId": attempt_id,
-        "testId": test_id,
-        "clientId": client_id,
-        "statsVersion": STATS_VERSION,
-        "aggregates": normalized_aggregates,
-        "summary": summary,
-        "perQuestion": per_question,
-        "eventCount": event_count,
-    }
-    _write_json_file(_attempt_stats_path(attempt_id), stats_payload)
+    events = _load_attempt_events(attempt_id)
+    test_payload = _load_test_payload(test_id)
+    summary = _build_attempt_summary_from_events(
+        attempt_id, attempt_payload, test_payload, events
+    )
+    stats_payload = _write_attempt_stats_from_summary(
+        attempt_id,
+        test_id,
+        client_id,
+        summary,
+        event_count=len(events),
+    )
     _upsert_attempt_index_entry(
         attempt_id,
         test_id,
         client_id,
         completed_at=payload.ts,
-        score=metrics["score"],
-        percent=metrics["percent"],
-        answered_count=metrics["answeredCount"],
-        skipped_count=metrics["skippedCount"],
-        avg_time_per_question=metrics["avgTimePerQuestion"],
-        fatigue_point=metrics["fatiguePoint"],
-        focus_stability_index=metrics["focusStabilityIndex"],
-        personal_difficulty_score=metrics["personalDifficultyScore"],
-        stats_version=STATS_VERSION,
+        stats_version=stats_payload.get("statsVersion"),
     )
     timestamps = attempt_payload.get("timestamps")
     if not isinstance(timestamps, dict):
@@ -1125,15 +1128,16 @@ def finalize_attempt(
     timestamps["finalizedAt"] = _utc_now()
     timestamps["updatedAt"] = _utc_now()
     attempt_payload["timestamps"] = timestamps
+    attempt_payload["aggregates"] = stats_payload.get("aggregates", {})
     _write_json_file(_attempt_meta_path(attempt_id), attempt_payload)
     timestamps = attempt_payload.get("timestamps", {})
     attempt_response = {
         **attempt_payload,
         "createdAt": timestamps.get("createdAt"),
         "finalizedAt": timestamps.get("finalizedAt"),
-        "aggregates": normalized_aggregates,
-        "summary": summary,
-        "statsVersion": STATS_VERSION,
+        "aggregates": stats_payload.get("aggregates", {}),
+        "summary": stats_payload.get("summary"),
+        "statsVersion": stats_payload.get("statsVersion"),
     }
     return {"status": "finalized", "attempt": attempt_response}
 

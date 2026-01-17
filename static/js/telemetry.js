@@ -334,6 +334,8 @@ export function buildAttemptSummary(session) {
   const total = session.questions.length;
   let answeredCount = 0;
   let correctCount = 0;
+  const accuracyByIndex = [];
+  const timeByIndex = [];
 
   const perQuestion = session.questions.map((entry, index) => {
     const selectedIndex = session.answers.get(entry.questionId);
@@ -355,6 +357,12 @@ export function buildAttemptSummary(session) {
         correctCount += 1;
       }
     }
+    if (typeof isCorrect === "boolean") {
+      accuracyByIndex.push(isCorrect ? 100 : 0);
+    } else {
+      accuracyByIndex.push(null);
+    }
+    timeByIndex.push(timing.totalMs || 0);
     const isSkipped = !isAnswered;
     return {
       questionId: entry.questionId,
@@ -399,6 +407,7 @@ export function buildAttemptSummary(session) {
     ...basePayload(session),
     score: correctCount,
     percentCorrect,
+    accuracy: percentCorrect,
     completed: Boolean(session.finished),
     answeredCount,
     skippedCount,
@@ -408,5 +417,7 @@ export function buildAttemptSummary(session) {
     fatiguePoint,
     focusStabilityIndex,
     personalDifficultyScore,
+    accuracyByIndex,
+    timeByIndex,
   };
 }
