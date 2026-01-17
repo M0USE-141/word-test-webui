@@ -6,6 +6,12 @@ import {
   state,
 } from "./state.js";
 import { formatNumber, t } from "./i18n.js";
+import {
+  trackAnswerEvent,
+  trackQuestionShown,
+  trackQuestionSkipped,
+  updateQuestionTiming,
+} from "./telemetry.js";
 
 const MATHJAX_IDLE_TIMEOUT_MS = 120;
 const NAV_RENDER_BATCH_SIZE = 60;
@@ -76,6 +82,26 @@ function createQuestionNavButton(entry, index) {
   button.className = "nav-button";
   updateQuestionNavButtonState(button, entry, index);
   button.addEventListener("click", () => {
+    if (state.session) {
+      const currentEntry =
+        state.session.questions[state.session.currentIndex];
+      if (currentEntry) {
+        const selected = state.session.answers.get(currentEntry.questionId);
+        if (selected === undefined || selected === -1) {
+          const durationMs =
+            typeof state.session.activeQuestionStartedAt === "number"
+              ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+              : 0;
+          trackQuestionSkipped(
+            state.session,
+            currentEntry,
+            state.session.currentIndex,
+            durationMs
+          );
+        }
+      }
+      updateQuestionTiming(state.session, entry.questionId);
+    }
     state.session.currentIndex = index;
     renderQuestion();
   });
@@ -354,6 +380,7 @@ export function renderQuestion() {
   }
 
   const entry = state.session.questions[state.session.currentIndex];
+  const previousQuestionId = state.session.activeQuestionId;
   const options = getOptionsForQuestion(entry);
   const selectedIndex = state.session.answers.get(entry.questionId) ?? -1;
   const correctIndex = options.findIndex((option) => option.isCorrect);
@@ -417,6 +444,7 @@ export function renderQuestion() {
 
     if (!state.session.finished) {
       optionButton.addEventListener("click", () => {
+        const previousAnswer = state.session.answers.get(entry.questionId);
         state.session.answers.set(entry.questionId, index);
         if (resolvedCorrectIndex === null) {
           state.session.answerStatus.set(entry.questionId, "unanswered");
@@ -429,6 +457,28 @@ export function renderQuestion() {
         progress.add(entry.questionId);
         saveProgress(state.session.testId, progress);
         updateProgressHint();
+        const durationMs =
+          typeof state.session.activeQuestionStartedAt === "number"
+            ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+            : 0;
+        const isCorrect =
+          resolvedCorrectIndex === null
+            ? null
+            : Boolean(options[index]?.isCorrect);
+        const eventType =
+          previousAnswer === undefined || previousAnswer === -1
+            ? "answer_selected"
+            : "answer_changed";
+        trackAnswerEvent(
+          eventType,
+          state.session,
+          entry,
+          state.session.currentIndex,
+          index,
+          options,
+          isCorrect,
+          durationMs
+        );
         if (state.session.settings.showAnswersImmediately && dom.answerFeedback) {
           dom.answerFeedback.textContent = getAnswerFeedback(
             index,
@@ -462,6 +512,11 @@ export function renderQuestion() {
     state.session.currentIndex >= state.session.questions.length - 1;
 
   renderQuestionNav();
+
+  updateQuestionTiming(state.session, entry.questionId);
+  if (previousQuestionId !== entry.questionId) {
+    trackQuestionShown(state.session, entry, state.session.currentIndex);
+  }
 }
 
 export function renderResultSummary(stats) {
