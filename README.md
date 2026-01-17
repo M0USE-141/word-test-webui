@@ -96,6 +96,19 @@ python cli.py path/to/test.docx --output data/tests
 }
 ```
 
+#### Админ: пересборка агрегатов из событий
+
+`POST /api/attempts/{attemptId}/rebuild?admin=true`
+
+Пересчитывает `aggregates` и `summary` на основе `events.ndjson`, если файл
+с событиями ещё не удалён плановой очисткой.
+
+### Очистка событий
+
+Периодическое удаление старых `events.ndjson` настраивается через переменную
+окружения `EVENTS_RETENTION_DAYS` (по умолчанию 30 дней). При значении `0` или
+меньше очистка отключается.
+
 ## Docker
 
 ### Сборка и запуск
