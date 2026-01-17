@@ -104,16 +104,16 @@ def _assets_dir(test_id: str) -> Path:
     return _test_dir(test_id) / "assets"
 
 
-def _attempt_dir(attempt_id: str) -> Path:
-    return ATTEMPTS_DIR / attempt_id
+def _attempt_dir(test_id: str, attempt_id: str) -> Path:
+    return _test_dir(test_id) / "attempts" / attempt_id
 
 
-def _attempt_payload_path(attempt_id: str) -> Path:
-    return _attempt_dir(attempt_id) / "attempt.json"
+def _attempt_payload_path(test_id: str, attempt_id: str) -> Path:
+    return _attempt_dir(test_id, attempt_id) / "attempt.json"
 
 
-def _attempt_events_path(attempt_id: str) -> Path:
-    return _attempt_dir(attempt_id) / "attempt_events.json"
+def _attempt_events_path(test_id: str, attempt_id: str) -> Path:
+    return _attempt_dir(test_id, attempt_id) / "attempt_events.json"
 
 
 def _utc_now() -> str:
@@ -160,7 +160,7 @@ def _event_dedupe_key(event: dict[str, object]) -> str:
 def _ensure_attempt_metadata(
     attempt_id: str, test_id: str, client_id: str
 ) -> dict[str, object]:
-    attempt_path = _attempt_payload_path(attempt_id)
+    attempt_path = _attempt_payload_path(test_id, attempt_id)
     existing = _read_json_file(attempt_path, None)
     if isinstance(existing, dict):
         if existing.get("testId") != test_id:
@@ -179,8 +179,10 @@ def _ensure_attempt_metadata(
     return payload
 
 
-def _load_attempt_events(attempt_id: str) -> list[dict[str, object]]:
-    data = _read_json_file(_attempt_events_path(attempt_id), {"events": []})
+def _load_attempt_events(test_id: str, attempt_id: str) -> list[dict[str, object]]:
+    data = _read_json_file(
+        _attempt_events_path(test_id, attempt_id), {"events": []}
+    )
     if isinstance(data, dict):
         events = data.get("events", [])
         if isinstance(events, list):
@@ -188,11 +190,84 @@ def _load_attempt_events(attempt_id: str) -> list[dict[str, object]]:
     return []
 
 
-def _save_attempt_events(attempt_id: str, events: list[dict[str, object]]) -> None:
+def _save_attempt_events(
+    test_id: str, attempt_id: str, events: list[dict[str, object]]
+) -> None:
     _write_json_file(
-        _attempt_events_path(attempt_id),
+        _attempt_events_path(test_id, attempt_id),
         {"attemptId": attempt_id, "events": events},
     )
+
+
+def _legacy_attempt_dir(attempt_id: str) -> Path:
+    return ATTEMPTS_DIR / attempt_id
+
+
+def _legacy_attempt_payload_path(attempt_id: str) -> Path:
+    return _legacy_attempt_dir(attempt_id) / "attempt.json"
+
+
+def _legacy_attempt_events_path(attempt_id: str) -> Path:
+    return _legacy_attempt_dir(attempt_id) / "attempt_events.json"
+
+
+def _load_attempt_payload(
+    attempt_id: str, test_id: str | None = None
+) -> dict[str, object] | None:
+    if test_id:
+        payload = _read_json_file(_attempt_payload_path(test_id, attempt_id), None)
+        if isinstance(payload, dict):
+            return payload
+    payload = _read_json_file(_legacy_attempt_payload_path(attempt_id), None)
+    if isinstance(payload, dict):
+        return payload
+    return None
+
+
+def _load_attempt_events_any(
+    attempt_id: str, test_id: str | None = None
+) -> list[dict[str, object]]:
+    if test_id:
+        events = _load_attempt_events(test_id, attempt_id)
+        if events:
+            return events
+    data = _read_json_file(_legacy_attempt_events_path(attempt_id), {"events": []})
+    if isinstance(data, dict):
+        events = data.get("events", [])
+        if isinstance(events, list):
+            return [event for event in events if isinstance(event, dict)]
+    return []
+
+
+def _iter_attempt_payloads() -> list[tuple[str | None, dict[str, object]]]:
+    attempts: list[tuple[str | None, dict[str, object]]] = []
+    for test_dir in sorted(DATA_DIR.iterdir()):
+        if not test_dir.is_dir():
+            continue
+        if (test_dir / "test.json").exists():
+            attempts_root = test_dir / "attempts"
+            if not attempts_root.exists():
+                continue
+            for attempt_dir in sorted(attempts_root.iterdir()):
+                if not attempt_dir.is_dir():
+                    continue
+                attempt_path = attempt_dir / "attempt.json"
+                attempt_payload = _read_json_file(attempt_path, None)
+                if isinstance(attempt_payload, dict):
+                    attempts.append(
+                        (attempt_payload.get("testId") or test_dir.name, attempt_payload)
+                    )
+            continue
+        if test_dir == ATTEMPTS_DIR:
+            continue
+    for attempt_dir in sorted(ATTEMPTS_DIR.iterdir()):
+        if not attempt_dir.is_dir():
+            continue
+        attempt_path = attempt_dir / "attempt.json"
+        attempt_payload = _read_json_file(attempt_path, None)
+        if isinstance(attempt_payload, dict):
+            attempts.append((attempt_payload.get("testId"), attempt_payload))
+    return attempts
 
 def _safe_asset_path(base_dir: Path, asset_path: str) -> Path:
     resolved = (base_dir / asset_path).resolve()
@@ -530,7 +605,7 @@ def record_attempt_event(
         raise HTTPException(status_code=400, detail="Mismatched clientId")
 
     _ensure_attempt_metadata(attempt_id, test_id, client_id)
-    events = _load_attempt_events(attempt_id)
+    events = _load_attempt_events(test_id, attempt_id)
     dedupe_key = _event_dedupe_key(event)
     existing_keys = {_event_dedupe_key(item) for item in events}
     if dedupe_key in existing_keys:
@@ -541,7 +616,7 @@ def record_attempt_event(
     stored_event["testId"] = test_id
     stored_event["clientId"] = client_id
     events.append(stored_event)
-    _save_attempt_events(attempt_id, events)
+    _save_attempt_events(test_id, attempt_id, events)
     return {"status": "recorded", "attemptId": attempt_id, "event": stored_event}
 
 
@@ -565,7 +640,7 @@ def finalize_attempt(
     if isinstance(payload.summary, dict):
         attempt_payload["summary"] = payload.summary
     attempt_payload["finalizedAt"] = _utc_now()
-    _write_json_file(_attempt_payload_path(attempt_id), attempt_payload)
+    _write_json_file(_attempt_payload_path(test_id, attempt_id), attempt_payload)
     return {"status": "finalized", "attempt": attempt_payload}
 
 
@@ -575,19 +650,13 @@ def list_attempt_stats(
 ) -> list[dict[str, object]]:
     client_id = _validate_id("clientId", client_id)
     results = []
-    for attempt_dir in sorted(ATTEMPTS_DIR.iterdir()):
-        if not attempt_dir.is_dir():
-            continue
-        attempt_path = attempt_dir / "attempt.json"
-        if not attempt_path.exists():
-            continue
-        attempt_payload = _read_json_file(attempt_path, None)
-        if not isinstance(attempt_payload, dict):
-            continue
+    for test_id, attempt_payload in _iter_attempt_payloads():
         if attempt_payload.get("clientId") != client_id:
             continue
-        attempt_id = attempt_payload.get("attemptId") or attempt_dir.name
-        events = _load_attempt_events(str(attempt_id))
+        attempt_id = attempt_payload.get("attemptId")
+        if not attempt_id:
+            continue
+        events = _load_attempt_events_any(str(attempt_id), test_id)
         results.append(
             {
                 "attemptId": attempt_payload.get("attemptId"),
@@ -610,13 +679,12 @@ def get_attempt_stats(
 ) -> dict[str, object]:
     attempt_id = _validate_id("attemptId", attempt_id)
     client_id = _validate_id("clientId", client_id)
-    attempt_path = _attempt_payload_path(attempt_id)
-    attempt_payload = _read_json_file(attempt_path, None)
+    attempt_payload = _load_attempt_payload(attempt_id)
     if not isinstance(attempt_payload, dict):
         raise HTTPException(status_code=404, detail="Attempt not found")
     if attempt_payload.get("clientId") != client_id:
         raise HTTPException(status_code=404, detail="Attempt not found")
-    events = _load_attempt_events(attempt_id)
+    events = _load_attempt_events_any(attempt_id, attempt_payload.get("testId"))
     return {
         "attempt": attempt_payload,
         "eventCount": len(events),
