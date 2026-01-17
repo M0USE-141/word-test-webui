@@ -44,14 +44,11 @@ function enqueue(queueKey, item) {
 }
 
 async function postJson(url, payload) {
-  const response = await fetch(url, {
+  return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) {
-    throw new Error(`Telemetry request failed: ${response.status}`);
-  }
 }
 
 async function flushEventQueue() {
@@ -68,10 +65,14 @@ async function flushEventQueue() {
     if (!attemptId) {
       continue;
     }
-    try {
-      await postJson(`/api/attempts/${encodeURIComponent(attemptId)}/events`, event);
-    } catch (error) {
-      remaining.push(event);
+    const response = await postJson(
+      `/api/attempts/${encodeURIComponent(attemptId)}/events`,
+      event
+    );
+    if (!response.ok) {
+      if (response.status !== 400 && response.status !== 422) {
+        remaining.push(event);
+      }
     }
   }
   const rest = queue.slice(BATCH_SIZE).concat(remaining);
@@ -97,13 +98,14 @@ async function flushSummaryQueue() {
     if (!attemptId) {
       continue;
     }
-    try {
-      await postJson(
-        `/api/attempts/${encodeURIComponent(attemptId)}/finalize`,
-        summary
-      );
-    } catch (error) {
-      remaining.push(summary);
+    const response = await postJson(
+      `/api/attempts/${encodeURIComponent(attemptId)}/finalize`,
+      summary
+    );
+    if (!response.ok) {
+      if (response.status !== 400 && response.status !== 422) {
+        remaining.push(summary);
+      }
     }
   }
   const rest = queue.slice(BATCH_SIZE).concat(remaining);
@@ -186,6 +188,9 @@ export function trackEvent(
     durationMs,
     isSkipped,
   };
+  if (!payload.attemptId || !payload.testId || !payload.clientId) {
+    return;
+  }
   enqueue(EVENT_QUEUE_KEY, payload);
 }
 
