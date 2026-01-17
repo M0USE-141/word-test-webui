@@ -157,10 +157,11 @@ def _event_dedupe_key(event: dict[str, object]) -> str:
     event_id = event.get("eventId")
     if isinstance(event_id, str) and event_id.strip():
         return f"id:{event_id.strip()}"
+    attempt_id = str(event.get("attemptId", "")).strip()
     event_type = str(event.get("eventType", "")).strip()
     ts = event.get("ts")
     question_id = event.get("questionId")
-    return f"{event_type}|{ts}|{question_id}"
+    return f"{attempt_id}|{event_type}|{ts}|{question_id}"
 
 
 def _ensure_attempt_metadata(
@@ -205,21 +206,26 @@ def _ensure_attempt_metadata(
     return payload
 
 
-def _load_attempt_events(attempt_id: str) -> list[dict[str, object]]:
+def _iter_attempt_events(attempt_id: str):
     events_path = _attempt_events_path(attempt_id)
     if not events_path.exists():
-        return []
-    events: list[dict[str, object]] = []
-    for line in events_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            payload = json_load(line)
-        except ValueError:
-            continue
-        if isinstance(payload, dict):
-            events.append(payload)
-    return events
+        return iter(())
+    def _iterator():
+        with events_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    payload = json_load(line)
+                except ValueError:
+                    continue
+                if isinstance(payload, dict):
+                    yield payload
+    return _iterator()
+
+
+def _load_attempt_events(attempt_id: str) -> list[dict[str, object]]:
+    return list(_iter_attempt_events(attempt_id))
 
 
 def _append_attempt_event(attempt_id: str, event: dict[str, object]) -> None:
@@ -590,9 +596,12 @@ def record_attempt_event(
     _ensure_attempt_metadata(
         attempt_id, test_id, client_id, payload.settings, payload.ts
     )
-    events = _load_attempt_events(attempt_id)
-    dedupe_key = _event_dedupe_key(event)
-    existing_keys = {_event_dedupe_key(item) for item in events}
+    dedupe_event = dict(event)
+    dedupe_event["attemptId"] = attempt_id
+    dedupe_key = _event_dedupe_key(dedupe_event)
+    existing_keys = {
+        _event_dedupe_key(item) for item in _iter_attempt_events(attempt_id)
+    }
     if dedupe_key in existing_keys:
         return {"status": "duplicate", "attemptId": attempt_id, "event": event}
 
@@ -626,7 +635,7 @@ def finalize_attempt(
     per_question = []
     if summary and isinstance(summary.get("perQuestion"), list):
         per_question = summary.get("perQuestion")
-    events = _load_attempt_events(attempt_id)
+    event_count = sum(1 for _ in _iter_attempt_events(attempt_id))
     stats_payload = {
         "attemptId": attempt_id,
         "testId": test_id,
@@ -634,7 +643,7 @@ def finalize_attempt(
         "aggregates": aggregates,
         "summary": summary,
         "perQuestion": per_question,
-        "eventCount": len(events),
+        "eventCount": event_count,
     }
     _write_json_file(_attempt_stats_path(attempt_id), stats_payload)
     timestamps = attempt_payload.get("timestamps")
