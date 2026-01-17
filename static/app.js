@@ -58,6 +58,12 @@ const editorObjectFormulaText = document.getElementById(
 const editorObjectFormulaFile = document.getElementById(
   "editor-object-formula-file"
 );
+const editorObjectImageDropzone = document.querySelector(
+  'label[for="editor-object-image-file"]'
+);
+const editorObjectFormulaDropzone = document.querySelector(
+  'label[for="editor-object-formula-file"]'
+);
 const editorAddObjectButton = document.getElementById("editor-add-object");
 const editorObjectStatus = document.getElementById("editor-object-status");
 const editorObjectsToggle = document.getElementById("toggle-editor-objects");
@@ -83,6 +89,9 @@ const settingOnlyUnanswered = document.getElementById(
 );
 const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
+
+const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
+const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".wmf", ".emf"];
 
 const testsCacheKey = "tests-cache";
 
@@ -294,6 +303,11 @@ function updateUploadFileState(file) {
     if (uploadClearButton) {
       uploadClearButton.disabled = false;
     }
+    if (isLegacyDocFile(file.name)) {
+      renderUploadLogs(DOCX_ONLY_WARNING, true);
+    } else {
+      renderUploadLogs(null);
+    }
     return;
   }
   if (uploadFileNameValue) {
@@ -306,6 +320,56 @@ function updateUploadFileState(file) {
   if (uploadClearButton) {
     uploadClearButton.disabled = true;
   }
+  renderUploadLogs(null);
+}
+
+function assignFileToInput(input, file) {
+  if (!input || !file) {
+    return;
+  }
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(file);
+  input.files = dataTransfer.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setupDropzone(dropzone, input, { validate, onInvalid } = {}) {
+  if (!dropzone || !input) {
+    return;
+  }
+  const highlight = () => dropzone.classList.add("is-dragover");
+  const unhighlight = () => dropzone.classList.remove("is-dragover");
+  const prevent = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      highlight();
+    });
+  });
+  ["dragleave", "dragend"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      unhighlight();
+    });
+  });
+  dropzone.addEventListener("drop", (event) => {
+    prevent(event);
+    unhighlight();
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (validate && !validate(file)) {
+      if (onInvalid) {
+        onInvalid(file);
+      }
+      return;
+    }
+    assignFileToInput(input, file);
+  });
 }
 
 function renderBlocks(container, blocks) {
@@ -335,6 +399,29 @@ function getInlineIdentifier(inline) {
       (value) => typeof value === "string" && value.trim().length > 0
     ) || ""
   ).trim();
+}
+
+function isLegacyDocFile(fileName) {
+  if (!fileName) {
+    return false;
+  }
+  const lowerName = fileName.toLowerCase();
+  return lowerName.endsWith(".doc") && !lowerName.endsWith(".docx");
+}
+
+function isSupportedImageFile(file) {
+  if (!file?.name) {
+    return false;
+  }
+  const lowerName = file.name.toLowerCase();
+  return SUPPORTED_IMAGE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+}
+
+function isXmlFile(file) {
+  if (!file?.name) {
+    return false;
+  }
+  return file.name.toLowerCase().endsWith(".xml");
 }
 
 function generateShortFormulaId(usedIds) {
@@ -1148,7 +1235,7 @@ function renderTestCards(tests, selectedId) {
   importCard.className = "test-card test-card--import";
   importCard.innerHTML = `
     <strong>Импорт теста</strong>
-    <span class="muted">Добавьте новую коллекцию из Word-файла.</span>
+    <span class="muted">Добавьте новую коллекцию из Word-файла. Только .docx.</span>
   `;
   importCard.addEventListener("click", () => {
     openImportModal();
@@ -1902,6 +1989,22 @@ function initializeManagementScreenEvents() {
   editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
   syncEditorObjectFields();
   setEditorObjectSection(null);
+  setupDropzone(uploadDropzone, uploadFileInput);
+  setupDropzone(editorObjectImageDropzone, editorObjectImageFile, {
+    validate: isSupportedImageFile,
+    onInvalid: () => {
+      setEditorObjectStatus(
+        "Поддерживаются только изображения (png, jpg, wmf, emf).",
+        true
+      );
+    },
+  });
+  setupDropzone(editorObjectFormulaDropzone, editorObjectFormulaFile, {
+    validate: isXmlFile,
+    onInvalid: () => {
+      setEditorObjectStatus("Поддерживаются только .xml файлы.", true);
+    },
+  });
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
@@ -2081,6 +2184,11 @@ function initializeManagementScreenEvents() {
     if (!uploadFileInput.files?.length) {
       questionContainer.textContent = "Сначала выберите файл для импорта.";
       renderUploadLogs("Сначала выберите файл для импорта.", true);
+      return;
+    }
+    if (isLegacyDocFile(uploadFileInput.files[0].name)) {
+      questionContainer.textContent = DOCX_ONLY_WARNING;
+      renderUploadLogs(DOCX_ONLY_WARNING, true);
       return;
     }
 
