@@ -4,6 +4,7 @@
   "description": "Electron wrapper for BSU Test Master",
   "main": "main.js",
   "private": true,
+  "author": "BSU Test Master",
   "repository": {
     "type": "git",
     "url": "https://github.com/M0USE-141/bsu-test-master.git"
@@ -36,7 +37,9 @@
     ],
     "win": {
       "target": "nsis",
-      "sign": false
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "perMachine": false,
