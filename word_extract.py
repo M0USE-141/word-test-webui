@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
-from typing import Optional
 
 from docx import Document
 from lxml import etree
@@ -26,43 +22,6 @@ NS = {
 }
 
 
-def find_soffice() -> Optional[str]:
-    """
-    Returns absolute path to soffice(.exe) as string, or None if not found.
-    Works around Windows quirks and PathLike issues.
-    """
-    env = os.environ.get("SOFFICE_PATH")
-    if env and Path(env).exists():
-        return str(env)
-
-    # 1) Normal PATH lookup (must use str)
-    for name in ("soffice", "soffice.exe"):
-        p = shutil.which(str(name))
-        if p:
-            return str(p)
-
-    # 2) Common install locations on Windows
-    if os.name == "nt":
-        candidates = [
-            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "LibreOffice" / "program" / "soffice.exe",
-            Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "LibreOffice" / "program" / "soffice.exe",
-            # Microsoft Store / other layouts sometimes:
-            Path(os.environ.get("PROGRAMW6432", r"C:\Program Files")) / "LibreOffice" / "program" / "soffice.exe",
-        ]
-        for c in candidates:
-            if c.exists():
-                return str(c)
-
-    # 3) macOS typical (if you ever run there)
-    if os.name == "posix":
-        mac = Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
-        if mac.exists():
-            return str(mac)
-
-    return None
-
-
-
 class WordTestExtractor:
     def __init__(
             self,
@@ -77,59 +36,15 @@ class WordTestExtractor:
         self.extract_dir = Path(image_output_dir)
         self.extract_dir.mkdir(parents=True, exist_ok=True)
         self.logs: list[str] = []  # short TK logs
-        self._tmp_dirs: list[Path] = []
         self._omml_xslt = self._load_omml_xslt()
         self._omml_xslt_missing_logged = False
 
     def cleanup(self) -> None:
-        for d in self._tmp_dirs:
-            try:
-                shutil.rmtree(d, ignore_errors=True)
-            except Exception:
-                pass
-
-    # ---- DOC -> DOCX via LibreOffice ----
-    def _convert_doc_to_docx(self, doc_path: Path) -> Path:
-        doc_path = doc_path.resolve()
-        if not doc_path.exists():
-            raise RuntimeError(f"Файл не найден: {doc_path}")
-
-        converted = doc_path.with_suffix(".docx")
-        if converted.exists():
-            log.info("DOCX already exists рядом с DOC: %s", converted)
-            return converted
-
-        soffice_path = find_soffice()
-        if not soffice_path:
-            raise RuntimeError(
-                "Не удалось найти soffice для конвертации .doc. "
-                "Установите LibreOffice и добавьте soffice в PATH."
-            )
-
-        temp_out = Path(tempfile.mkdtemp(prefix="word_test_docx_"))
-        self._tmp_dirs.append(temp_out)
-
-        log.info("Converting DOC -> DOCX via LibreOffice: %s", doc_path)
-        r = subprocess.run(
-            [soffice, "--headless", "--convert-to", "docx", "--outdir", str(temp_out), str(doc_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if r.returncode != 0:
-            log.error("LibreOffice convert failed rc=%s stderr=%s", r.returncode, (r.stderr or "").strip())
-            raise RuntimeError("Не удалось конвертировать .doc файл. Установите LibreOffice (soffice).")
-
-        candidates = sorted(temp_out.glob("*.docx"), key=lambda p: p.stat().st_mtime)
-        if not candidates:
-            raise RuntimeError("Конвертация .doc завершилась без результата.")
-        log.info("DOC -> DOCX done: %s", candidates[-1])
-        return candidates[-1]
+        return None
 
     def _load_document(self) -> tuple[Document, Path]:
-        if self.file_path.suffix.lower() == ".doc":
-            docx = self._convert_doc_to_docx(self.file_path)
-            return Document(docx), docx
+        if self.file_path.suffix.lower() != ".docx":
+            raise RuntimeError("Поддерживаются только .docx")
         return Document(self.file_path), self.file_path
 
     # ---- Extract embedded images from docx media ----

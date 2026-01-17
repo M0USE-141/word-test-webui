@@ -11,7 +11,7 @@ setup_console_logging()
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract tests from Word files")
-    parser.add_argument("file", type=Path, help="Path to .doc or .docx file")
+    parser.add_argument("file", type=Path, help="Path to .docx file")
     parser.add_argument(
         "--output",
         type=Path,
@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.file.suffix.lower() != ".docx":
+        raise SystemExit("Поддерживаются только .docx")
     test_id = uuid.uuid4().hex
     test_dir = args.output / test_id
     assets_dir = test_dir / "assets"

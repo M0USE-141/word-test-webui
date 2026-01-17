@@ -64,6 +64,12 @@ const editorObjectFormulaText = document.getElementById(
 const editorObjectFormulaFile = document.getElementById(
   "editor-object-formula-file"
 );
+const editorObjectImageDropzone = document.querySelector(
+  'label[for="editor-object-image-file"]'
+);
+const editorObjectFormulaDropzone = document.querySelector(
+  'label[for="editor-object-formula-file"]'
+);
 const editorAddObjectButton = document.getElementById("editor-add-object");
 const editorObjectStatus = document.getElementById("editor-object-status");
 const editorObjectsToggle = document.getElementById("toggle-editor-objects");
@@ -91,6 +97,9 @@ const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
 
 const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
+
+const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".wmf", ".emf"];
+ main
 
 const testsCacheKey = "tests-cache";
 
@@ -322,6 +331,55 @@ function updateUploadFileState(file) {
   renderUploadLogs(null);
 }
 
+function assignFileToInput(input, file) {
+  if (!input || !file) {
+    return;
+  }
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(file);
+  input.files = dataTransfer.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setupDropzone(dropzone, input, { validate, onInvalid } = {}) {
+  if (!dropzone || !input) {
+    return;
+  }
+  const highlight = () => dropzone.classList.add("is-dragover");
+  const unhighlight = () => dropzone.classList.remove("is-dragover");
+  const prevent = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      highlight();
+    });
+  });
+  ["dragleave", "dragend"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      unhighlight();
+    });
+  });
+  dropzone.addEventListener("drop", (event) => {
+    prevent(event);
+    unhighlight();
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (validate && !validate(file)) {
+      if (onInvalid) {
+        onInvalid(file);
+      }
+      return;
+    }
+    assignFileToInput(input, file);
+  });
+}
+
 function renderBlocks(container, blocks) {
   clearElement(container);
   blocks.forEach((block) => {
@@ -357,6 +415,21 @@ function isLegacyDocFile(fileName) {
   }
   const lowerName = fileName.toLowerCase();
   return lowerName.endsWith(".doc") && !lowerName.endsWith(".docx");
+}
+
+function isSupportedImageFile(file) {
+  if (!file?.name) {
+    return false;
+  }
+  const lowerName = file.name.toLowerCase();
+  return SUPPORTED_IMAGE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+}
+
+function isXmlFile(file) {
+  if (!file?.name) {
+    return false;
+  }
+  return file.name.toLowerCase().endsWith(".xml");
 }
 
 function generateShortFormulaId(usedIds) {
@@ -1979,6 +2052,22 @@ function initializeManagementScreenEvents() {
   editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
   syncEditorObjectFields();
   setEditorObjectSection(null);
+  setupDropzone(uploadDropzone, uploadFileInput);
+  setupDropzone(editorObjectImageDropzone, editorObjectImageFile, {
+    validate: isSupportedImageFile,
+    onInvalid: () => {
+      setEditorObjectStatus(
+        "Поддерживаются только изображения (png, jpg, wmf, emf).",
+        true
+      );
+    },
+  });
+  setupDropzone(editorObjectFormulaDropzone, editorObjectFormulaFile, {
+    validate: isXmlFile,
+    onInvalid: () => {
+      setEditorObjectStatus("Поддерживаются только .xml файлы.", true);
+    },
+  });
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
