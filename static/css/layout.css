@@ -132,6 +132,18 @@
   grid-template-columns: 1fr;
 }
 
+#screen-stats {
+  grid-template-columns: minmax(280px, 360px) 1fr;
+}
+
+.panel--stats-sidebar {
+  min-width: 0;
+}
+
+.panel--stats-main {
+  min-width: 0;
+}
+
 .panel--management {
   grid-column: 1 / -1;
   display: grid;
@@ -200,6 +212,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+@media (max-width: 960px) {
+  #screen-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 960px) {

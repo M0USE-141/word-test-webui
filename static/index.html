@@ -13,6 +13,10 @@
       src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
       defer
     ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+      defer
+    ></script>
     <script type="module" src="/static/js/app.js"></script>
   </head>
   <body>
@@ -198,6 +202,108 @@
           <div class="card">
             <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
             <div id="question-nav" class="question-nav"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="screen-stats" class="app-screen is-hidden">
+        <section class="panel panel--stats-sidebar">
+          <div class="card stats-card">
+            <div class="stats-header">
+              <div>
+                <h2 data-i18n="statsTitle">Статистика</h2>
+                <p class="muted" data-i18n="statsSubtitle">
+                  Аналитика по вашим попыткам прохождения тестов.
+                </p>
+              </div>
+              <button
+                id="stats-back"
+                type="button"
+                class="ghost"
+                data-i18n="statsBackButton"
+              >
+                К тестам
+              </button>
+            </div>
+            <div class="stats-controls">
+              <label class="stats-control">
+                <span data-i18n="statsAttemptLabel">Попытка</span>
+                <select id="stats-attempt-select"></select>
+              </label>
+              <button
+                id="stats-refresh"
+                type="button"
+                class="secondary"
+                data-i18n="statsRefreshButton"
+              >
+                Обновить
+              </button>
+            </div>
+            <div id="stats-empty" class="stats-empty is-hidden">
+              <strong data-i18n="statsEmptyTitle">
+                Пока нет попыток.
+              </strong>
+              <p class="muted" data-i18n="statsEmptyBody">
+                Пройдите тестирование, чтобы здесь появилась аналитика.
+              </p>
+              <button
+                id="stats-start-test"
+                type="button"
+                class="primary"
+                data-i18n="statsEmptyCta"
+              >
+                Пройдите тест
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="statsAttemptListTitle">Список попыток</h3>
+            <ul id="stats-attempt-list" class="stats-attempts"></ul>
+          </div>
+        </section>
+
+        <section class="panel panel--stats-main">
+          <div id="stats-kpi-grid" class="stats-kpi-grid"></div>
+
+          <div class="stats-charts">
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3 data-i18n="statsChartAttemptsTitle">
+                  Динамика точности
+                </h3>
+                <p class="muted" data-i18n="statsChartAttemptsSubtitle">
+                  По завершённым попыткам.
+                </p>
+              </div>
+              <div class="chart-area">
+                <canvas id="stats-chart-attempts"></canvas>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3 data-i18n="statsChartTimeTitle">
+                  Темп прохождения
+                </h3>
+                <p class="muted" data-i18n="statsChartTimeSubtitle">
+                  Среднее время на вопрос.
+                </p>
+              </div>
+              <div class="chart-area">
+                <canvas id="stats-chart-time"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="stats-section-header">
+              <h3 data-i18n="statsQuestionsTitle">Лента вопросов</h3>
+              <p class="muted" data-i18n="statsQuestionsSubtitle">
+                Детализация по выбранной попытке.
+              </p>
+            </div>
+            <div id="stats-question-stream" class="stats-question-stream"></div>
           </div>
         </section>
       </section>

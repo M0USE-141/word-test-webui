@@ -87,6 +87,17 @@ export const dom = {
   ),
   screenManagement: document.getElementById("screen-management"),
   screenTesting: document.getElementById("screen-testing"),
+  screenStats: document.getElementById("screen-stats"),
+  statsBackButton: document.getElementById("stats-back"),
+  statsRefreshButton: document.getElementById("stats-refresh"),
+  statsAttemptSelect: document.getElementById("stats-attempt-select"),
+  statsAttemptList: document.getElementById("stats-attempt-list"),
+  statsKpiGrid: document.getElementById("stats-kpi-grid"),
+  statsChartAttempts: document.getElementById("stats-chart-attempts"),
+  statsChartTime: document.getElementById("stats-chart-time"),
+  statsQuestionStream: document.getElementById("stats-question-stream"),
+  statsEmptyState: document.getElementById("stats-empty"),
+  statsStartTestButton: document.getElementById("stats-start-test"),
   settingQuestionCount: document.getElementById("setting-question-count"),
   settingRandomQuestions: document.getElementById(
     "setting-random-questions"
@@ -126,6 +137,12 @@ export const state = {
   uiState: {
     activeScreen: "management",
     locale: "ru",
+  },
+  stats: {
+    attempts: [],
+    selectedAttemptId: null,
+    attemptDetails: null,
+    filterTestId: null,
   },
   activeEditorCard: null,
   activeEditorCardKey: null,

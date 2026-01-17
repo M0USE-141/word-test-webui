@@ -160,6 +160,10 @@ export function renderManagementScreen() {
     dom.screenTesting.classList.add("is-hidden");
     dom.screenTesting.classList.remove("is-active");
   }
+  if (dom.screenStats) {
+    dom.screenStats.classList.add("is-hidden");
+    dom.screenStats.classList.remove("is-active");
+  }
 }
 
 export function renderTestingScreen() {
@@ -171,6 +175,25 @@ export function renderTestingScreen() {
     dom.screenManagement.classList.add("is-hidden");
     dom.screenManagement.classList.remove("is-active");
   }
+  if (dom.screenStats) {
+    dom.screenStats.classList.add("is-hidden");
+    dom.screenStats.classList.remove("is-active");
+  }
+}
+
+export function renderStatsScreen() {
+  if (dom.screenStats) {
+    dom.screenStats.classList.remove("is-hidden");
+    dom.screenStats.classList.add("is-active");
+  }
+  if (dom.screenManagement) {
+    dom.screenManagement.classList.add("is-hidden");
+    dom.screenManagement.classList.remove("is-active");
+  }
+  if (dom.screenTesting) {
+    dom.screenTesting.classList.add("is-hidden");
+    dom.screenTesting.classList.remove("is-active");
+  }
 }
 
 export function setActiveScreen(screen) {
@@ -180,6 +203,8 @@ export function setActiveScreen(screen) {
   state.uiState.activeScreen = screen;
   if (screen === "testing") {
     renderTestingScreen();
+  } else if (screen === "stats") {
+    renderStatsScreen();
   } else {
     renderManagementScreen();
   }
@@ -557,6 +582,7 @@ export function renderTestCards(
     onSelectTest = () => {},
     onStartTesting = async () => {},
     onEditTest = async () => {},
+    onViewStats = async () => {},
   } = {}
 ) {
   clearElement(dom.testCardsContainer);
@@ -652,7 +678,16 @@ export function renderTestCards(
       await onEditTest(test.id);
     });
 
-    actions.append(testingButton, editButton);
+    const statsButton = document.createElement("button");
+    statsButton.type = "button";
+    statsButton.className = "ghost";
+    statsButton.textContent = t("statsButton");
+    statsButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await onViewStats(test.id);
+    });
+
+    actions.append(testingButton, editButton, statsButton);
     card.append(title, meta, stats, actions);
     card.addEventListener("click", async () => {
       await onSelectTest(test.id);
@@ -660,4 +695,473 @@ export function renderTestCards(
 
     dom.testCardsContainer.appendChild(card);
   });
+}
+
+let statsAttemptsChart = null;
+let statsTimeChart = null;
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms)) {
+    return "—";
+  }
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  const formatter = new Intl.NumberFormat(state.uiState.locale, {
+    style: "unit",
+    unit: "second",
+    unitDisplay: "short",
+  });
+  if (seconds < 60) {
+    return formatter.format(seconds);
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  const minuteFormatter = new Intl.NumberFormat(state.uiState.locale, {
+    style: "unit",
+    unit: "minute",
+    unitDisplay: "short",
+  });
+  return `${minuteFormatter.format(minutes)} ${formatter.format(remaining)}`;
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return `${formatNumber(value, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatRatio(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return formatPercent(value * 100);
+}
+
+function resolveAggregateValue(aggregate, keys) {
+  if (!aggregate || typeof aggregate !== "object") {
+    return null;
+  }
+  for (const key of keys) {
+    if (Number.isFinite(aggregate[key])) {
+      return aggregate[key];
+    }
+  }
+  return null;
+}
+
+function resolveAttemptAggregate(attempt) {
+  if (!attempt || typeof attempt !== "object") {
+    return {};
+  }
+  return attempt.summary ?? attempt.aggregates ?? {};
+}
+
+function createKpiCard({ label, value, hint }) {
+  const card = document.createElement("div");
+  card.className = "kpi-card";
+  const labelEl = document.createElement("span");
+  labelEl.className = "muted";
+  labelEl.textContent = label;
+  const valueEl = document.createElement("strong");
+  valueEl.textContent = value;
+  card.append(labelEl, valueEl);
+  if (hint) {
+    const hintEl = document.createElement("span");
+    hintEl.className = "kpi-hint muted";
+    hintEl.textContent = hint;
+    card.appendChild(hintEl);
+  }
+  return card;
+}
+
+function getAttemptLabel(attempt, index) {
+  if (!attempt) {
+    return formatNumber(index + 1);
+  }
+  const dateValue = attempt.finalizedAt || attempt.createdAt;
+  if (dateValue) {
+    const date = new Date(dateValue);
+    if (!Number.isNaN(date.valueOf())) {
+      return date.toLocaleDateString(state.uiState.locale, {
+        day: "2-digit",
+        month: "short",
+      });
+    }
+  }
+  return formatNumber(index + 1);
+}
+
+function getAttemptTitle(attempt, index) {
+  const dateValue = attempt?.finalizedAt || attempt?.createdAt;
+  if (dateValue) {
+    const date = new Date(dateValue);
+    if (!Number.isNaN(date.valueOf())) {
+      return date.toLocaleString(state.uiState.locale, {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  return t("statsAttemptTitle", { index: formatNumber(index + 1) });
+}
+
+function buildChartConfig({ labels, data, label, color, fillColor }) {
+  return {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label,
+          data,
+          borderColor: color,
+          backgroundColor: fillColor,
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true,
+          pointRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--muted"
+            ),
+          },
+          grid: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--border"
+            ),
+          },
+        },
+        x: {
+          ticks: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--muted"
+            ),
+          },
+          grid: {
+            display: false,
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${label}: ${context.parsed.y}`,
+          },
+        },
+      },
+    },
+  };
+}
+
+function renderStatsAttemptList(attempts, selectedAttemptId, tests) {
+  if (!dom.statsAttemptList) {
+    return;
+  }
+  clearElement(dom.statsAttemptList);
+  if (!attempts.length) {
+    const empty = document.createElement("li");
+    empty.className = "muted";
+    empty.textContent = t("statsNoAttempts");
+    dom.statsAttemptList.appendChild(empty);
+    return;
+  }
+  const testById = new Map(tests.map((test) => [test.id, test.title]));
+  attempts.forEach((attempt, index) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "stats-attempt";
+    button.dataset.attemptId = attempt.attemptId;
+    if (attempt.attemptId === selectedAttemptId) {
+      button.classList.add("is-active");
+    }
+    const title = document.createElement("strong");
+    title.textContent = getAttemptTitle(attempt, index);
+    const meta = document.createElement("span");
+    meta.className = "muted";
+    const testTitle = testById.get(attempt.testId) || attempt.testId;
+    meta.textContent = t("statsAttemptMeta", { title: testTitle });
+    const metrics = document.createElement("span");
+    metrics.className = "stats-attempt__metric";
+    const aggregate = resolveAttemptAggregate(attempt);
+    const percent =
+      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+      (() => {
+        const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+        const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+          return (score / total) * 100;
+        }
+        return null;
+      })();
+    metrics.textContent = percent !== null ? formatPercent(percent) : "—";
+    button.append(title, meta, metrics);
+    item.appendChild(button);
+    dom.statsAttemptList.appendChild(item);
+  });
+}
+
+function renderStatsAttemptSelect(attempts, selectedAttemptId) {
+  if (!dom.statsAttemptSelect) {
+    return;
+  }
+  clearElement(dom.statsAttemptSelect);
+  if (!attempts.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = t("statsNoAttempts");
+    dom.statsAttemptSelect.appendChild(option);
+    dom.statsAttemptSelect.disabled = true;
+    return;
+  }
+  dom.statsAttemptSelect.disabled = false;
+  attempts.forEach((attempt, index) => {
+    const option = document.createElement("option");
+    option.value = attempt.attemptId;
+    option.textContent = getAttemptTitle(attempt, index);
+    dom.statsAttemptSelect.appendChild(option);
+  });
+  dom.statsAttemptSelect.value = selectedAttemptId || attempts[0].attemptId;
+}
+
+function renderStatsKpis({ attempts, selectedAttempt }) {
+  if (!dom.statsKpiGrid) {
+    return;
+  }
+  clearElement(dom.statsKpiGrid);
+  const aggregate = resolveAttemptAggregate(selectedAttempt);
+  const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+  const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+  const percent =
+    resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+    (Number.isFinite(score) && Number.isFinite(total) && total > 0
+      ? (score / total) * 100
+      : null);
+  const answered = resolveAggregateValue(aggregate, ["answeredCount"]);
+  const avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
+  const totalDuration = resolveAggregateValue(aggregate, ["totalDurationMs"]);
+  const focusIndex = resolveAggregateValue(aggregate, ["focusStabilityIndex"]);
+  const fatigueIndex = resolveAggregateValue(aggregate, ["fatiguePoint"]);
+
+  const cards = [
+    createKpiCard({
+      label: t("statsKpiAttempts"),
+      value: formatNumber(attempts.length),
+    }),
+    createKpiCard({
+      label: t("statsKpiAccuracy"),
+      value: percent !== null ? formatPercent(percent) : "—",
+      hint:
+        score !== null && total !== null
+          ? t("statsKpiAccuracyHint", {
+              correct: formatNumber(score),
+              total: formatNumber(total),
+            })
+          : null,
+    }),
+    createKpiCard({
+      label: t("statsKpiAnswered"),
+      value:
+        answered !== null
+          ? formatNumber(answered)
+          : total !== null
+            ? formatNumber(total)
+            : "—",
+    }),
+    createKpiCard({
+      label: t("statsKpiAvgTime"),
+      value: avgTime !== null ? formatDuration(avgTime) : "—",
+    }),
+    createKpiCard({
+      label: t("statsKpiTotalTime"),
+      value: totalDuration !== null ? formatDuration(totalDuration) : "—",
+    }),
+    createKpiCard({
+      label: t("statsKpiFocus"),
+      value: focusIndex !== null ? formatRatio(focusIndex) : "—",
+      hint:
+        fatigueIndex !== null
+          ? t("statsKpiFatigueHint", {
+              value: formatRatio(fatigueIndex),
+            })
+          : null,
+    }),
+  ];
+  cards.forEach((card) => dom.statsKpiGrid.appendChild(card));
+}
+
+function renderStatsQuestionStream(selectedAttempt) {
+  if (!dom.statsQuestionStream) {
+    return;
+  }
+  clearElement(dom.statsQuestionStream);
+  const summary = selectedAttempt?.summary;
+  const items = Array.isArray(summary?.perQuestion) ? summary.perQuestion : [];
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = t("statsNoQuestionData");
+    dom.statsQuestionStream.appendChild(empty);
+    return;
+  }
+  items.forEach((item) => {
+    const entry = document.createElement("div");
+    entry.className = "stats-question-item";
+    if (item.isSkipped) {
+      entry.classList.add("is-skipped");
+    } else if (item.isCorrect) {
+      entry.classList.add("is-correct");
+    } else {
+      entry.classList.add("is-incorrect");
+    }
+    const title = document.createElement("strong");
+    title.textContent = t("statsQuestionTitle", {
+      index: formatNumber((item.questionIndex ?? 0) + 1),
+    });
+    const subtitle = document.createElement("span");
+    subtitle.className = "muted";
+    subtitle.textContent = item.questionId
+      ? t("statsQuestionId", { id: item.questionId })
+      : "";
+
+    const meta = document.createElement("div");
+    meta.className = "stats-question-meta";
+    const status = document.createElement("span");
+    status.className = "stats-badge";
+    if (item.isSkipped) {
+      status.classList.add("stats-badge--neutral");
+      status.textContent = t("statsQuestionSkipped");
+    } else if (item.isCorrect) {
+      status.classList.add("stats-badge--success");
+      status.textContent = t("statsQuestionCorrect");
+    } else {
+      status.classList.add("stats-badge--danger");
+      status.textContent = t("statsQuestionIncorrect");
+    }
+    const duration = document.createElement("span");
+    duration.className = "muted";
+    duration.textContent = formatDuration(item.durationMs || 0);
+    meta.append(status, duration);
+
+    const info = document.createElement("div");
+    info.className = "stats-question-info";
+    info.append(title, subtitle);
+    entry.append(info, meta);
+    dom.statsQuestionStream.appendChild(entry);
+  });
+}
+
+function renderStatsCharts(attempts) {
+  if (!dom.statsChartAttempts || !dom.statsChartTime) {
+    return;
+  }
+  if (!window.Chart) {
+    return;
+  }
+
+  const labels = attempts.map(getAttemptLabel);
+  const accuracyValues = attempts.map((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const value =
+      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+      (() => {
+        const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+        const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+          return (score / total) * 100;
+        }
+        return 0;
+      })();
+    return Number.isFinite(value) ? Number(value.toFixed(1)) : 0;
+  });
+
+  const timeValues = attempts.map((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
+    if (!Number.isFinite(avgTime)) {
+      return 0;
+    }
+    return Number((avgTime / 1000).toFixed(1));
+  });
+
+  const styles = getComputedStyle(document.documentElement);
+  const primary = styles.getPropertyValue("--primary").trim();
+  const primarySoft = styles.getPropertyValue("--primary-soft").trim();
+  const success = styles.getPropertyValue("--success").trim();
+  const successSoft = styles.getPropertyValue("--success-soft").trim();
+
+  statsAttemptsChart?.destroy();
+  statsTimeChart?.destroy();
+
+  statsAttemptsChart = new window.Chart(
+    dom.statsChartAttempts.getContext("2d"),
+    buildChartConfig({
+      labels,
+      data: accuracyValues,
+      label: t("statsChartAttemptsLegend"),
+      color: primary,
+      fillColor: primarySoft,
+    })
+  );
+
+  statsTimeChart = new window.Chart(
+    dom.statsChartTime.getContext("2d"),
+    buildChartConfig({
+      labels,
+      data: timeValues,
+      label: t("statsChartTimeLegend"),
+      color: success,
+      fillColor: successSoft,
+    })
+  );
+}
+
+export function renderStatsView() {
+  const { attempts, selectedAttemptId, attemptDetails } = state.stats;
+  const filteredAttempts = Array.isArray(attempts) ? attempts : [];
+  const selectedAttempt =
+    attemptDetails?.attempt ||
+    filteredAttempts.find((attempt) => attempt.attemptId === selectedAttemptId) ||
+    null;
+
+  if (dom.statsEmptyState) {
+    dom.statsEmptyState.classList.toggle(
+      "is-hidden",
+      filteredAttempts.length > 0
+    );
+  }
+
+  renderStatsAttemptSelect(filteredAttempts, selectedAttemptId);
+  renderStatsAttemptList(
+    filteredAttempts,
+    selectedAttemptId,
+    state.testsCache
+  );
+  renderStatsKpis({ attempts: filteredAttempts, selectedAttempt });
+  renderStatsQuestionStream(selectedAttempt);
+  if (filteredAttempts.length) {
+    renderStatsCharts(filteredAttempts);
+  } else {
+    statsAttemptsChart?.destroy();
+    statsTimeChart?.destroy();
+    statsAttemptsChart = null;
+    statsTimeChart = null;
+  }
 }

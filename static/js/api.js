@@ -131,3 +131,23 @@ export async function uploadObjectAsset(testId, file) {
   }
   return payload;
 }
+
+export async function fetchAttemptStats(clientId) {
+  const response = await fetch(
+    `/api/stats/attempts?clientId=${encodeURIComponent(clientId)}`
+  );
+  if (!response.ok) {
+    throw new Error(t("errorFetchStats"));
+  }
+  return response.json();
+}
+
+export async function fetchAttemptDetails(attemptId, clientId) {
+  const response = await fetch(
+    `/api/stats/attempts/${attemptId}?clientId=${encodeURIComponent(clientId)}`
+  );
+  if (!response.ok) {
+    throw new Error(t("errorFetchStats"));
+  }
+  return response.json();
+}
