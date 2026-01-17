@@ -6,6 +6,14 @@
   border: 1px solid var(--border);
 }
 
+.question-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .upload-form {
   display: flex;
   flex-direction: column;
@@ -503,4 +511,11 @@ button.danger:hover {
   gap: 0.5rem;
   align-items: center;
   justify-content: flex-end;
+}
+
+@media (max-width: 960px) {
+  .question-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

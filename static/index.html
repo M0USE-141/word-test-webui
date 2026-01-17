@@ -168,30 +168,31 @@
         </section>
 
         <section class="panel panel--test">
-          <div class="card question-header">
-            <div>
-              <h2 id="question-progress" data-i18n="questionProgressZero">
-                Вопрос 0 из 0
-              </h2>
-              <p id="question-status" class="muted"></p>
+          <div class="card question-card">
+            <div class="question-card__header">
+              <div>
+                <h2 id="question-progress" data-i18n="questionProgressZero">
+                  Вопрос 0 из 0
+                </h2>
+                <p id="question-status" class="muted"></p>
+              </div>
+              <div class="question-actions">
+                <button id="exit-test" type="button" class="ghost">
+                  <span data-i18n="exitButton">Выйти</span>
+                </button>
+                <button id="prev-question" type="button" data-i18n="prevButton">
+                  Назад
+                </button>
+                <button id="next-question" type="button" data-i18n="nextButton">
+                  Дальше
+                </button>
+                <button id="finish-test" type="button" class="danger">
+                  <span data-i18n="finishTestButton">Завершить тест</span>
+                </button>
+              </div>
             </div>
-            <div class="question-actions">
-              <button id="exit-test" type="button" class="ghost">
-                <span data-i18n="exitButton">Выйти</span>
-              </button>
-              <button id="prev-question" type="button" data-i18n="prevButton">
-                Назад
-              </button>
-              <button id="next-question" type="button" data-i18n="nextButton">
-                Дальше
-              </button>
-              <button id="finish-test" type="button" class="danger">
-                <span data-i18n="finishTestButton">Завершить тест</span>
-              </button>
-            </div>
+            <div id="question-container"></div>
           </div>
-
-          <div id="question-container" class="card"></div>
           <div id="options-container" class="card is-hidden"></div>
 
           <div class="card">
