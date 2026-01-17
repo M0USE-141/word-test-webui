@@ -17,12 +17,27 @@
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <h1>Web-интерфейс тестирования</h1>
-        <p>
-          Импортируйте тест, настройте параметры и проходите вопросы прямо в
-          браузере.
-        </p>
+      <div class="app-header__content">
+        <div>
+          <h1>Web-интерфейс тестирования</h1>
+          <p>
+            Импортируйте тест, настройте параметры и проходите вопросы прямо в
+            браузере.
+          </p>
+        </div>
+        <div class="app-header__controls">
+          <label class="theme-toggle" for="theme-toggle">
+            <span class="theme-toggle__label">🌞 / 🌙</span>
+            <input
+              id="theme-toggle"
+              class="theme-toggle__input"
+              type="checkbox"
+              role="switch"
+              aria-label="Переключить тёмную тему"
+            />
+            <span class="theme-toggle__slider" aria-hidden="true"></span>
+          </label>
+        </div>
       </div>
     </header>
 
@@ -56,40 +71,56 @@
           <div class="card">
             <h2>Настройки теста</h2>
             <div class="settings-grid">
-              <label for="setting-question-count">
-                Количество вопросов (0 = все)
-              </label>
-              <input
-                type="number"
-                id="setting-question-count"
-                min="0"
-                value="0"
-              />
+              <div class="settings-item">
+                <label for="setting-question-count">
+                  Количество вопросов (0 = все)
+                </label>
+                <input
+                  type="number"
+                  id="setting-question-count"
+                  min="0"
+                  value="0"
+                />
+              </div>
 
-              <label class="checkbox-row" for="setting-random-questions">
+              <div class="settings-item">
+                <label for="setting-max-options">Макс. вариантов ответа</label>
+                <input
+                  type="number"
+                  id="setting-max-options"
+                  min="1"
+                  value="4"
+                />
+              </div>
+
+              <label
+                class="checkbox-row settings-item settings-item--checkbox"
+                for="setting-random-questions"
+              >
                 <input type="checkbox" id="setting-random-questions" />
                 <span>Случайный порядок вопросов</span>
               </label>
-              <label class="checkbox-row" for="setting-random-options">
+              <label
+                class="checkbox-row settings-item settings-item--checkbox"
+                for="setting-random-options"
+              >
                 <input type="checkbox" id="setting-random-options" />
                 <span>Случайный порядок вариантов ответов</span>
               </label>
-              <label class="checkbox-row" for="setting-only-unanswered">
+              <label
+                class="checkbox-row settings-item settings-item--checkbox"
+                for="setting-only-unanswered"
+              >
                 <input type="checkbox" id="setting-only-unanswered" />
                 <span>Только нерешённые вопросы</span>
               </label>
-              <label class="checkbox-row" for="setting-show-answers">
+              <label
+                class="checkbox-row settings-item settings-item--checkbox"
+                for="setting-show-answers"
+              >
                 <input type="checkbox" id="setting-show-answers" checked />
                 <span>Показывать правильный ответ сразу</span>
               </label>
-
-              <label for="setting-max-options">Макс. вариантов ответа</label>
-              <input
-                type="number"
-                id="setting-max-options"
-                min="1"
-                value="4"
-              />
             </div>
             <button id="start-test" class="primary" type="button">
               Начать тестирование

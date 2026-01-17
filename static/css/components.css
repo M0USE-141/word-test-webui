@@ -21,8 +21,8 @@
 
 .upload-dropzone {
   position: relative;
-  border: 1px solid #dbe3ff;
-  background: linear-gradient(135deg, #eef2ff, #ffffff);
+  border: 1px solid var(--border);
+  background: var(--card-muted);
   border-radius: 16px;
   padding: 1.25rem;
   display: grid;
@@ -36,17 +36,17 @@
 
 .upload-dropzone.is-empty {
   border-style: dashed;
-  border-color: #c7d2fe;
+  border-color: var(--border);
 }
 
 .upload-dropzone:hover {
-  border-color: #93c5fd;
+  border-color: var(--primary);
   box-shadow: 0 20px 36px rgba(37, 99, 235, 0.15);
   transform: translateY(-1px);
 }
 
 .upload-dropzone.is-dragover {
-  border-color: #60a5fa;
+  border-color: var(--primary);
   box-shadow: 0 22px 40px rgba(37, 99, 235, 0.18);
   transform: translateY(-2px);
 }
@@ -56,8 +56,8 @@
   gap: 0.6rem;
   padding: 1rem;
   border-radius: 14px;
-  border: 1px dashed rgba(37, 99, 235, 0.35);
-  background: rgba(255, 255, 255, 0.65);
+  border: 1px dashed var(--border);
+  background: var(--card);
 }
 
 .upload-dropzone__icon {
@@ -67,7 +67,7 @@
   margin: 0 auto;
   display: grid;
   place-items: center;
-  background: white;
+  background: var(--card);
   border: 1px solid var(--border);
   font-size: 1.5rem;
   color: var(--primary);
@@ -106,7 +106,7 @@
 
 .upload-clear-button {
   border: 1px solid var(--border);
-  background: white;
+  background: var(--card);
   color: var(--text);
   padding: 0.5rem 1rem;
   border-radius: 10px;
@@ -117,7 +117,7 @@
 }
 
 .upload-clear-button:hover:not(:disabled) {
-  border-color: #93c5fd;
+  border-color: var(--primary);
   color: var(--primary);
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.15);
   transform: translateY(-1px);
@@ -148,8 +148,8 @@
   gap: 0.2rem;
   padding: 0.75rem 0.85rem;
   border-radius: 12px;
-  border: 1px solid #e0e7ff;
-  background: #f8fafc;
+  border: 1px solid var(--border);
+  background: var(--card-muted);
   font-size: 0.9rem;
   color: var(--text);
   text-align: left;
@@ -159,7 +159,7 @@
 .upload-file-name.is-empty {
   color: var(--muted);
   border-color: var(--border);
-  background: #f1f5f9;
+  background: var(--card-muted-strong);
 }
 
 .upload-file-name__label {
@@ -179,7 +179,7 @@
   padding: 1rem;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--card);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
@@ -209,7 +209,7 @@ select {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.85rem 0.9rem;
-  background: #f8fafc;
+  background: var(--card-muted);
   cursor: pointer;
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   text-align: left;
@@ -217,7 +217,7 @@ select {
 }
 
 .test-card:hover {
-  border-color: #c7d2fe;
+  border-color: var(--primary-soft-strong);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
@@ -225,14 +225,14 @@ select {
 .test-card.is-active {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
-  background: #eef2ff;
+  background: var(--primary-soft);
 }
 
 .test-card--import {
   display: grid;
   gap: 0.35rem;
   align-items: start;
-  background: #eef2ff;
+  background: var(--primary-soft);
   border-style: dashed;
   color: var(--primary-strong);
 }
@@ -243,17 +243,17 @@ select {
 }
 
 .test-card--import:hover {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
+  background: var(--primary-soft-strong);
+  border-color: var(--primary);
 }
 
 .test-card--new {
   display: grid;
   gap: 0.35rem;
   align-items: start;
-  background: #ecfdf5;
+  background: var(--success-soft);
   border-style: dashed;
-  color: #047857;
+  color: var(--success-strong);
 }
 
 .test-card--new .muted {
@@ -262,8 +262,8 @@ select {
 }
 
 .test-card--new:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
+  background: var(--success-soft-strong);
+  border-color: var(--success);
 }
 
 .test-card__title {
@@ -304,7 +304,7 @@ button.secondary {
 }
 
 button.secondary:hover {
-  background: #d1d5db;
+  background: var(--neutral-strong);
 }
 
 .create-test-form {
@@ -351,7 +351,7 @@ button.danger {
 }
 
 button.danger:hover {
-  background: #b91c1c;
+  background: var(--danger-strong);
 }
 
 .ghost {
@@ -361,7 +361,7 @@ button.danger:hover {
 }
 
 .ghost:hover {
-  background: #f3f4f6;
+  background: var(--neutral-soft);
 }
 
 .upload-logs-panel {
@@ -393,29 +393,29 @@ button.danger:hover {
   gap: 0.75rem;
   align-items: flex-start;
   padding: 0.85rem 1rem;
-  background: #f8fafc;
+  background: var(--card-muted);
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text);
 }
 
 .option-card:hover {
-  background: #eef2ff;
+  background: var(--primary-soft);
 }
 
 .option-card.is-selected {
-  background: #fef9c3;
-  border-color: #facc15;
+  background: var(--warning-soft);
+  border-color: var(--warning);
 }
 
 .option-card.is-correct {
-  background: #dcfce7;
-  border-color: #22c55e;
+  background: var(--success-soft);
+  border-color: var(--success);
 }
 
 .option-card.is-incorrect {
-  background: #fee2e2;
-  border-color: #ef4444;
+  background: var(--danger-soft);
+  border-color: var(--danger);
 }
 
 .option-index {
@@ -440,15 +440,15 @@ button.danger:hover {
 }
 
 .nav-button.is-correct {
-  background: #bbf7d0;
+  background: var(--success-soft);
 }
 
 .nav-button.is-incorrect {
-  background: #fecaca;
+  background: var(--danger-soft);
 }
 
 .nav-button.is-neutral {
-  background: #f3f4f6;
+  background: var(--neutral-soft);
 }
 
 .result-details {
