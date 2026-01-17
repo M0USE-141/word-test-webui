@@ -54,6 +54,18 @@ import {
   saveLastResult,
   state,
 } from "./state.js";
+import {
+  buildAttemptSummary,
+  createAttemptId,
+  finalizeActiveQuestionTiming,
+  getClientId,
+  initTelemetry,
+  trackAttemptAbandoned,
+  trackAttemptFinished,
+  trackAttemptStarted,
+  trackQuestionSkipped,
+  updateQuestionTiming,
+} from "./telemetry.js";
 
 const THEME_STORAGE_KEY = "ui-theme";
 const DEFAULT_THEME = "light";
@@ -247,6 +259,12 @@ function buildSession(test, settings) {
     optionOrders: new Map(),
     finished: false,
     settings,
+    attemptId: createAttemptId(),
+    clientId: getClientId(),
+    startedAt: Date.now(),
+    activeQuestionId: null,
+    activeQuestionStartedAt: null,
+    questionTimings: new Map(),
   };
 }
 
@@ -417,6 +435,7 @@ function finishTest() {
     return;
   }
   state.session.finished = true;
+  finalizeActiveQuestionTiming(state.session);
 
   let correct = 0;
   let answered = 0;
@@ -443,6 +462,8 @@ function finishTest() {
     percent,
     completedAt: new Date().toISOString(),
   });
+  const summary = buildAttemptSummary(state.session);
+  trackAttemptFinished(state.session, summary);
   renderTestCardsWithHandlers(state.testsCache, state.session.testId);
   renderResultSummary({ correct, total, answered, percent });
   renderQuestion();
@@ -455,6 +476,7 @@ function startTest() {
   }
   const settings = getSettings();
   state.session = buildSession(state.currentTest, settings);
+  trackAttemptStarted(state.session);
   renderResultSummary(null);
   if (!state.session.questions.length) {
     dom.questionContainer.textContent = t("noQuestionsForTesting");
@@ -801,6 +823,11 @@ function initializeTestingScreenEvents() {
     if (!state.session) {
       return;
     }
+    updateQuestionTiming(
+      state.session,
+      state.session.questions[Math.max(0, state.session.currentIndex - 1)]
+        ?.questionId ?? null
+    );
     state.session.currentIndex = Math.max(0, state.session.currentIndex - 1);
     renderQuestion();
   });
@@ -809,6 +836,31 @@ function initializeTestingScreenEvents() {
     if (!state.session) {
       return;
     }
+    const currentEntry = state.session.questions[state.session.currentIndex];
+    if (currentEntry) {
+      const selected = state.session.answers.get(currentEntry.questionId);
+      if (selected === undefined || selected === -1) {
+        const durationMs =
+          typeof state.session.activeQuestionStartedAt === "number"
+            ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+            : 0;
+        trackQuestionSkipped(
+          state.session,
+          currentEntry,
+          state.session.currentIndex,
+          durationMs
+        );
+      }
+    }
+    updateQuestionTiming(
+      state.session,
+      state.session.questions[
+        Math.min(
+          state.session.questions.length - 1,
+          state.session.currentIndex + 1
+        )
+      ]?.questionId ?? null
+    );
     state.session.currentIndex = Math.min(
       state.session.questions.length - 1,
       state.session.currentIndex + 1
@@ -825,6 +877,10 @@ function initializeTestingScreenEvents() {
   });
 
   dom.exitTestButton?.addEventListener("click", () => {
+    if (state.session && !state.session.finished) {
+      finalizeActiveQuestionTiming(state.session);
+      trackAttemptAbandoned(state.session);
+    }
     setActiveScreen("management");
     dom.optionsContainer.classList.add("is-hidden");
   });
@@ -834,6 +890,7 @@ async function initialize() {
   const storedLocale = localStorage.getItem(LOCALE_STORAGE_KEY) || defaultLocale;
   applyLocale(storedLocale);
   setupThemeToggle();
+  initTelemetry();
   initializeManagementScreenEvents();
   initializeTestingScreenEvents();
   renderManagementScreen();
