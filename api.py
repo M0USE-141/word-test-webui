@@ -31,6 +31,7 @@ ATTEMPTS_DIR = Path(
     os.environ.get("TEST_ATTEMPTS_DIR", Path.cwd() / "data" / "attempts")
 )
 ATTEMPTS_DIR.mkdir(parents=True, exist_ok=True)
+ATTEMPTS_INDEX_PATH = ATTEMPTS_DIR / "index.json"
 STATIC_DIR = _resource_path("static")
 
 app = FastAPI(title="Test Extractor API")
@@ -188,6 +189,12 @@ def _ensure_attempt_metadata(
             timestamps["lastEventAt"] = event_ts
         existing["timestamps"] = timestamps
         _write_json_file(meta_path, existing)
+        _upsert_attempt_index_entry(
+            attempt_id,
+            test_id,
+            client_id,
+            started_at=event_ts or timestamps.get("createdAt"),
+        )
         return existing
     timestamps = {
         "createdAt": _utc_now(),
@@ -203,6 +210,12 @@ def _ensure_attempt_metadata(
         "timestamps": timestamps,
     }
     _write_json_file(meta_path, payload)
+    _upsert_attempt_index_entry(
+        attempt_id,
+        test_id,
+        client_id,
+        started_at=event_ts or timestamps.get("createdAt"),
+    )
     return payload
 
 
@@ -244,6 +257,106 @@ def _load_attempt_stats(attempt_id: str) -> dict[str, object]:
 def _load_attempt_meta(attempt_id: str) -> dict[str, object] | None:
     payload = _read_json_file(_attempt_meta_path(attempt_id), None)
     return payload if isinstance(payload, dict) else None
+
+
+def _load_attempt_index() -> list[dict[str, object]]:
+    payload = _read_json_file(ATTEMPTS_INDEX_PATH, [])
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _write_attempt_index(entries: list[dict[str, object]]) -> None:
+    _write_json_file(ATTEMPTS_INDEX_PATH, entries)
+
+
+def _resolve_metric(
+    source: dict[str, object] | None,
+    keys: list[str],
+) -> float | int | None:
+    if not isinstance(source, dict):
+        return None
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return value
+    return None
+
+
+def _upsert_attempt_index_entry(
+    attempt_id: str,
+    test_id: str,
+    client_id: str,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    score: float | int | None = None,
+    percent: float | int | None = None,
+) -> dict[str, object]:
+    entries = _load_attempt_index()
+    entry = next(
+        (item for item in entries if item.get("attemptId") == attempt_id),
+        None,
+    )
+    if entry is None:
+        entry = {
+            "attemptId": attempt_id,
+            "testId": test_id,
+            "clientId": client_id,
+            "startedAt": started_at,
+            "completedAt": completed_at,
+            "score": score,
+            "percent": percent,
+        }
+        entries.append(entry)
+        _write_attempt_index(entries)
+        return entry
+    if started_at and not entry.get("startedAt"):
+        entry["startedAt"] = started_at
+    if completed_at:
+        entry["completedAt"] = completed_at
+    if score is not None:
+        entry["score"] = score
+    if percent is not None:
+        entry["percent"] = percent
+    _write_attempt_index(entries)
+    return entry
+
+
+def _rebuild_attempt_index() -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for attempt_payload in _iter_attempt_metas():
+        attempt_id = attempt_payload.get("attemptId")
+        test_id = attempt_payload.get("testId")
+        client_id = attempt_payload.get("clientId")
+        if not attempt_id or not test_id or not client_id:
+            continue
+        stats_payload = _load_attempt_stats(str(attempt_id))
+        aggregates = stats_payload.get("aggregates")
+        summary = stats_payload.get("summary")
+        score = _resolve_metric(
+            aggregates, ["score", "correct"]
+        ) or _resolve_metric(summary, ["score", "correct"])
+        percent = _resolve_metric(
+            aggregates, ["percentCorrect", "accuracy"]
+        ) or _resolve_metric(summary, ["percentCorrect", "accuracy"])
+        timestamps = attempt_payload.get("timestamps", {})
+        if not isinstance(timestamps, dict):
+            timestamps = {}
+        entries.append(
+            {
+                "attemptId": attempt_id,
+                "testId": test_id,
+                "clientId": client_id,
+                "startedAt": timestamps.get("createdAt"),
+                "completedAt": timestamps.get("finalizedAt"),
+                "score": score,
+                "percent": percent,
+            }
+        )
+    _write_attempt_index(entries)
+    return entries
 
 
 def _iter_attempt_metas() -> list[dict[str, object]]:
@@ -636,6 +749,12 @@ def finalize_attempt(
     if summary and isinstance(summary.get("perQuestion"), list):
         per_question = summary.get("perQuestion")
     event_count = sum(1 for _ in _iter_attempt_events(attempt_id))
+    score = _resolve_metric(
+        aggregates, ["score", "correct"]
+    ) or _resolve_metric(summary, ["score", "correct"])
+    percent = _resolve_metric(
+        aggregates, ["percentCorrect", "accuracy"]
+    ) or _resolve_metric(summary, ["percentCorrect", "accuracy"])
     stats_payload = {
         "attemptId": attempt_id,
         "testId": test_id,
@@ -646,6 +765,14 @@ def finalize_attempt(
         "eventCount": event_count,
     }
     _write_json_file(_attempt_stats_path(attempt_id), stats_payload)
+    _upsert_attempt_index_entry(
+        attempt_id,
+        test_id,
+        client_id,
+        completed_at=payload.ts,
+        score=score,
+        percent=percent,
+    )
     timestamps = attempt_payload.get("timestamps")
     if not isinstance(timestamps, dict):
         timestamps = {}
@@ -670,29 +797,38 @@ def list_attempt_stats(
 ) -> list[dict[str, object]]:
     client_id = _validate_id("clientId", client_id)
     results = []
-    for attempt_payload in _iter_attempt_metas():
-        if attempt_payload.get("clientId") != client_id:
+    for entry in _load_attempt_index():
+        if entry.get("clientId") != client_id:
             continue
-        attempt_id = attempt_payload.get("attemptId")
+        attempt_id = entry.get("attemptId")
         if not attempt_id:
             continue
-        stats_payload = _load_attempt_stats(str(attempt_id))
-        timestamps = attempt_payload.get("timestamps", {})
-        if not isinstance(timestamps, dict):
-            timestamps = {}
+        summary = {}
+        score = entry.get("score")
+        percent = entry.get("percent")
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            summary["score"] = score
+        if isinstance(percent, (int, float)) and not isinstance(percent, bool):
+            summary["percentCorrect"] = percent
         results.append(
             {
-                "attemptId": attempt_payload.get("attemptId"),
-                "testId": attempt_payload.get("testId"),
-                "clientId": attempt_payload.get("clientId"),
-                "createdAt": timestamps.get("createdAt"),
-                "finalizedAt": timestamps.get("finalizedAt"),
-                "eventCount": stats_payload.get("eventCount", 0),
-                "aggregates": stats_payload.get("aggregates", {}),
-                "summary": stats_payload.get("summary"),
+                "attemptId": entry.get("attemptId"),
+                "testId": entry.get("testId"),
+                "clientId": entry.get("clientId"),
+                "startedAt": entry.get("startedAt"),
+                "completedAt": entry.get("completedAt"),
+                "createdAt": entry.get("startedAt"),
+                "finalizedAt": entry.get("completedAt"),
+                "summary": summary or None,
             }
         )
     return results
+
+
+@app.post("/api/stats/attempts/rebuild")
+def rebuild_attempt_stats_index() -> dict[str, object]:
+    entries = _rebuild_attempt_index()
+    return {"status": "rebuilt", "count": len(entries)}
 
 
 @app.get("/api/stats/attempts/{attempt_id}")
