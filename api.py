@@ -44,6 +44,10 @@ class TestUpdate(BaseModel):
     title: str
 
 
+class TestCreate(BaseModel):
+    title: str
+
+
 def _test_dir(test_id: str) -> Path:
     return DATA_DIR / test_id
 
@@ -86,6 +90,21 @@ def list_tests() -> list[dict[str, object]]:
         payload = payload_path.read_text(encoding="utf-8")
         tests.append(serialize_metadata(json_load(payload)))
     return tests
+
+
+@app.post("/api/tests")
+def create_test(payload: TestCreate) -> dict[str, object]:
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    test_id = uuid.uuid4().hex
+    test_dir = _test_dir(test_id)
+    test_dir.mkdir(parents=True, exist_ok=True)
+    assets_dir = _assets_dir(test_id)
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    test_payload = serialize_test_payload(test_id, title, [], assets_dir)
+    _save_test_payload(test_id, test_payload)
+    return {"metadata": serialize_metadata(test_payload), "payload": test_payload}
 
 
 @app.get("/api/tests/{test_id}")

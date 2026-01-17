@@ -339,6 +339,25 @@ select {
   border-color: #a5b4fc;
 }
 
+.test-card--new {
+  display: grid;
+  gap: 0.35rem;
+  align-items: start;
+  background: #ecfdf5;
+  border-style: dashed;
+  color: #047857;
+}
+
+.test-card--new .muted {
+  color: var(--text);
+  opacity: 0.75;
+}
+
+.test-card--new:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
 .test-card__title {
   font-size: 1rem;
   margin: 0 0 0.25rem;
@@ -378,6 +397,21 @@ button.secondary {
 
 button.secondary:hover {
   background: #d1d5db;
+}
+
+.create-test-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.create-test-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.create-test-form .is-error {
+  color: var(--danger);
 }
 
 .settings-grid {
