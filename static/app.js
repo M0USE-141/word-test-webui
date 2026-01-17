@@ -84,6 +84,8 @@ const settingOnlyUnanswered = document.getElementById(
 const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
 
+const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
+
 const testsCacheKey = "tests-cache";
 
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
@@ -294,6 +296,11 @@ function updateUploadFileState(file) {
     if (uploadClearButton) {
       uploadClearButton.disabled = false;
     }
+    if (isLegacyDocFile(file.name)) {
+      renderUploadLogs(DOCX_ONLY_WARNING, true);
+    } else {
+      renderUploadLogs(null);
+    }
     return;
   }
   if (uploadFileNameValue) {
@@ -306,6 +313,7 @@ function updateUploadFileState(file) {
   if (uploadClearButton) {
     uploadClearButton.disabled = true;
   }
+  renderUploadLogs(null);
 }
 
 function renderBlocks(container, blocks) {
@@ -335,6 +343,14 @@ function getInlineIdentifier(inline) {
       (value) => typeof value === "string" && value.trim().length > 0
     ) || ""
   ).trim();
+}
+
+function isLegacyDocFile(fileName) {
+  if (!fileName) {
+    return false;
+  }
+  const lowerName = fileName.toLowerCase();
+  return lowerName.endsWith(".doc") && !lowerName.endsWith(".docx");
 }
 
 function generateShortFormulaId(usedIds) {
@@ -1148,7 +1164,7 @@ function renderTestCards(tests, selectedId) {
   importCard.className = "test-card test-card--import";
   importCard.innerHTML = `
     <strong>Импорт теста</strong>
-    <span class="muted">Добавьте новую коллекцию из Word-файла.</span>
+    <span class="muted">Добавьте новую коллекцию из Word-файла. Только .docx.</span>
   `;
   importCard.addEventListener("click", () => {
     openImportModal();
@@ -2081,6 +2097,11 @@ function initializeManagementScreenEvents() {
     if (!uploadFileInput.files?.length) {
       questionContainer.textContent = "Сначала выберите файл для импорта.";
       renderUploadLogs("Сначала выберите файл для импорта.", true);
+      return;
+    }
+    if (isLegacyDocFile(uploadFileInput.files[0].name)) {
+      questionContainer.textContent = DOCX_ONLY_WARNING;
+      renderUploadLogs(DOCX_ONLY_WARNING, true);
       return;
     }
 
