@@ -6,7 +6,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/bsu-test-master.git"
+    "url": "https://github.com/M0USE-141/bsu-test-master.git"
   },
   "scripts": {
     "start": "electron .",
