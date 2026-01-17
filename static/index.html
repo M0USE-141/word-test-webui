@@ -28,7 +28,20 @@
           <div class="card card--collections">
             <h2>Коллекции тестов</h2>
             <div class="controls">
-              <div id="test-cards" class="test-collections"></div>
+              <div id="test-cards" class="test-collections">
+                <button type="button" class="test-card test-card--new">
+                  <strong>Новая коллекция</strong>
+                  <span class="muted"
+                    >Создайте пустой тест и заполните его вручную.</span
+                  >
+                </button>
+                <button type="button" class="test-card test-card--import">
+                  <strong>Импорт теста</strong>
+                  <span class="muted"
+                    >Добавьте новую коллекцию из Word-файла.</span
+                  >
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -356,6 +369,40 @@
           <h3>Логи импорта</h3>
           <ul id="upload-logs" class="upload-logs"></ul>
         </div>
+      </div>
+    </div>
+
+    <div id="create-test-modal" class="modal" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2>Новая коллекция</h2>
+            <p class="muted">Задайте название и начните создавать вопросы.</p>
+          </div>
+          <div class="modal-actions">
+            <button id="close-create-test" type="button" class="ghost">
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <form id="create-test-form" class="create-test-form">
+          <label class="upload-field" for="create-test-title">
+            <span>Название коллекции</span>
+            <input
+              type="text"
+              id="create-test-title"
+              placeholder="Например, Алгебра — базовый уровень"
+              required
+            />
+          </label>
+          <div class="create-test-actions">
+            <button type="submit">Создать коллекцию</button>
+            <button id="cancel-create-test" type="button" class="secondary">
+              Отмена
+            </button>
+          </div>
+          <p id="create-test-status" class="muted"></p>
+        </form>
       </div>
     </div>
   </body>
