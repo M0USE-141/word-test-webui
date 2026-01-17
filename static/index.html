@@ -17,12 +17,23 @@
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <h1>Web-интерфейс тестирования</h1>
-        <p>
-          Импортируйте тест, настройте параметры и проходите вопросы прямо в
-          браузере.
-        </p>
+      <div class="app-header__content">
+        <div>
+          <h1>Web-интерфейс тестирования</h1>
+          <p>
+            Импортируйте тест, настройте параметры и проходите вопросы прямо в
+            браузере.
+          </p>
+        </div>
+        <div class="app-header__controls">
+          <label class="theme-toggle" for="theme-toggle">
+            <span>Тема</span>
+            <select id="theme-toggle" name="theme">
+              <option value="light">Светлая</option>
+              <option value="dark">Тёмная синяя</option>
+            </select>
+          </label>
+        </div>
       </div>
     </header>
 

@@ -29,19 +29,19 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: var(--card-muted);
   display: grid;
   gap: 0.5rem;
   -webkit-tap-highlight-color: transparent;
 }
 
 .editor-card:hover {
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  border-color: var(--primary-soft-strong);
 }
 
 .editor-card--new {
-  background: #eef2ff;
+  background: var(--primary-soft);
   border-style: dashed;
   cursor: pointer;
   text-align: left;
@@ -51,7 +51,7 @@
 }
 
 .editor-card--new:hover {
-  background: #e0e7ff;
+  background: var(--primary-soft-strong);
   transform: none;
 }
 
@@ -63,9 +63,9 @@
 }
 
 .editor-card.is-expanded {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
-  box-shadow: 0 0 0 2px #a5b4fc;
+  background: var(--primary-soft-strong);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .editor-card-expand {
@@ -95,7 +95,7 @@
   overflow: hidden;
   display: grid;
   gap: 0.25rem;
-  color: #475569;
+  color: var(--muted);
 }
 
 .editor-card-preview p {
@@ -166,7 +166,7 @@
   padding: 0.75rem;
   display: grid;
   gap: 0.5rem;
-  background: #f8fafc;
+  background: var(--card-muted);
 }
 
 .editor-option.is-error {
@@ -211,7 +211,7 @@
   padding: 0.75rem;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--card);
 }
 
 .editor-object-toggles {
@@ -224,7 +224,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: var(--card-muted);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -235,8 +235,8 @@
 }
 
 .editor-object-toggle:hover {
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  border-color: var(--primary-soft-strong);
 }
 
 .editor-object-toggle:active {
@@ -254,7 +254,7 @@
   padding: 0.75rem;
   border-radius: 12px;
   border: 1px dashed var(--border);
-  background: #f9fafb;
+  background: var(--card-muted);
 }
 
 .editor-object-upload__header {
@@ -271,8 +271,8 @@
   gap: 0.35rem;
   padding: 0.85rem;
   border-radius: 12px;
-  border: 1px dashed rgba(37, 99, 235, 0.35);
-  background: rgba(255, 255, 255, 0.8);
+  border: 1px dashed var(--border);
+  background: var(--card);
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease,
@@ -280,13 +280,13 @@
 }
 
 .editor-object-dropzone:hover {
-  border-color: #93c5fd;
+  border-color: var(--primary);
   box-shadow: 0 10px 20px rgba(37, 99, 235, 0.12);
   transform: translateY(-1px);
 }
 
 .editor-object-dropzone.is-dragover {
-  border-color: #60a5fa;
+  border-color: var(--primary);
   box-shadow: 0 12px 22px rgba(37, 99, 235, 0.16);
   transform: translateY(-2px);
 }
@@ -330,7 +330,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: var(--card-muted);
   display: flex;
   gap: 0.75rem;
   align-items: flex-start;
@@ -365,7 +365,7 @@
   padding: 0.5rem;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--card);
   font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-word;
@@ -380,7 +380,7 @@
 .object-preview-math {
   padding: 0.5rem;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--card);
   border: 1px solid var(--border);
 }
 

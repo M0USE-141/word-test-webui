@@ -1,4 +1,5 @@
 export const dom = {
+  themeToggle: document.getElementById("theme-toggle"),
   testCardsContainer: document.getElementById("test-cards"),
   questionList: document.getElementById("question-nav"),
   questionContainer: document.getElementById("question-container"),

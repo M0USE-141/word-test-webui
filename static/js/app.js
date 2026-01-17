@@ -54,6 +54,33 @@ import {
   state,
 } from "./state.js";
 
+const THEME_STORAGE_KEY = "ui-theme";
+const DEFAULT_THEME = "light";
+
+function applyThemePreference(theme) {
+  const nextTheme = theme === "dark" ? "dark" : DEFAULT_THEME;
+  document.documentElement.dataset.theme = nextTheme;
+  if (dom.themeToggle) {
+    dom.themeToggle.value = nextTheme;
+  }
+  return nextTheme;
+}
+
+function setupThemeToggle() {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  const activeTheme = applyThemePreference(stored || DEFAULT_THEME);
+  if (!stored) {
+    localStorage.setItem(THEME_STORAGE_KEY, activeTheme);
+  }
+  if (!dom.themeToggle) {
+    return;
+  }
+  dom.themeToggle.addEventListener("change", (event) => {
+    const nextTheme = applyThemePreference(event.target.value);
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  });
+}
+
 function updateUploadFileState(file) {
   if (!dom.uploadFileName) {
     return;
@@ -734,6 +761,7 @@ function initializeTestingScreenEvents() {
 }
 
 async function initialize() {
+  setupThemeToggle();
   initializeManagementScreenEvents();
   initializeTestingScreenEvents();
   renderManagementScreen();
