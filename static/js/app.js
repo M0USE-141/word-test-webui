@@ -42,9 +42,9 @@ import {
   updateEditorTestActions,
   updateProgressHint,
 } from "./rendering.js";
+import { defaultLocale, formatNumber, setLocale, t } from "./i18n.js";
 import {
   clearLastResult,
-  DOCX_ONLY_WARNING,
   dom,
   editorMobileQuery,
   getSettings,
@@ -56,6 +56,57 @@ import {
 
 const THEME_STORAGE_KEY = "ui-theme";
 const DEFAULT_THEME = "light";
+const LOCALE_STORAGE_KEY = "ui-locale";
+
+function applyLocale(lang) {
+  const nextLocale = setLocale(lang);
+  state.uiState.locale = nextLocale;
+  document.documentElement.lang = nextLocale;
+  document.title = t("pageTitle");
+  localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
+  if (dom.langSelect) {
+    dom.langSelect.value = nextLocale;
+  }
+
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    const key = element.dataset.i18n;
+    if (!key) {
+      return;
+    }
+    element.textContent = t(key);
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    const key = element.dataset.i18nPlaceholder;
+    if (!key) {
+      return;
+    }
+    element.setAttribute("placeholder", t(key));
+  });
+
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    const key = element.dataset.i18nAriaLabel;
+    if (!key) {
+      return;
+    }
+    element.setAttribute("aria-label", t(key));
+  });
+
+  updateProgressHint();
+  if (state.session) {
+    renderQuestion();
+  }
+  renderResultSummary(
+    state.currentTest?.id ? loadLastResult(state.currentTest.id) : null
+  );
+  renderTestCardsWithHandlers(state.testsCache, state.currentTest?.id || null);
+  updateEditorTestActions();
+  renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+  renderEditorObjects();
+  updateUploadFileState(dom.uploadFileInput?.files?.[0] || null);
+
+  return nextLocale;
+}
 
 function applyThemePreference(theme) {
   const nextTheme = theme === "dark" ? "dark" : DEFAULT_THEME;
@@ -99,16 +150,17 @@ function updateUploadFileState(file) {
       dom.uploadClearButton.disabled = false;
     }
     if (isLegacyDocFile(file.name)) {
-      renderUploadLogs(DOCX_ONLY_WARNING, true);
+      renderUploadLogs(t("docxOnlyWarning"), true);
     } else {
       renderUploadLogs(null);
     }
     return;
   }
+  const noFileLabel = t("uploadNoFileSelected");
   if (dom.uploadFileNameValue) {
-    dom.uploadFileNameValue.textContent = "Файл не выбран";
+    dom.uploadFileNameValue.textContent = noFileLabel;
   } else {
-    dom.uploadFileName.textContent = "Файл не выбран";
+    dom.uploadFileName.textContent = noFileLabel;
   }
   dom.uploadFileName.classList.add("is-empty");
   dom.uploadDropzone?.classList.add("is-empty");
@@ -302,10 +354,12 @@ async function refreshCurrentTest(testId = state.currentTest?.id) {
   renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
   state.session = null;
   updateProgressHint();
-  dom.questionContainer.textContent =
-    "Нажмите «Начать тестирование», чтобы применить настройки.";
+  dom.questionContainer.textContent = t("startTestingHint");
   dom.optionsContainer.textContent = "";
-  dom.questionProgress.textContent = "Вопрос 0 из 0";
+  dom.questionProgress.textContent = t("questionProgress", {
+    current: formatNumber(0),
+    total: formatNumber(0),
+  });
   renderQuestionNav();
 }
 
@@ -314,10 +368,13 @@ async function selectTest(testId) {
     state.currentTest = null;
     state.session = null;
     updateProgressHint();
-    dom.questionContainer.textContent = "Сначала загрузите тест через API.";
+    dom.questionContainer.textContent = t("noTestsLoaded");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = "Вопрос 0 из 0";
+    dom.questionProgress.textContent = t("questionProgress", {
+      current: formatNumber(0),
+      total: formatNumber(0),
+    });
     renderQuestionNav();
     renderResultSummary(null);
     renderTestCardsWithHandlers(state.testsCache, null);
@@ -330,11 +387,13 @@ async function selectTest(testId) {
   updateProgressHint();
   if (!isSameTest) {
     state.session = null;
-    dom.questionContainer.textContent =
-      "Нажмите «Начать тестирование», чтобы применить настройки.";
+    dom.questionContainer.textContent = t("startTestingHint");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = "Вопрос 0 из 0";
+    dom.questionProgress.textContent = t("questionProgress", {
+      current: formatNumber(0),
+      total: formatNumber(0),
+    });
     renderQuestionNav();
     renderResultSummary(loadLastResult(testId));
   }
@@ -390,17 +449,20 @@ function finishTest() {
 
 function startTest() {
   if (!state.currentTest) {
-    dom.questionContainer.textContent = "Сначала выберите тест.";
+    dom.questionContainer.textContent = t("noTestSelected");
     return;
   }
   const settings = getSettings();
   state.session = buildSession(state.currentTest, settings);
   renderResultSummary(null);
   if (!state.session.questions.length) {
-    dom.questionContainer.textContent = "Нет вопросов для тестирования.";
+    dom.questionContainer.textContent = t("noQuestionsForTesting");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = "Вопрос 0 из 0";
+    dom.questionProgress.textContent = t("questionProgress", {
+      current: formatNumber(0),
+      total: formatNumber(0),
+    });
     return;
   }
   renderQuestion();
@@ -447,7 +509,7 @@ function initializeManagementScreenEvents() {
     validate: isSupportedImageFile,
     onInvalid: () => {
       setEditorObjectStatus(
-        "Поддерживаются только изображения (png, jpg, wmf, emf).",
+        t("objectImageInvalid"),
         true
       );
     },
@@ -455,7 +517,7 @@ function initializeManagementScreenEvents() {
   setupDropzone(dom.editorObjectFormulaDropzone, dom.editorObjectFormulaFile, {
     validate: isXmlFile,
     onInvalid: () => {
-      setEditorObjectStatus("Поддерживаются только .xml файлы.", true);
+      setEditorObjectStatus(t("objectXmlInvalid"), true);
     },
   });
 
@@ -492,7 +554,7 @@ function initializeManagementScreenEvents() {
       return;
     }
     const newTitle = window.prompt(
-      "Введите новое название теста:",
+      t("promptRenameTest"),
       state.currentTest.title
     );
     if (!newTitle || newTitle.trim() === state.currentTest.title) {
@@ -513,7 +575,7 @@ function initializeManagementScreenEvents() {
     if (!state.currentTest) {
       return;
     }
-    const confirmed = window.confirm("Удалить тест и все связанные данные?");
+    const confirmed = window.confirm(t("confirmDeleteTest"));
     if (!confirmed) {
       return;
     }
@@ -575,7 +637,7 @@ function initializeManagementScreenEvents() {
     clearEditorValidation();
     const questionRaw = dom.editorQuestionText.value ?? "";
     if (!questionRaw.trim()) {
-      alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+      alert(t("alertFillQuestion"));
       return;
     }
     const inlineRegistry = buildInlineRegistry(
@@ -586,24 +648,26 @@ function initializeManagementScreenEvents() {
     if (questionParse.missing.length && questionField) {
       setFieldError(
         questionField,
-        `Не найдены объекты: ${formatMissingMarkers(questionParse.missing)}`
+        t("missingObjects", {
+          objects: formatMissingMarkers(questionParse.missing),
+        })
       );
     }
 
     const optionPayloads = collectEditorOptionPayloads(inlineRegistry);
     if (!optionPayloads.payloads.length) {
-      alert("Заполните текст вопроса и хотя бы один вариант ответа.");
+      alert(t("alertFillQuestion"));
       return;
     }
     optionPayloads.missingByOption.forEach(({ element, missing }) => {
       setFieldError(
         element,
-        `Не найдены объекты: ${formatMissingMarkers(missing)}`
+        t("missingObjects", { objects: formatMissingMarkers(missing) })
       );
     });
 
     if (questionParse.missing.length || optionPayloads.missingByOption.length) {
-      alert("Проверьте идентификаторы объектов в отмеченных полях.");
+      alert(t("alertCheckObjects"));
       return;
     }
 
@@ -655,13 +719,13 @@ function initializeManagementScreenEvents() {
   dom.uploadForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!dom.uploadFileInput.files?.length) {
-      dom.questionContainer.textContent = "Сначала выберите файл для импорта.";
-      renderUploadLogs("Сначала выберите файл для импорта.", true);
+      dom.questionContainer.textContent = t("importSelectFileFirst");
+      renderUploadLogs(t("importSelectFileFirst"), true);
       return;
     }
     if (isLegacyDocFile(dom.uploadFileInput.files[0].name)) {
-      dom.questionContainer.textContent = DOCX_ONLY_WARNING;
-      renderUploadLogs(DOCX_ONLY_WARNING, true);
+      dom.questionContainer.textContent = t("docxOnlyWarning");
+      renderUploadLogs(t("docxOnlyWarning"), true);
       return;
     }
 
@@ -680,7 +744,7 @@ function initializeManagementScreenEvents() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        const detail = payload?.detail || "Не удалось импортировать тест";
+        const detail = payload?.detail || t("importFailed");
         throw new Error(detail);
       }
       const uploadResult = payload ?? {};
@@ -709,10 +773,10 @@ function initializeManagementScreenEvents() {
     }
     const title = dom.createTestTitleInput.value.trim();
     if (!title) {
-      setCreateTestStatus("Введите название коллекции.", true);
+      setCreateTestStatus(t("createTestTitleMissing"), true);
       return;
     }
-    setCreateTestStatus("Создаём коллекцию...");
+    setCreateTestStatus(t("createTestCreating"));
     try {
       const payload = await createEmptyTest(title);
       const newTestId = payload?.metadata?.id || payload?.payload?.id;
@@ -763,10 +827,16 @@ function initializeTestingScreenEvents() {
 }
 
 async function initialize() {
+  const storedLocale = localStorage.getItem(LOCALE_STORAGE_KEY) || defaultLocale;
+  applyLocale(storedLocale);
   setupThemeToggle();
   initializeManagementScreenEvents();
   initializeTestingScreenEvents();
   renderManagementScreen();
+
+  dom.langSelect?.addEventListener("change", (event) => {
+    applyLocale(event.target.value);
+  });
 
   try {
     const tests = await fetchTests();

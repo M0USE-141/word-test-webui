@@ -22,6 +22,49 @@
   gap: 0.75rem;
 }
 
+.language-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.language-select label {
+  font-weight: 600;
+}
+
+.language-select select {
+  appearance: none;
+  border-radius: 10px;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-weight: 600;
+  min-width: 140px;
+}
+
+.language-select select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.language-select select:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+:root[data-theme="dark"] .language-select select {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+:root[data-theme="dark"] .language-select select option {
+  color: #e2e8f0;
+  background: #1f2937;
+}
+
 .theme-toggle {
   display: flex;
   align-items: center;

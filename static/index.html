@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Word Test Extractor — Web UI</title>
+    <title data-i18n="pageTitle">Word Test Extractor — Web UI</title>
     <link rel="stylesheet" href="/static/css/base.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
@@ -19,13 +19,23 @@
     <header class="app-header">
       <div class="app-header__content">
         <div>
-          <h1>Web-интерфейс тестирования</h1>
+          <h1 data-i18n="headerTitle">Web-интерфейс тестирования</h1>
           <p>
-            Импортируйте тест, настройте параметры и проходите вопросы прямо в
-            браузере.
+            <span data-i18n="headerSubtitle">
+              Импортируйте тест, настройте параметры и проходите вопросы прямо в
+              браузере.
+            </span>
           </p>
         </div>
         <div class="app-header__controls">
+          <div class="language-select">
+            <label for="lang-select" data-i18n="languageLabel">Язык</label>
+            <select id="lang-select">
+              <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
+              <option value="en" data-i18n="languageEn">🇬🇧 English</option>
+              <option value="uz" data-i18n="languageUz">🇺🇿 O‘zbek</option>
+            </select>
+          </div>
           <label class="theme-toggle" for="theme-toggle">
             <span class="theme-toggle__label">🌞 / 🌙</span>
             <input
@@ -34,6 +44,7 @@
               type="checkbox"
               role="switch"
               aria-label="Переключить тёмную тему"
+              data-i18n-aria-label="themeToggleLabel"
             />
             <span class="theme-toggle__slider" aria-hidden="true"></span>
           </label>
@@ -45,18 +56,20 @@
       <section id="screen-management" class="app-screen is-active">
         <section class="panel panel--management">
           <div class="card card--collections">
-            <h2>Коллекции тестов</h2>
+            <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
             <div class="controls">
               <div id="test-cards" class="test-collections">
                 <button type="button" class="test-card test-card--new">
-                  <strong>Новая коллекция</strong>
+                  <strong data-i18n="newCollectionTitle">Новая коллекция</strong>
                   <span class="muted"
+                    data-i18n="newCollectionHint"
                     >Создайте пустой тест и заполните его вручную.</span
                   >
                 </button>
                 <button type="button" class="test-card test-card--import">
-                  <strong>Импорт теста</strong>
+                  <strong data-i18n="importTestTitle">Импорт теста</strong>
                   <span class="muted"
+                    data-i18n="importTestHint"
                     >Добавьте новую коллекцию из Word-файла.</span
                   >
                 </button>
@@ -69,11 +82,13 @@
       <section id="screen-testing" class="app-screen is-hidden">
         <section class="panel panel--controls">
           <div class="card">
-            <h2>Настройки теста</h2>
+            <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
             <div class="settings-grid">
               <div class="settings-item">
                 <label for="setting-question-count">
-                  Количество вопросов (0 = все)
+                  <span data-i18n="questionCountLabel">
+                    Количество вопросов (0 = все)
+                  </span>
                 </label>
                 <input
                   type="number"
@@ -84,7 +99,9 @@
               </div>
 
               <div class="settings-item">
-                <label for="setting-max-options">Макс. вариантов ответа</label>
+                <label for="setting-max-options">
+                  <span data-i18n="maxOptionsLabel">Макс. вариантов ответа</span>
+                </label>
                 <input
                   type="number"
                   id="setting-max-options"
@@ -98,39 +115,54 @@
                 for="setting-random-questions"
               >
                 <input type="checkbox" id="setting-random-questions" />
-                <span>Случайный порядок вопросов</span>
+                <span data-i18n="randomQuestionsLabel">
+                  Случайный порядок вопросов
+                </span>
               </label>
               <label
                 class="checkbox-row settings-item settings-item--checkbox"
                 for="setting-random-options"
               >
                 <input type="checkbox" id="setting-random-options" />
-                <span>Случайный порядок вариантов ответов</span>
+                <span data-i18n="randomOptionsLabel">
+                  Случайный порядок вариантов ответов
+                </span>
               </label>
               <label
                 class="checkbox-row settings-item settings-item--checkbox"
                 for="setting-only-unanswered"
               >
                 <input type="checkbox" id="setting-only-unanswered" />
-                <span>Только нерешённые вопросы</span>
+                <span data-i18n="onlyUnansweredLabel">
+                  Только нерешённые вопросы
+                </span>
               </label>
               <label
                 class="checkbox-row settings-item settings-item--checkbox"
                 for="setting-show-answers"
               >
                 <input type="checkbox" id="setting-show-answers" checked />
-                <span>Показывать правильный ответ сразу</span>
+                <span data-i18n="showAnswersLabel">
+                  Показывать правильный ответ сразу
+                </span>
               </label>
             </div>
-            <button id="start-test" class="primary" type="button">
+            <button
+              id="start-test"
+              class="primary"
+              type="button"
+              data-i18n="startTestButton"
+            >
               Начать тестирование
             </button>
             <p class="hint" id="progress-hint"></p>
           </div>
 
           <div class="card">
-            <h2>Результаты</h2>
-            <p id="result-summary">Ещё нет завершённых попыток.</p>
+            <h2 data-i18n="resultsTitle">Результаты</h2>
+            <p id="result-summary" data-i18n="noCompletedAttempts">
+              Ещё нет завершённых попыток.
+            </p>
             <ul id="result-details" class="result-details"></ul>
           </div>
         </section>
@@ -138,17 +170,23 @@
         <section class="panel panel--test">
           <div class="card question-header">
             <div>
-              <h2 id="question-progress">Вопрос 0 из 0</h2>
+              <h2 id="question-progress" data-i18n="questionProgressZero">
+                Вопрос 0 из 0
+              </h2>
               <p id="question-status" class="muted"></p>
             </div>
             <div class="question-actions">
               <button id="exit-test" type="button" class="ghost">
-                Выйти
+                <span data-i18n="exitButton">Выйти</span>
               </button>
-              <button id="prev-question" type="button">Назад</button>
-              <button id="next-question" type="button">Дальше</button>
+              <button id="prev-question" type="button" data-i18n="prevButton">
+                Назад
+              </button>
+              <button id="next-question" type="button" data-i18n="nextButton">
+                Дальше
+              </button>
               <button id="finish-test" type="button" class="danger">
-                Завершить тест
+                <span data-i18n="finishTestButton">Завершить тест</span>
               </button>
             </div>
           </div>
@@ -157,7 +195,7 @@
           <div id="options-container" class="card is-hidden"></div>
 
           <div class="card">
-            <h3>Навигация по вопросам</h3>
+            <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
             <div id="question-nav" class="question-nav"></div>
           </div>
         </section>
@@ -168,19 +206,34 @@
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <h2>Редактор вопросов</h2>
-            <p class="muted" id="editor-status">
+            <h2 data-i18n="editorTitle">Редактор вопросов</h2>
+            <p class="muted" id="editor-status" data-i18n="editorSubtitle">
               Выберите вопрос из списка или создайте новый.
             </p>
           </div>
           <div class="modal-actions">
-            <button id="editor-rename-test" type="button" class="secondary">
+            <button
+              id="editor-rename-test"
+              type="button"
+              class="secondary"
+              data-i18n="renameTestButton"
+            >
               Переименовать тест
             </button>
-            <button id="editor-delete-test" type="button" class="danger">
+            <button
+              id="editor-delete-test"
+              type="button"
+              class="danger"
+              data-i18n="deleteTestButton"
+            >
               Удалить тест
             </button>
-            <button id="close-editor" type="button" class="ghost">
+            <button
+              id="close-editor"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
               Закрыть
             </button>
           </div>
@@ -188,31 +241,42 @@
 
         <div class="modal-grid">
           <div class="modal-panel editor-column editor-column--list">
-            <h3>Список вопросов</h3>
+            <h3 data-i18n="editorQuestionListTitle">Список вопросов</h3>
             <div id="editor-question-list" class="editor-list"></div>
           </div>
 
           <div class="modal-panel editor-column editor-column--form">
             <div id="editor-panel" class="editor-panel editor-panel--form">
-              <h3 id="editor-form-title">Новый вопрос</h3>
+              <h3 id="editor-form-title" data-i18n="editorFormTitleNew">
+                Новый вопрос
+              </h3>
               <form id="editor-form" class="editor-form">
                 <label class="editor-field">
-                  <span>Текст вопроса</span>
+                  <span data-i18n="editorQuestionTextLabel">Текст вопроса</span>
                   <textarea id="editor-question-text" rows="4"></textarea>
                   <p class="hint">
-                    Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                    <span data-i18n="editorInlineHint">
+                      Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                    </span>
                   </p>
                 </label>
 
                 <div class="editor-options">
                   <div class="editor-options-header">
-                    <h4>Варианты ответов</h4>
-                    <button id="add-option" type="button" class="ghost">
+                    <h4 data-i18n="editorOptionsTitle">Варианты ответов</h4>
+                    <button
+                      id="add-option"
+                      type="button"
+                      class="ghost"
+                      data-i18n="editorAddOptionButton"
+                    >
                       Добавить вариант
                     </button>
                   </div>
                   <p class="hint">
-                    Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                    <span data-i18n="editorInlineHint">
+                      Вставляйте объекты через {{image:ID}} и {{formula:ID}}
+                    </span>
                   </p>
                   <div
                     id="editor-options-list"
@@ -221,18 +285,23 @@
                 </div>
 
                 <div class="editor-actions">
-                  <button id="save-question" type="submit">
+                  <button id="save-question" type="submit" data-i18n="editorSaveButton">
                     Сохранить
                   </button>
-                  <button id="reset-editor" type="button" class="ghost">
+                  <button
+                    id="reset-editor"
+                    type="button"
+                    class="ghost"
+                    data-i18n="editorResetButton"
+                  >
                     Очистить форму
                   </button>
                 </div>
               </form>
 
               <div class="editor-objects-panel">
-                <h4>Объекты вопроса</h4>
-                <p class="muted">
+                <h4 data-i18n="editorObjectsTitle">Объекты вопроса</h4>
+                <p class="muted" data-i18n="editorObjectsHint">
                   Изображения и формулы в тексте вопроса или вариантов ответов.
                 </p>
                 <div class="editor-object-toggles">
@@ -240,6 +309,7 @@
                     id="toggle-editor-objects"
                     type="button"
                     class="editor-object-toggle"
+                    data-i18n="editorObjectsToggleShow"
                   >
                     Показать объекты
                   </button>
@@ -247,6 +317,7 @@
                     id="toggle-editor-object-upload"
                     type="button"
                     class="editor-object-toggle"
+                    data-i18n="editorObjectUploadToggleShow"
                   >
                     Добавить объект
                   </button>
@@ -256,37 +327,59 @@
                   class="editor-object-section editor-object-upload is-hidden"
                 >
                   <div class="editor-object-upload__header">
-                    <strong>Добавить объект</strong>
-                    <p class="muted">
+                    <strong data-i18n="editorObjectUploadTitle">
+                      Добавить объект
+                    </strong>
+                    <p class="muted" data-i18n="editorObjectUploadHint">
                       Сначала загрузите объект, затем используйте его ID в
                       тексте.
                     </p>
                   </div>
                   <label class="editor-field">
-                    <span>Тип объекта</span>
+                    <span data-i18n="editorObjectTypeLabel">Тип объекта</span>
                     <select id="editor-object-type">
-                      <option value="image">Изображение</option>
-                      <option value="formula">Формула (XML)</option>
+                      <option value="image" data-i18n="editorObjectTypeImage">
+                        Изображение
+                      </option>
+                      <option
+                        value="formula"
+                        data-i18n="editorObjectTypeFormula"
+                      >
+                        Формула (XML)
+                      </option>
                     </select>
                   </label>
                   <label class="editor-field">
-                    <span>ID объекта</span>
-                    <input id="editor-object-id" type="text" placeholder="Например, img-1" />
+                    <span data-i18n="editorObjectIdLabel">ID объекта</span>
+                    <input
+                      id="editor-object-id"
+                      type="text"
+                      placeholder="Например, img-1"
+                      data-i18n-placeholder="editorObjectIdPlaceholder"
+                    />
                   </label>
                   <div id="editor-object-image-fields" class="editor-field">
-                    <span>Файл изображения (png, jpg, wmf, emf)</span>
+                    <span data-i18n="editorObjectImageFileLabel">
+                      Файл изображения (png, jpg, wmf, emf)
+                    </span>
                     <label
                       class="editor-object-dropzone"
                       for="editor-object-image-file"
                     >
                       <span class="editor-object-dropzone__title">
-                        Перетащите файл изображения сюда
+                        <span data-i18n="editorObjectImageDropTitle">
+                          Перетащите файл изображения сюда
+                        </span>
                       </span>
                       <span class="editor-object-dropzone__hint">
-                        или выберите на устройстве
+                        <span data-i18n="editorObjectDropHint">
+                          или выберите на устройстве
+                        </span>
                       </span>
                       <span class="editor-object-dropzone__action">
-                        Выбрать файл
+                        <span data-i18n="editorObjectDropAction">
+                          Выбрать файл
+                        </span>
                       </span>
                     </label>
                     <input
@@ -296,21 +389,34 @@
                     />
                   </div>
                   <div id="editor-object-formula-fields" class="editor-field is-hidden">
-                    <span>XML формулы</span>
-                    <textarea id="editor-object-formula-text" rows="4" placeholder="<math>...</math>"></textarea>
-                    <span class="muted">или импортируйте XML файл</span>
+                    <span data-i18n="editorObjectFormulaLabel">XML формулы</span>
+                    <textarea
+                      id="editor-object-formula-text"
+                      rows="4"
+                      placeholder="<math>...</math>"
+                      data-i18n-placeholder="editorObjectFormulaPlaceholder"
+                    ></textarea>
+                    <span class="muted" data-i18n="editorObjectFormulaFileHint">
+                      или импортируйте XML файл
+                    </span>
                     <label
                       class="editor-object-dropzone"
                       for="editor-object-formula-file"
                     >
                       <span class="editor-object-dropzone__title">
-                        Перетащите XML файл сюда
+                        <span data-i18n="editorObjectFormulaDropTitle">
+                          Перетащите XML файл сюда
+                        </span>
                       </span>
                       <span class="editor-object-dropzone__hint">
-                        или выберите на устройстве
+                        <span data-i18n="editorObjectDropHint">
+                          или выберите на устройстве
+                        </span>
                       </span>
                       <span class="editor-object-dropzone__action">
-                        Выбрать файл
+                        <span data-i18n="editorObjectDropAction">
+                          Выбрать файл
+                        </span>
                       </span>
                     </label>
                     <input
@@ -320,7 +426,12 @@
                       class="editor-object-input"
                     />
                   </div>
-                  <button id="editor-add-object" type="button" class="secondary">
+                  <button
+                    id="editor-add-object"
+                    type="button"
+                    class="secondary"
+                    data-i18n="editorAddObjectButton"
+                  >
                     Добавить объект
                   </button>
                   <p id="editor-object-status" class="muted"></p>
@@ -330,7 +441,9 @@
                   class="editor-object-section is-hidden"
                 >
                   <div id="editor-objects" class="object-list">
-                    <p class="muted">Выберите вопрос, чтобы увидеть объекты.</p>
+                    <p class="muted" data-i18n="editorObjectSelectQuestion">
+                      Выберите вопрос, чтобы увидеть объекты.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -344,11 +457,18 @@
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <h2>Импорт тестов</h2>
-            <p class="muted">Загрузите Word-файл и получите новую коллекцию.</p>
+            <h2 data-i18n="importTitle">Импорт тестов</h2>
+            <p class="muted" data-i18n="importSubtitle">
+              Загрузите Word-файл и получите новую коллекцию.
+            </p>
           </div>
           <div class="modal-actions">
-            <button id="close-import" type="button" class="ghost">
+            <button
+              id="close-import"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
               Закрыть
             </button>
           </div>
@@ -358,17 +478,29 @@
             <div class="upload-dropzone__area">
               <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
               <div class="upload-dropzone__content">
-                <p>Перетащите Word-файл сюда</p>
-                <p class="muted">или выберите вручную на устройстве</p>
+                <p data-i18n="uploadDropTitle">Перетащите Word-файл сюда</p>
+                <p class="muted" data-i18n="uploadDropHint">
+                  или выберите вручную на устройстве
+                </p>
               </div>
             </div>
             <div id="upload-file-name" class="upload-file-name is-empty">
-              <span class="upload-file-name__label">Выбранный файл</span>
-              <span class="upload-file-name__value">Файл не выбран</span>
+              <span
+                class="upload-file-name__label"
+                data-i18n="uploadSelectedFileLabel"
+              >
+                Выбранный файл
+              </span>
+              <span
+                class="upload-file-name__value"
+                data-i18n="uploadNoFileSelected"
+              >
+                Файл не выбран
+              </span>
             </div>
             <div class="upload-dropzone__actions">
               <label class="upload-select-button" for="upload-file">
-                Выбрать файл
+                <span data-i18n="uploadSelectFileButton">Выбрать файл</span>
               </label>
               <button
                 id="upload-clear-file"
@@ -376,9 +508,11 @@
                 class="upload-clear-button"
                 disabled
               >
-                Очистить
+                <span data-i18n="uploadClearButton">Очистить</span>
               </button>
-              <span class="upload-hint">Только .docx</span>
+              <span class="upload-hint" data-i18n="uploadDocxHint">
+                Только .docx
+              </span>
             </div>
             <input
               type="file"
@@ -390,18 +524,24 @@
           </div>
           <div class="upload-actions">
             <label class="upload-field" for="upload-symbol">
-              <span>Маркер правильного ответа</span>
+              <span data-i18n="uploadSymbolLabel">
+                Маркер правильного ответа
+              </span>
               <input type="text" id="upload-symbol" name="symbol" />
             </label>
             <label class="upload-checkbox" for="upload-log-small-tables">
               <input type="checkbox" id="upload-log-small-tables" />
-              <span>Логировать таблицы &lt; 3 строк</span>
+              <span data-i18n="uploadLogSmallTables">
+                Логировать таблицы &lt; 3 строк
+              </span>
             </label>
-            <button type="submit">Импортировать</button>
+            <button type="submit" data-i18n="importSubmitButton">
+              Импортировать
+            </button>
           </div>
         </form>
         <div class="upload-logs-panel">
-          <h3>Логи импорта</h3>
+          <h3 data-i18n="importLogsTitle">Логи импорта</h3>
           <ul id="upload-logs" class="upload-logs"></ul>
         </div>
       </div>
@@ -411,28 +551,43 @@
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <h2>Новая коллекция</h2>
-            <p class="muted">Задайте название и начните создавать вопросы.</p>
+            <h2 data-i18n="createTestTitle">Новая коллекция</h2>
+            <p class="muted" data-i18n="createTestSubtitle">
+              Задайте название и начните создавать вопросы.
+            </p>
           </div>
           <div class="modal-actions">
-            <button id="close-create-test" type="button" class="ghost">
+            <button
+              id="close-create-test"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
               Закрыть
             </button>
           </div>
         </div>
         <form id="create-test-form" class="create-test-form">
           <label class="upload-field" for="create-test-title">
-            <span>Название коллекции</span>
+            <span data-i18n="collectionNameLabel">Название коллекции</span>
             <input
               type="text"
               id="create-test-title"
               placeholder="Например, Алгебра — базовый уровень"
+              data-i18n-placeholder="collectionNamePlaceholder"
               required
             />
           </label>
           <div class="create-test-actions">
-            <button type="submit">Создать коллекцию</button>
-            <button id="cancel-create-test" type="button" class="secondary">
+            <button type="submit" data-i18n="createCollectionButton">
+              Создать коллекцию
+            </button>
+            <button
+              id="cancel-create-test"
+              type="button"
+              class="secondary"
+              data-i18n="cancelButton"
+            >
               Отмена
             </button>
           </div>

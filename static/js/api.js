@@ -1,4 +1,5 @@
 import { readTestsCache, state, writeTestsCache } from "./state.js";
+import { t } from "./i18n.js";
 
 export async function fetchTests({ force = false } = {}) {
   if (!force) {
@@ -14,7 +15,7 @@ export async function fetchTests({ force = false } = {}) {
 
   const response = await fetch("/api/tests");
   if (!response.ok) {
-    throw new Error("Не удалось загрузить список тестов");
+    throw new Error(t("errorFetchTests"));
   }
   const data = await response.json();
   writeTestsCache(data);
@@ -24,7 +25,7 @@ export async function fetchTests({ force = false } = {}) {
 export async function fetchTest(testId) {
   const response = await fetch(`/api/tests/${testId}`);
   if (!response.ok) {
-    throw new Error("Не удалось загрузить тест");
+    throw new Error(t("errorFetchTest"));
   }
   return response.json();
 }
@@ -39,7 +40,7 @@ export async function updateQuestion(testId, questionId, payload) {
   );
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "Не удалось обновить вопрос");
+    throw new Error(data.detail || t("errorUpdateQuestion"));
   }
   return response.json();
 }
@@ -52,7 +53,7 @@ export async function addQuestion(testId, payload) {
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "Не удалось добавить вопрос");
+    throw new Error(data.detail || t("errorAddQuestion"));
   }
   return response.json();
 }
@@ -66,7 +67,7 @@ export async function deleteQuestion(testId, questionId) {
   );
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "Не удалось удалить вопрос");
+    throw new Error(data.detail || t("errorDeleteQuestion"));
   }
 }
 
@@ -80,7 +81,7 @@ export async function renameTest(testId, title) {
   );
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload?.detail || "Не удалось переименовать тест";
+    const detail = payload?.detail || t("errorRenameTest");
     throw new Error(detail);
   }
   const tests = await fetchTests();
@@ -96,7 +97,7 @@ export async function createEmptyTest(title) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload?.detail || "Не удалось создать коллекцию";
+    const detail = payload?.detail || t("errorCreateCollection");
     throw new Error(detail);
   }
   return payload;
@@ -110,7 +111,7 @@ export async function deleteTest(testId) {
   );
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload?.detail || "Не удалось удалить тест";
+    const detail = payload?.detail || t("errorDeleteTest");
     throw new Error(detail);
   }
   return payload;
@@ -125,7 +126,7 @@ export async function uploadObjectAsset(testId, file) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload?.detail || "Не удалось загрузить объект";
+    const detail = payload?.detail || t("errorUploadObject");
     throw new Error(detail);
   }
   return payload;
