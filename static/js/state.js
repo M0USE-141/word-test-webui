@@ -110,6 +110,8 @@ export const SUPPORTED_IMAGE_EXTENSIONS = [
 export const INLINE_MARKER_REGEX = /{{\s*(image|formula)\s*:\s*([^}]+)\s*}}/g;
 
 const TESTS_CACHE_KEY = "tests-cache";
+const TESTS_CACHE_VERSION = "v1";
+const TESTS_CACHE_TTL_MS = 10 * 60 * 1000;
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
 
 export const state = {
@@ -137,8 +139,25 @@ export function readTestsCache() {
     return [];
   }
   try {
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    const payload = JSON.parse(raw);
+    if (payload?.version !== TESTS_CACHE_VERSION) {
+      localStorage.removeItem(TESTS_CACHE_KEY);
+      return [];
+    }
+    if (typeof payload?.savedAt !== "number") {
+      localStorage.removeItem(TESTS_CACHE_KEY);
+      return [];
+    }
+    const age = Date.now() - payload.savedAt;
+    if (age < 0 || age > TESTS_CACHE_TTL_MS) {
+      localStorage.removeItem(TESTS_CACHE_KEY);
+      return [];
+    }
+    if (!Array.isArray(payload?.data)) {
+      localStorage.removeItem(TESTS_CACHE_KEY);
+      return [];
+    }
+    return payload.data;
   } catch (error) {
     return [];
   }
@@ -146,7 +165,12 @@ export function readTestsCache() {
 
 export function writeTestsCache(tests) {
   state.testsCache = tests;
-  localStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(tests));
+  const payload = {
+    version: TESTS_CACHE_VERSION,
+    savedAt: Date.now(),
+    data: tests,
+  };
+  localStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(payload));
 }
 
 export function clearTestsCache() {
