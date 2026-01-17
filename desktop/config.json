@@ -1,0 +1,6 @@
+{
+  "port": 8000,
+  "allowLan": false,
+  "lanToken": "",
+  "dataDir": "data/tests"
+}
