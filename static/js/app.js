@@ -45,6 +45,7 @@ import {
 import { defaultLocale, formatNumber, setLocale, t } from "./i18n.js";
 import {
   clearLastResult,
+  clearTestsCache,
   dom,
   editorMobileQuery,
   getSettings,
@@ -563,6 +564,8 @@ function initializeManagementScreenEvents() {
     try {
       await renameTestApi(state.currentTest.id, newTitle.trim());
       state.currentTest = await fetchTest(state.currentTest.id);
+      clearTestsCache();
+      state.testsCache = await fetchTests({ force: true });
       renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
       updateProgressHint();
       updateEditorTestActions();
@@ -583,7 +586,8 @@ function initializeManagementScreenEvents() {
       await deleteTestApi(state.currentTest.id);
       localStorage.removeItem(`test-progress:${state.currentTest.id}`);
       clearLastResult(state.currentTest.id);
-      state.testsCache = await fetchTests();
+      clearTestsCache();
+      state.testsCache = await fetchTests({ force: true });
       const nextId = state.testsCache[0]?.id || null;
       renderTestCardsWithHandlers(state.testsCache, nextId);
       await selectTest(nextId);
