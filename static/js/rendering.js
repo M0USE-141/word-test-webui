@@ -708,6 +708,8 @@ export function renderTestCards(
 
 let statsAttemptsChart = null;
 let statsTimeChart = null;
+let statsFatigueChart = null;
+let statsSkippedChart = null;
 
 function formatDuration(ms) {
   if (!Number.isFinite(ms)) {
@@ -819,7 +821,14 @@ function getAttemptTitle(attempt, index) {
   return t("statsAttemptTitle", { index: formatNumber(index + 1) });
 }
 
-function buildChartConfig({ labels, data, label, color, fillColor }) {
+function buildLineChartConfig({
+  labels,
+  data,
+  label,
+  color,
+  fillColor,
+  fill = true,
+}) {
   return {
     type: "line",
     data: {
@@ -832,7 +841,7 @@ function buildChartConfig({ labels, data, label, color, fillColor }) {
           backgroundColor: fillColor,
           borderWidth: 2,
           tension: 0.3,
-          fill: true,
+          fill,
           pointRadius: 3,
         },
       ],
@@ -877,6 +886,82 @@ function buildChartConfig({ labels, data, label, color, fillColor }) {
       },
     },
   };
+}
+
+function buildBarChartConfig({ labels, data, label, color }) {
+  return {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label,
+          data,
+          backgroundColor: color,
+          borderRadius: 6,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--muted"
+            ),
+          },
+          grid: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--border"
+            ),
+          },
+        },
+        x: {
+          ticks: {
+            color: getComputedStyle(document.documentElement).getPropertyValue(
+              "--muted"
+            ),
+          },
+          grid: {
+            display: false,
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${label}: ${context.parsed.y}`,
+          },
+        },
+      },
+    },
+  };
+}
+
+function toggleChartEmpty(element, hasData) {
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("is-hidden", hasData);
+}
+
+function isValidNumber(value) {
+  return Number.isFinite(value);
+}
+
+function getAttemptDateValue(attempt) {
+  const dateValue = attempt?.finalizedAt || attempt?.createdAt;
+  if (!dateValue) {
+    return null;
+  }
+  const timestamp = Date.parse(dateValue);
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function renderStatsAttemptList(attempts, selectedAttemptId, tests) {
@@ -1077,13 +1162,42 @@ function renderStatsQuestionStream(selectedAttempt) {
   });
 }
 
-function renderStatsCharts(selectedAttempt) {
-  if (!dom.statsChartAttempts || !dom.statsChartTime) {
+function renderStatsCharts({ attempts, selectedAttempt }) {
+  if (
+    !dom.statsChartAttempts ||
+    !dom.statsChartTime ||
+    !dom.statsChartFatigue ||
+    !dom.statsChartSkipped
+  ) {
     return;
   }
   if (!window.Chart) {
     return;
   }
+
+  const sortedAttempts = [...attempts].sort((a, b) => {
+    const aDate = getAttemptDateValue(a) ?? 0;
+    const bDate = getAttemptDateValue(b) ?? 0;
+    return aDate - bDate;
+  });
+  const attemptLabels = sortedAttempts.map((attempt, index) =>
+    getAttemptLabel(attempt, index)
+  );
+  const attemptAccuracyValues = sortedAttempts.map((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const percent =
+      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+      (() => {
+        const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+        const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+          return (score / total) * 100;
+        }
+        return null;
+      })();
+    return Number.isFinite(percent) ? Number(percent.toFixed(1)) : null;
+  });
+  const hasAttemptAccuracy = attemptAccuracyValues.some(isValidNumber);
 
   const summary = selectedAttempt?.summary ?? selectedAttempt?.aggregates ?? {};
   const accuracyByIndex = Array.isArray(summary.accuracyByIndex)
@@ -1094,8 +1208,15 @@ function renderStatsCharts(selectedAttempt) {
     : Array.isArray(summary.timeByIndex)
       ? summary.timeByIndex
     : [];
-  const maxLen = Math.max(accuracyByIndex.length, timeByIndex.length);
-  const labels = Array.from({ length: maxLen }, (_, index) =>
+  const perQuestion = Array.isArray(summary.perQuestion)
+    ? summary.perQuestion
+    : [];
+  const maxLen = Math.max(
+    accuracyByIndex.length,
+    timeByIndex.length,
+    perQuestion.length
+  );
+  const questionLabels = Array.from({ length: maxLen }, (_, index) =>
     formatNumber(index + 1)
   );
   const accuracyValues = accuracyByIndex.map((value) =>
@@ -1107,37 +1228,87 @@ function renderStatsCharts(selectedAttempt) {
     }
     return Number((value / 1000).toFixed(1));
   });
+  const skippedValues = Array.from({ length: maxLen }, () => 0);
+  perQuestion.forEach((item, index) => {
+    const targetIndex =
+      item?.index ?? item?.questionIndex ?? (Number.isFinite(index) ? index : 0);
+    if (targetIndex < 0 || targetIndex >= skippedValues.length) {
+      return;
+    }
+    skippedValues[targetIndex] = item?.isSkipped ? 1 : 0;
+  });
+  const hasTimeValues = timeValues.some(isValidNumber);
+  const hasAccuracyValues = accuracyValues.some(isValidNumber);
+  const hasSkippedValues = skippedValues.some(isValidNumber);
 
   const styles = getComputedStyle(document.documentElement);
   const primary = styles.getPropertyValue("--primary").trim();
   const primarySoft = styles.getPropertyValue("--primary-soft").trim();
   const success = styles.getPropertyValue("--success").trim();
   const successSoft = styles.getPropertyValue("--success-soft").trim();
+  const danger = styles.getPropertyValue("--danger").trim();
+  const warning = styles.getPropertyValue("--warning").trim() || danger;
 
   statsAttemptsChart?.destroy();
   statsTimeChart?.destroy();
+  statsFatigueChart?.destroy();
+  statsSkippedChart?.destroy();
 
-  statsAttemptsChart = new window.Chart(
-    dom.statsChartAttempts.getContext("2d"),
-    buildChartConfig({
-      labels,
-      data: accuracyValues,
-      label: t("statsChartAttemptsLegend"),
-      color: primary,
-      fillColor: primarySoft,
-    })
-  );
+  toggleChartEmpty(dom.statsChartAttemptsEmpty, hasAttemptAccuracy);
+  toggleChartEmpty(dom.statsChartTimeEmpty, hasTimeValues);
+  toggleChartEmpty(dom.statsChartFatigueEmpty, hasAccuracyValues);
+  toggleChartEmpty(dom.statsChartSkippedEmpty, hasSkippedValues);
 
-  statsTimeChart = new window.Chart(
-    dom.statsChartTime.getContext("2d"),
-    buildChartConfig({
-      labels,
-      data: timeValues,
-      label: t("statsChartTimeLegend"),
-      color: success,
-      fillColor: successSoft,
-    })
-  );
+  if (hasAttemptAccuracy) {
+    statsAttemptsChart = new window.Chart(
+      dom.statsChartAttempts.getContext("2d"),
+      buildLineChartConfig({
+        labels: attemptLabels,
+        data: attemptAccuracyValues,
+        label: t("statsChartAttemptsLegend"),
+        color: primary,
+        fillColor: primarySoft,
+        fill: false,
+      })
+    );
+  }
+
+  if (hasTimeValues) {
+    statsTimeChart = new window.Chart(
+      dom.statsChartTime.getContext("2d"),
+      buildBarChartConfig({
+        labels: questionLabels,
+        data: timeValues,
+        label: t("statsChartTimeLegend"),
+        color: successSoft || success,
+      })
+    );
+  }
+
+  if (hasAccuracyValues) {
+    statsFatigueChart = new window.Chart(
+      dom.statsChartFatigue.getContext("2d"),
+      buildLineChartConfig({
+        labels: questionLabels,
+        data: accuracyValues,
+        label: t("statsChartFatigueLegend"),
+        color: primary,
+        fillColor: primarySoft,
+      })
+    );
+  }
+
+  if (hasSkippedValues) {
+    statsSkippedChart = new window.Chart(
+      dom.statsChartSkipped.getContext("2d"),
+      buildBarChartConfig({
+        labels: questionLabels,
+        data: skippedValues,
+        label: t("statsChartSkippedLegend"),
+        color: warning,
+      })
+    );
+  }
 }
 
 export function renderStatsView() {
@@ -1164,11 +1335,19 @@ export function renderStatsView() {
   renderStatsKpis({ attempts: filteredAttempts, selectedAttempt });
   renderStatsQuestionStream(selectedAttempt);
   if (selectedAttempt) {
-    renderStatsCharts(selectedAttempt);
+    renderStatsCharts({ attempts: filteredAttempts, selectedAttempt });
   } else {
     statsAttemptsChart?.destroy();
     statsTimeChart?.destroy();
+    statsFatigueChart?.destroy();
+    statsSkippedChart?.destroy();
     statsAttemptsChart = null;
     statsTimeChart = null;
+    statsFatigueChart = null;
+    statsSkippedChart = null;
+    toggleChartEmpty(dom.statsChartAttemptsEmpty, false);
+    toggleChartEmpty(dom.statsChartTimeEmpty, false);
+    toggleChartEmpty(dom.statsChartFatigueEmpty, false);
+    toggleChartEmpty(dom.statsChartSkippedEmpty, false);
   }
 }

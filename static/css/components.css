@@ -634,6 +634,29 @@ button.danger:hover {
   height: 100%;
 }
 
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8),
+    rgba(255, 255, 255, 0.95)
+  );
+}
+
+body.theme-dark .chart-empty {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.7),
+    rgba(15, 23, 42, 0.9)
+  );
+}
+
 .stats-section-header {
   display: flex;
   flex-direction: column;

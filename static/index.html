@@ -270,28 +270,84 @@
             <div class="card chart-card">
               <div class="chart-header">
                 <h3 data-i18n="statsChartAttemptsTitle">
-                  Динамика точности
+                  Динамика точности по попыткам
                 </h3>
                 <p class="muted" data-i18n="statsChartAttemptsSubtitle">
-                  По завершённым попыткам.
+                  Сравнение завершённых попыток.
                 </p>
               </div>
               <div class="chart-area">
                 <canvas id="stats-chart-attempts"></canvas>
+                <div
+                  id="stats-chart-attempts-empty"
+                  class="chart-empty muted is-hidden"
+                  data-i18n="statsChartEmpty"
+                >
+                  Нет данных для графика.
+                </div>
               </div>
             </div>
 
             <div class="card chart-card">
               <div class="chart-header">
                 <h3 data-i18n="statsChartTimeTitle">
-                  Темп прохождения
+                  Время по вопросам
                 </h3>
                 <p class="muted" data-i18n="statsChartTimeSubtitle">
-                  Среднее время на вопрос.
+                  В выбранной попытке.
                 </p>
               </div>
               <div class="chart-area">
                 <canvas id="stats-chart-time"></canvas>
+                <div
+                  id="stats-chart-time-empty"
+                  class="chart-empty muted is-hidden"
+                  data-i18n="statsChartEmpty"
+                >
+                  Нет данных для графика.
+                </div>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3 data-i18n="statsChartFatigueTitle">
+                  Точность по индексу вопроса
+                </h3>
+                <p class="muted" data-i18n="statsChartFatigueSubtitle">
+                  Индикатор усталости в попытке.
+                </p>
+              </div>
+              <div class="chart-area">
+                <canvas id="stats-chart-fatigue"></canvas>
+                <div
+                  id="stats-chart-fatigue-empty"
+                  class="chart-empty muted is-hidden"
+                  data-i18n="statsChartEmpty"
+                >
+                  Нет данных для графика.
+                </div>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <div class="chart-header">
+                <h3 data-i18n="statsChartSkippedTitle">
+                  Пропуски по индексу
+                </h3>
+                <p class="muted" data-i18n="statsChartSkippedSubtitle">
+                  Где чаще пропускали вопросы.
+                </p>
+              </div>
+              <div class="chart-area">
+                <canvas id="stats-chart-skipped"></canvas>
+                <div
+                  id="stats-chart-skipped-empty"
+                  class="chart-empty muted is-hidden"
+                  data-i18n="statsChartEmpty"
+                >
+                  Нет данных для графика.
+                </div>
               </div>
             </div>
           </div>

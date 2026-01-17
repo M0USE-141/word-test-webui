@@ -95,6 +95,14 @@ export const dom = {
   statsKpiGrid: document.getElementById("stats-kpi-grid"),
   statsChartAttempts: document.getElementById("stats-chart-attempts"),
   statsChartTime: document.getElementById("stats-chart-time"),
+  statsChartFatigue: document.getElementById("stats-chart-fatigue"),
+  statsChartSkipped: document.getElementById("stats-chart-skipped"),
+  statsChartAttemptsEmpty: document.getElementById(
+    "stats-chart-attempts-empty"
+  ),
+  statsChartTimeEmpty: document.getElementById("stats-chart-time-empty"),
+  statsChartFatigueEmpty: document.getElementById("stats-chart-fatigue-empty"),
+  statsChartSkippedEmpty: document.getElementById("stats-chart-skipped-empty"),
   statsQuestionStream: document.getElementById("stats-question-stream"),
   statsEmptyState: document.getElementById("stats-empty"),
   statsStartTestButton: document.getElementById("stats-start-test"),
