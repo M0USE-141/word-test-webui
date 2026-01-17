@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -15,9 +16,17 @@ from word_extract import WordTestExtractor
 
 setup_console_logging()
 
-DATA_DIR = Path(os.environ.get("TEST_DATA_DIR", "data/tests"))
+def _resource_path(relative: str) -> Path:
+    if getattr(sys, "frozen", False):
+        base_dir = Path(sys._MEIPASS)
+    else:
+        base_dir = Path(__file__).resolve().parent
+    return base_dir / relative
+
+
+DATA_DIR = Path(os.environ.get("TEST_DATA_DIR", Path.cwd() / "data" / "tests"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-STATIC_DIR = Path("static")
+STATIC_DIR = _resource_path("static")
 
 app = FastAPI(title="Test Extractor API")
 

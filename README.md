@@ -51,6 +51,26 @@ docker run --rm -p 8000:8000 -v "${PWD}/data:/app/data" bsu-test-master
 docker compose up --build
 ```
 
+## Standalone (PyInstaller)
+
+Сборка единого бинарника:
+
+```bash
+python -m pip install pyinstaller
+pyinstaller pyinstaller.spec
+```
+
+Готовый бинарник лежит в `dist/bsu-test-master` (Windows: `dist/bsu-test-master.exe`).
+
+Запуск без установленного Python и без интернета:
+
+```bash
+./dist/bsu-test-master
+```
+
+По умолчанию данные сохраняются рядом с бинарником в `data/tests/`. При необходимости
+задайте путь через переменную окружения `TEST_DATA_DIR`.
+
 ## Ограничения контейнера
 
 В Linux-контейнере недоступен COM-рендер формул через Microsoft Word: используются плейсхолдеры или альтернативный рендер (например, через LibreOffice/MathJax), если он предусмотрен логикой сервиса.
