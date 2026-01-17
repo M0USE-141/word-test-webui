@@ -1,0 +1,4 @@
+node_modules/
+dist/
+resources/server/bsu-test-server
+resources/server/bsu-test-server.exe

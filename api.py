@@ -3,7 +3,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +27,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _get_lan_token() -> str | None:
+    token = os.environ.get("BSU_LAN_TOKEN")
+    if token:
+        return token.strip()
+    return None
+
+
+@app.middleware("http")
+async def enforce_lan_token(request: Request, call_next):
+    token = _get_lan_token()
+    if token:
+        provided = request.query_params.get("token")
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            provided = auth_header.split(" ", 1)[1].strip()
+        if provided != token:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    return await call_next(request)
 
 
 @app.get("/")

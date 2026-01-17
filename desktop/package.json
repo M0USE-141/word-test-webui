@@ -1,0 +1,55 @@
+{
+  "name": "bsu-test-desktop",
+  "version": "0.1.0",
+  "description": "Electron wrapper for BSU Test Master",
+  "main": "main.js",
+  "private": true,
+  "author": "BSU Test Master",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/bsu-test-master.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "build-backend": "pyinstaller --onefile desktop/server_entry.py --name bsu-test-server --distpath desktop/resources/server --hidden-import uvicorn"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.7.3"
+  },
+  "build": {
+    "appId": "com.bsu.testmaster",
+    "productName": "BSU Test Master",
+    "files": [
+      "main.js",
+      "config.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/server",
+        "to": "resources/server"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ]
+  }
+}
