@@ -1071,7 +1071,7 @@ function renderStatsQuestionStream(selectedAttempt) {
   });
 }
 
-function renderStatsCharts(attempts) {
+function renderStatsCharts(selectedAttempt) {
   if (!dom.statsChartAttempts || !dom.statsChartTime) {
     return;
   }
@@ -1079,29 +1079,25 @@ function renderStatsCharts(attempts) {
     return;
   }
 
-  const labels = attempts.map(getAttemptLabel);
-  const accuracyValues = attempts.map((attempt) => {
-    const aggregate = resolveAttemptAggregate(attempt);
-    const value =
-      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
-      (() => {
-        const score = resolveAggregateValue(aggregate, ["score", "correct"]);
-        const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
-        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
-          return (score / total) * 100;
-        }
-        return 0;
-      })();
-    return Number.isFinite(value) ? Number(value.toFixed(1)) : 0;
-  });
-
-  const timeValues = attempts.map((attempt) => {
-    const aggregate = resolveAttemptAggregate(attempt);
-    const avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
-    if (!Number.isFinite(avgTime)) {
+  const summary = selectedAttempt?.summary ?? selectedAttempt?.aggregates ?? {};
+  const accuracyByIndex = Array.isArray(summary.accuracyByIndex)
+    ? summary.accuracyByIndex
+    : [];
+  const timeByIndex = Array.isArray(summary.timeByIndex)
+    ? summary.timeByIndex
+    : [];
+  const maxLen = Math.max(accuracyByIndex.length, timeByIndex.length);
+  const labels = Array.from({ length: maxLen }, (_, index) =>
+    formatNumber(index + 1)
+  );
+  const accuracyValues = accuracyByIndex.map((value) =>
+    Number.isFinite(value) ? Number(value.toFixed(1)) : null
+  );
+  const timeValues = timeByIndex.map((value) => {
+    if (!Number.isFinite(value)) {
       return 0;
     }
-    return Number((avgTime / 1000).toFixed(1));
+    return Number((value / 1000).toFixed(1));
   });
 
   const styles = getComputedStyle(document.documentElement);
@@ -1159,8 +1155,8 @@ export function renderStatsView() {
   );
   renderStatsKpis({ attempts: filteredAttempts, selectedAttempt });
   renderStatsQuestionStream(selectedAttempt);
-  if (filteredAttempts.length) {
-    renderStatsCharts(filteredAttempts);
+  if (selectedAttempt) {
+    renderStatsCharts(selectedAttempt);
   } else {
     statsAttemptsChart?.destroy();
     statsTimeChart?.destroy();
