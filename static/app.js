@@ -30,6 +30,12 @@ const editorRenameTestButton = document.getElementById("editor-rename-test");
 const editorDeleteTestButton = document.getElementById("editor-delete-test");
 const importModal = document.getElementById("import-modal");
 const closeImportButton = document.getElementById("close-import");
+const createTestModal = document.getElementById("create-test-modal");
+const closeCreateTestButton = document.getElementById("close-create-test");
+const cancelCreateTestButton = document.getElementById("cancel-create-test");
+const createTestForm = document.getElementById("create-test-form");
+const createTestTitleInput = document.getElementById("create-test-title");
+const createTestStatus = document.getElementById("create-test-status");
 const editorQuestionList = document.getElementById("editor-question-list");
 const editorForm = document.getElementById("editor-form");
 const editorFormTitle = document.getElementById("editor-form-title");
@@ -91,7 +97,9 @@ const settingShowAnswers = document.getElementById("setting-show-answers");
 const settingMaxOptions = document.getElementById("setting-max-options");
 
 const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
+
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".wmf", ".emf"];
+ main
 
 const testsCacheKey = "tests-cache";
 
@@ -1230,6 +1238,18 @@ function startTest() {
 function renderTestCards(tests, selectedId) {
   clearElement(testCardsContainer);
 
+  const newCard = document.createElement("button");
+  newCard.type = "button";
+  newCard.className = "test-card test-card--new";
+  newCard.innerHTML = `
+    <strong>Новая коллекция</strong>
+    <span class="muted">Создайте пустой тест и заполните его вручную.</span>
+  `;
+  newCard.addEventListener("click", () => {
+    openCreateTestModal();
+  });
+  testCardsContainer.appendChild(newCard);
+
   const importCard = document.createElement("button");
   importCard.type = "button";
   importCard.className = "test-card test-card--import";
@@ -1341,6 +1361,35 @@ function closeImportModal() {
   }
   importModal.classList.remove("is-open");
   importModal.setAttribute("aria-hidden", "true");
+}
+
+function setCreateTestStatus(message = "", isError = false) {
+  if (!createTestStatus) {
+    return;
+  }
+  createTestStatus.textContent = message;
+  createTestStatus.classList.toggle("is-error", isError);
+}
+
+function openCreateTestModal() {
+  if (!createTestModal) {
+    return;
+  }
+  setCreateTestStatus("");
+  if (createTestTitleInput) {
+    createTestTitleInput.value = "";
+    createTestTitleInput.focus();
+  }
+  createTestModal.classList.add("is-open");
+  createTestModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCreateTestModal() {
+  if (!createTestModal) {
+    return;
+  }
+  createTestModal.classList.remove("is-open");
+  createTestModal.setAttribute("aria-hidden", "true");
 }
 
 function renderEditorOptions(options = []) {
@@ -1965,6 +2014,20 @@ async function renameTest(testId, title) {
   }
 }
 
+async function createEmptyTest(title) {
+  const response = await fetch("/api/tests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail || "Не удалось создать коллекцию";
+    throw new Error(detail);
+  }
+  return payload;
+}
+
 async function deleteTest(testId) {
   const response = await fetch(`/api/tests/${testId}`, {
     method: "DELETE",
@@ -2014,9 +2077,23 @@ function initializeManagementScreenEvents() {
     closeImportModal();
   });
 
+  closeCreateTestButton?.addEventListener("click", () => {
+    closeCreateTestModal();
+  });
+
+  cancelCreateTestButton?.addEventListener("click", () => {
+    closeCreateTestModal();
+  });
+
   importModal?.addEventListener("click", (event) => {
     if (event.target === importModal) {
       closeImportModal();
+    }
+  });
+
+  createTestModal?.addEventListener("click", (event) => {
+    if (event.target === createTestModal) {
+      closeCreateTestModal();
     }
   });
 
@@ -2226,6 +2303,31 @@ function initializeManagementScreenEvents() {
     } catch (error) {
       questionContainer.textContent = error.message;
       renderUploadLogs(error.message, true);
+    }
+  });
+
+  createTestForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!createTestTitleInput) {
+      return;
+    }
+    const title = createTestTitleInput.value.trim();
+    if (!title) {
+      setCreateTestStatus("Введите название коллекции.", true);
+      return;
+    }
+    setCreateTestStatus("Создаём коллекцию...");
+    try {
+      const payload = await createEmptyTest(title);
+      const newTestId = payload?.metadata?.id || payload?.payload?.id;
+      const tests = await fetchTests({ force: true });
+      renderTestCards(tests, newTestId);
+      if (newTestId) {
+        await selectTest(newTestId);
+      }
+      closeCreateTestModal();
+    } catch (error) {
+      setCreateTestStatus(error.message, true);
     }
   });
 }
