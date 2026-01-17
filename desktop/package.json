@@ -15,11 +15,11 @@
     "build-backend": "pyinstaller --onefile desktop/server_entry.py --name bsu-test-server --distpath desktop/resources/server"
   },
   "devDependencies": {
-    "electron": "^32.2.8",
-    "electron-builder": "^25.0.5"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0"
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.7.3"
   },
   "build": {
     "appId": "com.bsu.testmaster",
