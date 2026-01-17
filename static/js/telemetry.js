@@ -318,6 +318,14 @@ function average(values) {
   return sum / values.length;
 }
 
+function averageNullable(values) {
+  const filtered = values.filter((value) => Number.isFinite(value));
+  if (!filtered.length) {
+    return null;
+  }
+  return average(filtered);
+}
+
 function standardDeviation(values) {
   if (values.length < 2) {
     return 0;
@@ -335,7 +343,7 @@ export function buildAttemptSummary(session) {
   let answeredCount = 0;
   let correctCount = 0;
   const accuracyByIndex = [];
-  const timeByIndex = [];
+  const tempoByIndex = [];
 
   const perQuestion = session.questions.map((entry, index) => {
     const selectedIndex = session.answers.get(entry.questionId);
@@ -362,15 +370,13 @@ export function buildAttemptSummary(session) {
     } else {
       accuracyByIndex.push(null);
     }
-    timeByIndex.push(timing.totalMs || 0);
+    tempoByIndex.push(timing.totalMs || 0);
     const isSkipped = !isAnswered;
     return {
       questionId: entry.questionId,
-      questionIndex: index,
-      answerId: resolveAnswerId(options, selectedIndex),
+      index,
       isCorrect,
       durationMs: timing.totalMs,
-      shownCount: timing.shownCount,
       isSkipped,
     };
   });
@@ -378,6 +384,12 @@ export function buildAttemptSummary(session) {
   const skippedCount = total - answeredCount;
   const percentCorrect = total ? (correctCount / total) * 100 : 0;
   const questionDurations = perQuestion.map((item) => item.durationMs || 0);
+  const accuracySeries = perQuestion.map((item) => {
+    if (typeof item.isCorrect === "boolean") {
+      return item.isCorrect ? 1 : 0;
+    }
+    return null;
+  });
   const totalDurationMs = session.startedAt ? now - session.startedAt : 0;
   const questionDurationTotalMs = questionDurations.reduce(
     (sum, value) => sum + value,
@@ -387,12 +399,26 @@ export function buildAttemptSummary(session) {
     ? questionDurationTotalMs / total
     : 0;
 
-  const third = Math.max(1, Math.floor(questionDurations.length / 3));
-  const firstSlice = questionDurations.slice(0, third);
-  const lastSlice = questionDurations.slice(-third);
-  const firstAvg = average(firstSlice);
-  const lastAvg = average(lastSlice);
-  const fatiguePoint = firstAvg ? (lastAvg - firstAvg) / firstAvg : 0;
+  const windowSize = Math.max(1, Math.floor(accuracySeries.length / 3));
+  let bestAverage = null;
+  let fatigueIndex = null;
+  accuracySeries.forEach((value, index) => {
+    const start = Math.max(0, index - windowSize + 1);
+    const window = accuracySeries.slice(start, index + 1);
+    const avg = averageNullable(window);
+    if (avg === null) {
+      return;
+    }
+    if (bestAverage === null || avg > bestAverage) {
+      bestAverage = avg;
+    } else if (fatigueIndex === null && avg < bestAverage) {
+      fatigueIndex = index;
+    }
+  });
+  const fatiguePoint =
+    fatigueIndex !== null && accuracySeries.length
+      ? (fatigueIndex + 1) / accuracySeries.length
+      : 0;
 
   const mean = average(questionDurations);
   const focusStabilityIndex = mean
@@ -418,6 +444,7 @@ export function buildAttemptSummary(session) {
     focusStabilityIndex,
     personalDifficultyScore,
     accuracyByIndex,
-    timeByIndex,
+    tempoByIndex,
+    timeByIndex: tempoByIndex,
   };
 }

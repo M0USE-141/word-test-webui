@@ -90,8 +90,10 @@ function createQuestionNavButton(entry, index) {
         const selected = state.session.answers.get(currentEntry.questionId);
         if (selected === undefined || selected === -1) {
           const durationMs =
-            typeof state.session.activeQuestionStartedAt === "number"
-              ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+            typeof state.session.questionShownAt === "number"
+              ? Math.max(0, Date.now() - state.session.questionShownAt)
+              : typeof state.session.activeQuestionStartedAt === "number"
+                ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
               : 0;
           trackQuestionSkipped(
             state.session,
@@ -407,7 +409,7 @@ export function renderQuestion() {
   }
 
   const entry = state.session.questions[state.session.currentIndex];
-  const previousQuestionId = state.session.activeQuestionId;
+  const previousRenderedQuestionId = state.session.lastRenderedQuestionId;
   const options = getOptionsForQuestion(entry);
   const selectedIndex = state.session.answers.get(entry.questionId) ?? -1;
   const correctIndex = options.findIndex((option) => option.isCorrect);
@@ -485,8 +487,10 @@ export function renderQuestion() {
         saveProgress(state.session.testId, progress);
         updateProgressHint();
         const durationMs =
-          typeof state.session.activeQuestionStartedAt === "number"
-            ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+          typeof state.session.questionShownAt === "number"
+            ? Math.max(0, Date.now() - state.session.questionShownAt)
+            : typeof state.session.activeQuestionStartedAt === "number"
+              ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
             : 0;
         const isCorrect =
           resolvedCorrectIndex === null
@@ -542,7 +546,9 @@ export function renderQuestion() {
   renderQuestionNav();
 
   updateQuestionTiming(state.session, entry.questionId);
-  if (previousQuestionId !== entry.questionId) {
+  if (previousRenderedQuestionId !== entry.questionId) {
+    state.session.questionShownAt = Date.now();
+    state.session.lastRenderedQuestionId = entry.questionId;
     trackQuestionShown(state.session, entry, state.session.currentIndex);
   }
 }
@@ -1036,7 +1042,7 @@ function renderStatsQuestionStream(selectedAttempt) {
     }
     const title = document.createElement("strong");
     title.textContent = t("statsQuestionTitle", {
-      index: formatNumber((item.questionIndex ?? 0) + 1),
+      index: formatNumber((item.index ?? item.questionIndex ?? 0) + 1),
     });
     const subtitle = document.createElement("span");
     subtitle.className = "muted";
@@ -1083,8 +1089,10 @@ function renderStatsCharts(selectedAttempt) {
   const accuracyByIndex = Array.isArray(summary.accuracyByIndex)
     ? summary.accuracyByIndex
     : [];
-  const timeByIndex = Array.isArray(summary.timeByIndex)
-    ? summary.timeByIndex
+  const timeByIndex = Array.isArray(summary.tempoByIndex)
+    ? summary.tempoByIndex
+    : Array.isArray(summary.timeByIndex)
+      ? summary.timeByIndex
     : [];
   const maxLen = Math.max(accuracyByIndex.length, timeByIndex.length);
   const labels = Array.from({ length: maxLen }, (_, index) =>

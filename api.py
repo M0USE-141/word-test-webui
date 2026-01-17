@@ -525,7 +525,6 @@ def _build_attempt_summary_from_events(
         questions = []
 
     answer_events: dict[int, dict[str, object]] = {}
-    shown_counts: dict[int, int] = {}
     attempt_started: datetime | None = None
     attempt_finished: datetime | None = None
     attempt_finished_duration: int | None = None
@@ -534,8 +533,6 @@ def _build_attempt_summary_from_events(
             continue
         event_type = event.get("eventType")
         question_id = event.get("questionId")
-        if event_type == "question_shown" and isinstance(question_id, int):
-            shown_counts[question_id] = shown_counts.get(question_id, 0) + 1
         if event_type in {"answer_selected", "answer_changed", "question_skipped"}:
             if isinstance(question_id, int):
                 answer_events[question_id] = event
@@ -560,14 +557,12 @@ def _build_attempt_summary_from_events(
             continue
         event = answer_events.get(question_id)
         is_answered = False
-        answer_id = None
         is_correct = None
         duration_ms = 0
         if event:
             event_type = event.get("eventType")
             if event_type in {"answer_selected", "answer_changed"}:
                 is_answered = True
-                answer_id = event.get("answerId")
                 is_correct = event.get("isCorrect")
                 if not isinstance(is_correct, bool):
                     is_correct = None
@@ -586,11 +581,9 @@ def _build_attempt_summary_from_events(
         per_question.append(
             {
                 "questionId": question_id,
-                "questionIndex": index,
-                "answerId": answer_id,
+                "index": index,
                 "isCorrect": is_correct if is_answered else None,
                 "durationMs": duration_ms,
-                "shownCount": shown_counts.get(question_id, 0),
                 "isSkipped": not is_answered,
             }
         )
@@ -598,7 +591,7 @@ def _build_attempt_summary_from_events(
     skipped_count = total - answered_count
     percent_correct = (correct_count / total) * 100 if total else 0
     accuracy_by_index: list[float | None] = []
-    time_by_index: list[int] = []
+    tempo_by_index: list[int] = []
     for item in per_question:
         if not isinstance(item, dict):
             continue
@@ -611,9 +604,9 @@ def _build_attempt_summary_from_events(
         if isinstance(duration_value, (int, float)) and not isinstance(
             duration_value, bool
         ):
-            time_by_index.append(int(duration_value))
+            tempo_by_index.append(int(duration_value))
         else:
-            time_by_index.append(0)
+            tempo_by_index.append(0)
     total_duration_ms = 0
     if attempt_finished_duration is not None:
         total_duration_ms = attempt_finished_duration
@@ -630,6 +623,12 @@ def _build_attempt_summary_from_events(
             return 0.0
         return sum(values) / len(values)
 
+    def _average_optional(values: list[float | None]) -> float | None:
+        filtered = [value for value in values if isinstance(value, (int, float))]
+        if not filtered:
+            return None
+        return sum(filtered) / len(filtered)
+
     def _standard_deviation(values: list[int]) -> float:
         if len(values) < 2:
             return 0.0
@@ -637,10 +636,30 @@ def _build_attempt_summary_from_events(
         variance = sum((value - mean) ** 2 for value in values) / len(values)
         return variance**0.5
 
-    third = max(1, len(durations) // 3) if durations else 1
-    first_avg = _average(durations[:third])
-    last_avg = _average(durations[-third:]) if durations else 0.0
-    fatigue_point = (last_avg - first_avg) / first_avg if first_avg else 0
+    accuracy_series: list[float | None] = []
+    for item in per_question:
+        is_correct = item.get("isCorrect")
+        if isinstance(is_correct, bool):
+            accuracy_series.append(1.0 if is_correct else 0.0)
+        else:
+            accuracy_series.append(None)
+    window_size = max(1, len(accuracy_series) // 3) if accuracy_series else 1
+    best_average: float | None = None
+    fatigue_index: int | None = None
+    for index in range(len(accuracy_series)):
+        start = max(0, index - window_size + 1)
+        window_avg = _average_optional(accuracy_series[start : index + 1])
+        if window_avg is None:
+            continue
+        if best_average is None or window_avg > best_average:
+            best_average = window_avg
+        elif fatigue_index is None and window_avg < best_average:
+            fatigue_index = index
+    fatigue_point = (
+        (fatigue_index + 1) / len(accuracy_series)
+        if fatigue_index is not None and accuracy_series
+        else 0
+    )
     mean = _average(durations)
     focus_stability_index = (
         max(0.0, 1 - _standard_deviation(durations) / mean) if mean else 0.0
@@ -677,7 +696,8 @@ def _build_attempt_summary_from_events(
         "focusStabilityIndex": focus_stability_index,
         "personalDifficultyScore": personal_difficulty_score,
         "accuracyByIndex": accuracy_by_index,
-        "timeByIndex": time_by_index,
+        "tempoByIndex": tempo_by_index,
+        "timeByIndex": tempo_by_index,
         "totalCount": total,
     }
     return summary
@@ -702,6 +722,7 @@ def _write_attempt_stats_from_summary(
         "focusStabilityIndex": summary.get("focusStabilityIndex"),
         "personalDifficultyScore": summary.get("personalDifficultyScore"),
         "accuracyByIndex": summary.get("accuracyByIndex"),
+        "tempoByIndex": summary.get("tempoByIndex") or summary.get("timeByIndex"),
         "timeByIndex": summary.get("timeByIndex"),
         "totalCount": summary.get("totalCount"),
     }
