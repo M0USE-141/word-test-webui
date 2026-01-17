@@ -1448,13 +1448,21 @@ function renderEditorQuestionList() {
     const expand = document.createElement("div");
     expand.className = "editor-card-expand";
 
+    const questionKey = String(question.id ?? index + 1);
     const handleSelectQuestion = () => {
+      if (
+        card === activeEditorCard &&
+        activeEditorCardKey === questionKey &&
+        editorMobileQuery.matches
+      ) {
+        return;
+      }
       setEditorState("edit", question.id);
       syncEditorFormFromQuestion(question);
       renderEditorObjects(question);
-      activeEditorCardKey = String(question.id ?? index + 1);
+      activeEditorCardKey = questionKey;
       if (editorMobileQuery.matches) {
-        showEditorPanelInCard(card, String(question.id ?? index + 1));
+        showEditorPanelInCard(card, questionKey);
       } else {
         syncEditorPanelLocation();
       }
