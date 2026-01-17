@@ -9,6 +9,10 @@ import {
 import { clearElement, renderBlocks } from "./rendering.js";
 import { formatNumber, t } from "./i18n.js";
 
+const EDITOR_RENDER_BATCH_SIZE = 24;
+const EDITOR_IDLE_TIMEOUT_MS = 120;
+let editorQuestionRenderToken = 0;
+
 export function getInlineIdentifier(inline) {
   if (!inline || typeof inline !== "object") {
     return "";
@@ -729,6 +733,8 @@ export function collectEditorOptionPayloads(registry) {
 }
 
 export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
+  editorQuestionRenderToken += 1;
+  const renderToken = editorQuestionRenderToken;
   clearElement(dom.editorQuestionList);
   state.activeEditorCard = null;
   const newCard = document.createElement("button");
@@ -757,7 +763,9 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
       syncEditorPanelLocation();
     }
   });
-  dom.editorQuestionList.appendChild(newCard);
+  const headerFragment = document.createDocumentFragment();
+  headerFragment.appendChild(newCard);
+  dom.editorQuestionList.appendChild(headerFragment);
 
   if (!state.currentTest || !state.currentTest.questions?.length) {
     const empty = document.createElement("p");
@@ -767,95 +775,133 @@ export function renderEditorQuestionList({ onDeleteQuestion } = {}) {
     return;
   }
 
-  state.currentTest.questions.forEach((question, index) => {
-    const card = document.createElement("div");
-    card.className = "editor-card";
-    const questionId = question.id ?? index + 1;
-    card.dataset.editorCardKey = String(questionId);
-
-    const title = document.createElement("div");
-    title.className = "editor-card-title";
-    title.textContent = `#${formatNumber(questionId)}`;
-
-    const preview = document.createElement("div");
-    preview.className = "editor-card-preview";
-    const blocks = question.question?.blocks;
-    if (Array.isArray(blocks) && blocks.length) {
-      renderBlocks(preview, blocks);
-    } else {
-      const text = blocksToText(blocks || [])
-        .replace(INLINE_MARKER_REGEX, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      preview.textContent = text || t("editorQuestionNoText");
+  const questions = state.currentTest.questions;
+  let renderedIndex = 0;
+  const finalizeRender = () => {
+    if (renderToken !== editorQuestionRenderToken) {
+      return;
     }
-
-    const actions = document.createElement("div");
-    actions.className = "editor-card-actions";
-
-    const expand = document.createElement("div");
-    expand.className = "editor-card-expand";
-
-    const questionKey = String(question.id ?? index + 1);
-    const handleSelectQuestion = () => {
-      if (
-        card === state.activeEditorCard &&
-        state.activeEditorCardKey === questionKey &&
-        editorMobileQuery.matches
-      ) {
-        return;
-      }
-      setEditorState("edit", question.id);
-      syncEditorFormFromQuestion(question);
-      renderEditorObjects(question);
-      state.activeEditorCardKey = questionKey;
-      if (editorMobileQuery.matches) {
-        showEditorPanelInCard(card, questionKey);
+    if (editorMobileQuery.matches && state.activeEditorCardKey) {
+      const targetCard = dom.editorQuestionList.querySelector(
+        `[data-editor-card-key="${state.activeEditorCardKey}"]`
+      );
+      if (targetCard) {
+        showEditorPanelInCard(targetCard, state.activeEditorCardKey);
       } else {
+        state.activeEditorCardKey = null;
         syncEditorPanelLocation();
       }
-    };
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "danger";
-    deleteButton.textContent = t("commonDelete");
-    deleteButton.addEventListener("click", async () => {
-      if (!state.currentTest) {
-        return;
-      }
-      const confirmed = window.confirm(
-        t("confirmDeleteQuestion", {
-          id: formatNumber(question.id ?? index + 1),
-        })
-      );
-      if (!confirmed) {
-        return;
-      }
-      if (onDeleteQuestion) {
-        await onDeleteQuestion(question.id);
-      }
-    });
-
-    actions.append(deleteButton);
-    card.append(title, preview, actions, expand);
-    card.addEventListener("click", handleSelectQuestion);
-    dom.editorQuestionList.appendChild(card);
-  });
-
-  if (editorMobileQuery.matches && state.activeEditorCardKey) {
-    const targetCard = dom.editorQuestionList.querySelector(
-      `[data-editor-card-key="${state.activeEditorCardKey}"]`
-    );
-    if (targetCard) {
-      showEditorPanelInCard(targetCard, state.activeEditorCardKey);
     } else {
-      state.activeEditorCardKey = null;
       syncEditorPanelLocation();
     }
-  } else {
-    syncEditorPanelLocation();
-  }
+  };
+
+  const renderChunk = () => {
+    if (renderToken !== editorQuestionRenderToken) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    let rendered = 0;
+    while (
+      renderedIndex < questions.length &&
+      rendered < EDITOR_RENDER_BATCH_SIZE
+    ) {
+      const question = questions[renderedIndex];
+      const index = renderedIndex;
+      renderedIndex += 1;
+      rendered += 1;
+
+      const card = document.createElement("div");
+      card.className = "editor-card";
+      const questionId = question.id ?? index + 1;
+      card.dataset.editorCardKey = String(questionId);
+
+      const title = document.createElement("div");
+      title.className = "editor-card-title";
+      title.textContent = `#${formatNumber(questionId)}`;
+
+      const preview = document.createElement("div");
+      preview.className = "editor-card-preview";
+      const blocks = question.question?.blocks;
+      if (Array.isArray(blocks) && blocks.length) {
+        renderBlocks(preview, blocks);
+      } else {
+        const text = blocksToText(blocks || [])
+          .replace(INLINE_MARKER_REGEX, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        preview.textContent = text || t("editorQuestionNoText");
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "editor-card-actions";
+
+      const expand = document.createElement("div");
+      expand.className = "editor-card-expand";
+
+      const questionKey = String(question.id ?? index + 1);
+      const handleSelectQuestion = () => {
+        if (
+          card === state.activeEditorCard &&
+          state.activeEditorCardKey === questionKey &&
+          editorMobileQuery.matches
+        ) {
+          return;
+        }
+        setEditorState("edit", question.id);
+        syncEditorFormFromQuestion(question);
+        renderEditorObjects(question);
+        state.activeEditorCardKey = questionKey;
+        if (editorMobileQuery.matches) {
+          showEditorPanelInCard(card, questionKey);
+        } else {
+          syncEditorPanelLocation();
+        }
+      };
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "danger";
+      deleteButton.textContent = t("commonDelete");
+      deleteButton.addEventListener("click", async () => {
+        if (!state.currentTest) {
+          return;
+        }
+        const confirmed = window.confirm(
+          t("confirmDeleteQuestion", {
+            id: formatNumber(question.id ?? index + 1),
+          })
+        );
+        if (!confirmed) {
+          return;
+        }
+        if (onDeleteQuestion) {
+          await onDeleteQuestion(question.id);
+        }
+      });
+
+      actions.append(deleteButton);
+      card.append(title, preview, actions, expand);
+      card.addEventListener("click", handleSelectQuestion);
+      fragment.appendChild(card);
+    }
+    dom.editorQuestionList.appendChild(fragment);
+    if (renderedIndex < questions.length) {
+      scheduleNextChunk();
+    } else {
+      finalizeRender();
+    }
+  };
+
+  const scheduleNextChunk = () => {
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(renderChunk, { timeout: EDITOR_IDLE_TIMEOUT_MS });
+    } else {
+      window.requestAnimationFrame(renderChunk);
+    }
+  };
+
+  scheduleNextChunk();
 }
 
 export function setEditorObjectStatus(message, isError = false) {
