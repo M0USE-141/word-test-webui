@@ -122,6 +122,9 @@ def upload_test(
     symbol: str = Form("*"),
     log_small_tables: bool = Form(False),
 ) -> dict[str, object]:
+    file_name = file.filename or ""
+    if Path(file_name).suffix.lower() == ".doc":
+        raise HTTPException(status_code=400, detail="Поддерживаются только .docx")
     test_id = uuid.uuid4().hex
     test_dir = _test_dir(test_id)
     test_dir.mkdir(parents=True, exist_ok=True)
