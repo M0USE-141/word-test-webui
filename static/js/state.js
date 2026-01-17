@@ -149,6 +149,11 @@ export function writeTestsCache(tests) {
   localStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(tests));
 }
 
+export function clearTestsCache() {
+  state.testsCache = [];
+  localStorage.removeItem(TESTS_CACHE_KEY);
+}
+
 export function loadProgress(testId) {
   if (!testId) {
     return new Set();
