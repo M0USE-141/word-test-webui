@@ -329,12 +329,99 @@ function getInlineIdentifier(inline) {
   const candidates =
     inline.type === "image"
       ? [inline.id, inline.src, inline.alt]
-      : [inline.id];
+      : [inline.id, inline.src];
   return (
     candidates.find(
       (value) => typeof value === "string" && value.trim().length > 0
     ) || ""
   ).trim();
+}
+
+function generateShortFormulaId(usedIds) {
+  let id = "";
+  do {
+    id = Math.random().toString(36).slice(2, 8);
+  } while (!id || usedIds.has(id));
+  usedIds.add(id);
+  return id;
+}
+
+function collectFormulaIdsFromBlocks(blocks, usedIds) {
+  if (!Array.isArray(blocks)) {
+    return;
+  }
+  blocks.forEach((block) => {
+    if (!block || !Array.isArray(block.inlines)) {
+      return;
+    }
+    block.inlines.forEach((inline) => {
+      if (!inline || inline.type !== "formula") {
+        return;
+      }
+      const id =
+        typeof inline.id === "string" ? inline.id.trim() : "";
+      if (id) {
+        usedIds.add(id);
+      }
+    });
+  });
+}
+
+function ensureFormulaIdsForQuestion(question) {
+  if (!question) {
+    return;
+  }
+  const usedIds = new Set();
+  collectFormulaIdsFromBlocks(question.question?.blocks, usedIds);
+  question.options?.forEach((option) => {
+    collectFormulaIdsFromBlocks(option.content?.blocks, usedIds);
+  });
+  question.objects?.forEach((inline) => {
+    if (!inline || inline.type !== "formula") {
+      return;
+    }
+    const id =
+      typeof inline.id === "string" ? inline.id.trim() : "";
+    if (id) {
+      usedIds.add(id);
+    }
+  });
+
+  const assignId = (inline) => {
+    if (!inline || inline.type !== "formula") {
+      return;
+    }
+    const trimmedId =
+      typeof inline.id === "string" ? inline.id.trim() : "";
+    if (trimmedId) {
+      inline.id = trimmedId;
+      usedIds.add(trimmedId);
+      return;
+    }
+    inline.id = generateShortFormulaId(usedIds);
+  };
+
+  const assignInBlocks = (blocks) => {
+    if (!Array.isArray(blocks)) {
+      return;
+    }
+    blocks.forEach((block) => {
+      if (!block || !Array.isArray(block.inlines)) {
+        return;
+      }
+      block.inlines.forEach((inline) => {
+        assignId(inline);
+      });
+    });
+  };
+
+  assignInBlocks(question.question?.blocks);
+  question.options?.forEach((option) => {
+    assignInBlocks(option.content?.blocks);
+  });
+  question.objects?.forEach((inline) => {
+    assignId(inline);
+  });
 }
 
 function inlineToMarker(inline) {
@@ -466,6 +553,10 @@ function buildInlineRegistry(question) {
 
 function getInlineSummary(inline, index) {
   const typeLabel = inline.type === "image" ? "Изображение" : "Формула";
+  if (inline.type === "formula") {
+    const id = getInlineIdentifier(inline);
+    return `Формула: ${createShortLabel(id, typeLabel)}`;
+  }
   const hint =
     getInlineIdentifier(inline) || `#${index + 1}`;
   return `${typeLabel}: ${createShortLabel(hint, typeLabel)}`;
@@ -539,6 +630,7 @@ function syncEditorFormFromQuestion(question) {
   if (!question) {
     return;
   }
+  ensureFormulaIdsForQuestion(question);
   if (editorQuestionText) {
     editorQuestionText.value = blocksToText(question.question?.blocks || []);
   }
@@ -1597,15 +1689,24 @@ async function handleAddObject() {
     return;
   }
   const type = editorObjectType?.value || "image";
-  const id = editorObjectId?.value.trim() ?? "";
-  if (!id) {
-    setEditorObjectStatus("Укажите ID объекта.", true);
-    return;
-  }
-  const existingKey = `${type}:${id}`;
+  let id = editorObjectId?.value.trim() ?? "";
   const registry = buildInlineRegistry(
     findEditorQuestion() ?? { objects: editorState.objects }
   );
+  const usedFormulaIds = new Set();
+  registry.forEach((inline, key) => {
+    if (key.startsWith("formula:")) {
+      usedFormulaIds.add(key.slice("formula:".length));
+    }
+  });
+  if (!id && type !== "formula") {
+    setEditorObjectStatus("Укажите ID объекта.", true);
+    return;
+  }
+  if (!id && type === "formula") {
+    id = generateShortFormulaId(usedFormulaIds);
+  }
+  const existingKey = `${type}:${id}`;
   if (registry.has(existingKey)) {
     setEditorObjectStatus("Объект с таким ID уже существует.", true);
     return;
