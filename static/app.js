@@ -1533,13 +1533,28 @@ function setEditorObjectStatus(message, isError = false) {
   editorObjectStatus.classList.toggle("is-error", isError);
 }
 
+function updateEditorObjectToggles(showList, showUpload) {
+  if (editorObjectsToggle) {
+    editorObjectsToggle.textContent = showList
+      ? "Скрыть объекты"
+      : "Показать объекты";
+  }
+  if (editorObjectUploadToggle) {
+    editorObjectUploadToggle.textContent = showUpload
+      ? "Скрыть добавление"
+      : "Добавить объект";
+  }
+}
+
 function setEditorObjectSection(section) {
   if (!editorObjectUploadSection || !editorObjectListSection) {
     return;
   }
   const showUpload = section === "upload";
+  const showList = section === "list";
   editorObjectUploadSection.classList.toggle("is-hidden", !showUpload);
-  editorObjectListSection.classList.toggle("is-hidden", showUpload);
+  editorObjectListSection.classList.toggle("is-hidden", !showList);
+  updateEditorObjectToggles(showList, showUpload);
 }
 
 function syncEditorObjectFields() {
@@ -1775,6 +1790,7 @@ function initializeManagementScreenEvents() {
   updateUploadFileState(uploadFileInput?.files?.[0]);
   editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
   syncEditorObjectFields();
+  setEditorObjectSection(null);
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
@@ -1838,11 +1854,15 @@ function initializeManagementScreenEvents() {
   });
 
   editorObjectsToggle?.addEventListener("click", () => {
-    setEditorObjectSection("list");
+    const isVisible = !editorObjectListSection?.classList.contains("is-hidden");
+    setEditorObjectSection(isVisible ? null : "list");
   });
 
   editorObjectUploadToggle?.addEventListener("click", () => {
-    setEditorObjectSection("upload");
+    const isVisible = !editorObjectUploadSection?.classList.contains(
+      "is-hidden"
+    );
+    setEditorObjectSection(isVisible ? null : "upload");
   });
 
   editorResetButton?.addEventListener("click", () => {

@@ -877,6 +877,55 @@ button.danger:hover {
   color: var(--danger);
 }
 
+.editor-object-dropzone {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(37, 99, 235, 0.35);
+  background: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.editor-object-dropzone:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.editor-object-dropzone__title {
+  font-weight: 600;
+}
+
+.editor-object-dropzone__hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.editor-object-dropzone__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+  align-self: center;
+}
+
+.editor-object-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
 .object-list {
   display: grid;
   gap: 0.75rem;
