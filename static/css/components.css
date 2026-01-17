@@ -10,9 +10,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.collections-header h2 {
+  margin: 0;
 }
 
 .question-card__header {

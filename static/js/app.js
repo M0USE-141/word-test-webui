@@ -429,9 +429,11 @@ function finishTest() {
 
   let correct = 0;
   let answered = 0;
+  const questionStatuses = new Map();
   state.session.questions.forEach((entry) => {
     const selected = state.session.answers.get(entry.questionId);
     if (selected === undefined || selected === -1) {
+      questionStatuses.set(entry.questionId, "unanswered");
       return;
     }
     answered += 1;
@@ -439,7 +441,12 @@ function finishTest() {
       state.session.optionOrders.get(entry.questionId) ??
       entry.question.options;
     if (options[selected]?.isCorrect) {
+      questionStatuses.set(entry.questionId, "correct");
       correct += 1;
+    } else if (options.some((option) => option.isCorrect)) {
+      questionStatuses.set(entry.questionId, "incorrect");
+    } else {
+      questionStatuses.set(entry.questionId, "answered");
     }
   });
   const total = state.session.questions.length;
@@ -474,6 +481,11 @@ function finishTest() {
         state.session.optionOrders.get(entry.questionId) ??
         entry.question.options;
       const correctIndex = options.findIndex((option) => option.isCorrect);
+      const status =
+        questionStatuses.get(entry.questionId) ||
+        (selectedIndex === null || selectedIndex === -1
+          ? "unanswered"
+          : "answered");
       const isCorrect =
         selectedIndex === null ||
         selectedIndex === -1 ||
@@ -484,6 +496,7 @@ function finishTest() {
         question_id: entry.questionId,
         selected_index: selectedIndex,
         is_correct: isCorrect,
+        status,
         duration_seconds:
           (state.session.questionTimings.get(entry.questionId) || 0) / 1000,
       };
@@ -517,16 +530,12 @@ function openAnalyticsModal() {
   if (!dom.analyticsModal) {
     return;
   }
-  if (!state.currentTest) {
-    window.alert(t("analyticsSelectTest"));
-    return;
-  }
   dom.analyticsModal.classList.add("is-open");
   dom.analyticsModal.setAttribute("aria-hidden", "false");
   if (dom.analyticsStatus) {
     dom.analyticsStatus.textContent = t("analyticsLoading");
   }
-  fetchAnalytics(state.currentTest.id)
+  fetchAnalytics()
     .then((analytics) => {
       if (dom.analyticsStatus) {
         dom.analyticsStatus.textContent = analytics.attempts_count

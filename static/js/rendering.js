@@ -350,7 +350,7 @@ export function renderQuestion() {
       optionButton.addEventListener("click", () => {
         state.session.answers.set(entry.questionId, index);
         if (resolvedCorrectIndex === null) {
-          state.session.answerStatus.set(entry.questionId, "unanswered");
+          state.session.answerStatus.set(entry.questionId, "answered");
         } else if (index === resolvedCorrectIndex) {
           state.session.answerStatus.set(entry.questionId, "correct");
         } else {
@@ -669,7 +669,7 @@ export function renderAnalytics(analytics) {
 
   const questionStats = analytics.question_stats ?? [];
   const errorRateItems = questionStats.map((entry) => ({
-    label: `#${formatNumber(entry.question_id)}`,
+    label: entry.question_label || `#${formatNumber(entry.question_id)}`,
     value: (entry.error_rate ?? 0) * 100,
     formatted: formatNumber((entry.error_rate ?? 0) * 100, {
       minimumFractionDigits: 1,
@@ -688,8 +688,9 @@ export function renderAnalytics(analytics) {
     } else {
       topErrors.forEach((entry) => {
         const item = document.createElement("li");
+        const label = entry.question_label || `#${formatNumber(entry.question_id)}`;
         item.textContent = t("analyticsTopErrorItem", {
-          id: formatNumber(entry.question_id),
+          label,
           rate: formatNumber((entry.error_rate ?? 0) * 100, {
             minimumFractionDigits: 1,
             maximumFractionDigits: 1,

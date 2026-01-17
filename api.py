@@ -209,6 +209,7 @@ def record_attempt(test_id: str, attempt: AttemptCreate) -> dict[str, object]:
         raise HTTPException(status_code=404, detail="Test not found")
     attempts = _load_attempts(test_id)
     attempt_payload = attempt.model_dump()
+    attempt_payload["test_id"] = test_id
     attempt_payload["id"] = uuid.uuid4().hex
     attempt_payload["recorded_at"] = datetime.utcnow().isoformat() + "Z"
     attempts.append(attempt_payload)
@@ -221,105 +222,61 @@ def get_analytics(test_id: str) -> dict[str, object]:
     if not _payload_path(test_id).exists():
         raise HTTPException(status_code=404, detail="Test not found")
     attempts = _load_attempts(test_id)
-    attempts_count = len(attempts)
-    if attempts_count == 0:
-        return {
-            "test_id": test_id,
-            "attempts_count": 0,
-            "average_percent": 0,
-            "average_correct": 0,
-            "average_answered": 0,
-            "average_duration_seconds": None,
-            "question_stats": [],
-            "top_errors": [],
-            "time_distribution": [],
-        }
-
-    total_percent = 0.0
-    total_correct = 0
-    total_answered = 0
-    duration_sum = 0.0
-    duration_count = 0
-    question_totals: dict[int, int] = {}
-    question_incorrect: dict[int, int] = {}
-
-    time_distribution = {
-        "under_2_min": 0,
-        "2_to_5_min": 0,
-        "5_to_10_min": 0,
-        "over_10_min": 0,
-    }
-
+    label_lookup = {}
+    payload = _load_test_payload(test_id)
+    title = payload.get("title") if isinstance(payload.get("title"), str) else ""
     for attempt in attempts:
-        total_percent += float(attempt.get("percent", 0))
-        total_correct += int(attempt.get("correct", 0))
-        total_answered += int(attempt.get("answered", 0))
-        duration_seconds = attempt.get("duration_seconds")
-        if isinstance(duration_seconds, (int, float)):
-            duration_sum += float(duration_seconds)
-            duration_count += 1
-            if duration_seconds < 120:
-                time_distribution["under_2_min"] += 1
-            elif duration_seconds < 300:
-                time_distribution["2_to_5_min"] += 1
-            elif duration_seconds < 600:
-                time_distribution["5_to_10_min"] += 1
-            else:
-                time_distribution["over_10_min"] += 1
-
+        if isinstance(attempt, dict) and not attempt.get("test_id"):
+            attempt["test_id"] = test_id
+    if title:
+        label_prefix = f"{title} · "
+    else:
+        label_prefix = ""
+    for attempt in attempts:
         question_stats = attempt.get("question_stats") or []
         if not isinstance(question_stats, list):
             continue
         for entry in question_stats:
-            if not isinstance(entry, dict):
-                continue
             question_id = entry.get("question_id")
-            if not isinstance(question_id, int):
+            if isinstance(question_id, int):
+                label_lookup[(test_id, question_id)] = f"{label_prefix}#{question_id}"
+    aggregation = _aggregate_attempts(attempts, label_lookup, fallback_test_id=test_id)
+    aggregation["test_id"] = test_id
+    return aggregation
+
+
+@app.get("/api/analytics")
+def get_all_analytics() -> dict[str, object]:
+    attempts: list[dict[str, object]] = []
+    label_lookup: dict[tuple[str, int], str] = {}
+    for test_dir in sorted(DATA_DIR.iterdir()):
+        if not test_dir.is_dir():
+            continue
+        test_id = test_dir.name
+        payload_path = _payload_path(test_id)
+        if not payload_path.exists():
+            continue
+        payload = json_load(payload_path.read_text(encoding="utf-8"))
+        title = payload.get("title") if isinstance(payload.get("title"), str) else ""
+        label_prefix = f"{title} · " if title else ""
+        test_attempts = _load_attempts(test_id)
+        for attempt in test_attempts:
+            if isinstance(attempt, dict) and not attempt.get("test_id"):
+                attempt["test_id"] = test_id
+        for attempt in test_attempts:
+            question_stats = attempt.get("question_stats") or []
+            if not isinstance(question_stats, list):
                 continue
-            question_totals[question_id] = question_totals.get(question_id, 0) + 1
-            if entry.get("is_correct") is False:
-                question_incorrect[question_id] = (
-                    question_incorrect.get(question_id, 0) + 1
-                )
-
-    question_stats_payload = []
-    for question_id in sorted(question_totals.keys()):
-        total = question_totals[question_id]
-        incorrect = question_incorrect.get(question_id, 0)
-        error_rate = incorrect / total if total else 0
-        question_stats_payload.append(
-            {
-                "question_id": question_id,
-                "attempts": total,
-                "incorrect": incorrect,
-                "error_rate": error_rate,
-            }
-        )
-
-    top_errors = sorted(
-        [entry for entry in question_stats_payload if entry["incorrect"] > 0],
-        key=lambda entry: (entry["error_rate"], entry["incorrect"]),
-        reverse=True,
-    )[:5]
-
-    average_duration_seconds = (
-        duration_sum / duration_count if duration_count else None
-    )
-
-    return {
-        "test_id": test_id,
-        "attempts_count": attempts_count,
-        "average_percent": total_percent / attempts_count,
-        "average_correct": total_correct / attempts_count,
-        "average_answered": total_answered / attempts_count,
-        "average_duration_seconds": average_duration_seconds,
-        "question_stats": question_stats_payload,
-        "top_errors": top_errors,
-        "time_distribution": [
-            {"bucket": bucket, "count": count}
-            for bucket, count in time_distribution.items()
-        ],
-    }
+            for entry in question_stats:
+                question_id = entry.get("question_id")
+                if isinstance(question_id, int):
+                    label_lookup[(test_id, question_id)] = (
+                        f"{label_prefix}#{question_id}"
+                    )
+        attempts.extend(test_attempts)
+    aggregation = _aggregate_attempts(attempts, label_lookup)
+    aggregation["test_id"] = "all"
+    return aggregation
 
 
 @app.get("/api/tests/{test_id}/assets/{asset_path:path}")
@@ -391,6 +348,115 @@ def _load_attempts(test_id: str) -> list[dict[str, object]]:
 
 def _save_attempts(test_id: str, attempts: list[dict[str, object]]) -> None:
     _attempts_path(test_id).write_text(json_dump(attempts), encoding="utf-8")
+
+
+def _aggregate_attempts(
+    attempts: list[dict[str, object]],
+    label_lookup: dict[tuple[str, int], str],
+    fallback_test_id: str | None = None,
+) -> dict[str, object]:
+    attempts_count = len(attempts)
+    if attempts_count == 0:
+        return {
+            "attempts_count": 0,
+            "average_percent": 0,
+            "average_correct": 0,
+            "average_answered": 0,
+            "average_duration_seconds": None,
+            "question_stats": [],
+            "top_errors": [],
+            "time_distribution": [],
+        }
+
+    total_percent = 0.0
+    total_correct = 0
+    total_answered = 0
+    duration_sum = 0.0
+    duration_count = 0
+    question_totals: dict[tuple[str, int], int] = {}
+    question_incorrect: dict[tuple[str, int], int] = {}
+
+    time_distribution = {
+        "under_2_min": 0,
+        "2_to_5_min": 0,
+        "5_to_10_min": 0,
+        "over_10_min": 0,
+    }
+
+    for attempt in attempts:
+        total_percent += float(attempt.get("percent", 0))
+        total_correct += int(attempt.get("correct", 0))
+        total_answered += int(attempt.get("answered", 0))
+        duration_seconds = attempt.get("duration_seconds")
+        if isinstance(duration_seconds, (int, float)):
+            duration_sum += float(duration_seconds)
+            duration_count += 1
+            if duration_seconds < 120:
+                time_distribution["under_2_min"] += 1
+            elif duration_seconds < 300:
+                time_distribution["2_to_5_min"] += 1
+            elif duration_seconds < 600:
+                time_distribution["5_to_10_min"] += 1
+            else:
+                time_distribution["over_10_min"] += 1
+
+        question_stats = attempt.get("question_stats") or []
+        if not isinstance(question_stats, list):
+            continue
+        attempt_test_id = attempt.get("test_id") or fallback_test_id
+        if not isinstance(attempt_test_id, str):
+            continue
+        for entry in question_stats:
+            if not isinstance(entry, dict):
+                continue
+            question_id = entry.get("question_id")
+            if not isinstance(question_id, int):
+                continue
+            key = (attempt_test_id, question_id)
+            question_totals[key] = question_totals.get(key, 0) + 1
+            if entry.get("is_correct") is False:
+                question_incorrect[key] = question_incorrect.get(key, 0) + 1
+
+    question_stats_payload = []
+    for key in sorted(question_totals.keys()):
+        test_id, question_id = key
+        total = question_totals[key]
+        incorrect = question_incorrect.get(key, 0)
+        error_rate = incorrect / total if total else 0
+        question_stats_payload.append(
+            {
+                "test_id": test_id,
+                "question_id": question_id,
+                "question_label": label_lookup.get(key, f"#{question_id}"),
+                "attempts": total,
+                "incorrect": incorrect,
+                "error_rate": error_rate,
+            }
+        )
+
+    top_errors = sorted(
+        [entry for entry in question_stats_payload if entry["incorrect"] > 0],
+        key=lambda entry: (entry["error_rate"], entry["incorrect"]),
+        reverse=True,
+    )[:5]
+
+    average_duration_seconds = (
+        duration_sum / duration_count if duration_count else None
+    )
+
+    return {
+        "attempts_count": attempts_count,
+        "average_percent": total_percent / attempts_count,
+        "average_correct": total_correct / attempts_count,
+        "average_answered": total_answered / attempts_count,
+        "average_duration_seconds": average_duration_seconds,
+        "question_stats": question_stats_payload,
+        "top_errors": top_errors,
+        "time_distribution": [
+            {"bucket": bucket, "count": count}
+            for bucket, count in time_distribution.items()
+        ],
+    }
 
 
 def _find_question(

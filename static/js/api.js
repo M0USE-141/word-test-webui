@@ -133,7 +133,10 @@ export async function uploadObjectAsset(testId, file) {
 }
 
 export async function fetchAnalytics(testId) {
-  const response = await fetch(`/api/tests/${testId}/analytics`);
+  const url = testId
+    ? `/api/tests/${testId}/analytics`
+    : "/api/analytics";
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(t("errorFetchAnalytics"));
   }
