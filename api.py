@@ -9,7 +9,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from logging_setup import setup_console_logging
 from serialization import serialize_metadata, serialize_test_payload
@@ -60,17 +60,36 @@ class TestCreate(BaseModel):
     title: str
 
 
-class AttemptEventRequest(BaseModel):
-    testId: str
-    clientId: str
-    event: dict[str, object]
+class AttemptEventPayload(BaseModel):
+    attemptId: str | None = None
+    testId: str = Field(..., min_length=1)
+    clientId: str = Field(..., min_length=1)
+    ts: str = Field(..., min_length=1)
+    timezone: str = Field(..., min_length=1)
+    settings: dict[str, object]
+    questionId: int | None = None
+    questionIndex: int | None = None
+    answerId: int | str | None = None
+    isCorrect: bool | None = None
+    durationMs: int | None = None
+    isSkipped: bool | None = None
+    eventType: str = Field(..., min_length=1)
 
 
 class AttemptFinalizeRequest(BaseModel):
-    testId: str
-    clientId: str
+    attemptId: str | None = None
+    testId: str = Field(..., min_length=1)
+    clientId: str = Field(..., min_length=1)
+    ts: str = Field(..., min_length=1)
+    timezone: str = Field(..., min_length=1)
+    settings: dict[str, object]
     aggregates: dict[str, object] | None = None
     summary: dict[str, object] | None = None
+
+
+class AttemptFinalizeResponse(BaseModel):
+    status: str
+    attempt: dict[str, object]
 
 
 def _test_dir(test_id: str) -> Path:
@@ -136,18 +155,6 @@ def _event_dedupe_key(event: dict[str, object]) -> str:
     ts = event.get("ts")
     question_id = event.get("questionId")
     return f"{event_type}|{ts}|{question_id}"
-
-
-def _validate_event(event: dict[str, object]) -> None:
-    event_type = event.get("eventType")
-    if not isinstance(event_type, str) or not event_type.strip():
-        raise HTTPException(status_code=400, detail="eventType is required")
-    ts = event.get("ts")
-    if not isinstance(ts, (int, float)):
-        raise HTTPException(status_code=400, detail="ts is required")
-    question_id = event.get("questionId")
-    if not isinstance(question_id, int):
-        raise HTTPException(status_code=400, detail="questionId is required")
 
 
 def _ensure_attempt_metadata(
@@ -507,22 +514,19 @@ def delete_question(test_id: str, question_id: int) -> dict[str, object]:
 @app.post("/api/attempts/{attempt_id}/events")
 def record_attempt_event(
     attempt_id: str,
-    payload: AttemptEventRequest,
+    payload: AttemptEventPayload,
 ) -> dict[str, object]:
     attempt_id = _validate_id("attemptId", attempt_id)
     test_id = _validate_id("testId", payload.testId)
     client_id = _validate_id("clientId", payload.clientId)
     _validate_test_exists(test_id)
 
-    event = payload.event
-    if not isinstance(event, dict):
-        raise HTTPException(status_code=400, detail="event is required")
-    _validate_event(event)
-    if "attemptId" in event and event["attemptId"] != attempt_id:
+    event = payload.dict()
+    if event.get("attemptId") and event["attemptId"] != attempt_id:
         raise HTTPException(status_code=400, detail="Mismatched attemptId")
-    if "testId" in event and event["testId"] != test_id:
+    if event.get("testId") != test_id:
         raise HTTPException(status_code=400, detail="Mismatched testId")
-    if "clientId" in event and event["clientId"] != client_id:
+    if event.get("clientId") != client_id:
         raise HTTPException(status_code=400, detail="Mismatched clientId")
 
     _ensure_attempt_metadata(attempt_id, test_id, client_id)
@@ -533,15 +537,15 @@ def record_attempt_event(
         return {"status": "duplicate", "attemptId": attempt_id, "event": event}
 
     stored_event = dict(event)
-    stored_event.setdefault("attemptId", attempt_id)
-    stored_event.setdefault("testId", test_id)
-    stored_event.setdefault("clientId", client_id)
+    stored_event["attemptId"] = attempt_id
+    stored_event["testId"] = test_id
+    stored_event["clientId"] = client_id
     events.append(stored_event)
     _save_attempt_events(attempt_id, events)
     return {"status": "recorded", "attemptId": attempt_id, "event": stored_event}
 
 
-@app.post("/api/attempts/{attempt_id}/finalize")
+@app.post("/api/attempts/{attempt_id}/finalize", response_model=AttemptFinalizeResponse)
 def finalize_attempt(
     attempt_id: str,
     payload: AttemptFinalizeRequest,
@@ -550,6 +554,8 @@ def finalize_attempt(
     test_id = _validate_id("testId", payload.testId)
     client_id = _validate_id("clientId", payload.clientId)
     _validate_test_exists(test_id)
+    if payload.attemptId and payload.attemptId != attempt_id:
+        raise HTTPException(status_code=400, detail="Mismatched attemptId")
 
     attempt_payload = _ensure_attempt_metadata(attempt_id, test_id, client_id)
     aggregates = payload.aggregates or {}
@@ -591,6 +597,7 @@ def list_attempt_stats(
                 "finalizedAt": attempt_payload.get("finalizedAt"),
                 "eventCount": len(events),
                 "aggregates": attempt_payload.get("aggregates", {}),
+                "summary": attempt_payload.get("summary"),
             }
         )
     return results

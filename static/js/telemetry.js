@@ -54,32 +54,70 @@ async function postJson(url, payload) {
   }
 }
 
-async function flushQueue(queueKey, url) {
+async function flushEventQueue() {
   if (!navigator.onLine) {
     return;
   }
-  const queue = readQueue(queueKey);
+  const queue = readQueue(EVENT_QUEUE_KEY);
   if (!queue.length) {
     return;
   }
-  const batch = queue.slice(0, BATCH_SIZE);
-  try {
-    await postJson(url, { items: batch });
-    const remaining = queue.slice(batch.length);
-    writeQueue(queueKey, remaining);
-    if (remaining.length) {
-      setTimeout(() => {
-        flushQueue(queueKey, url);
-      }, 0);
+  const remaining = [];
+  for (const event of queue.slice(0, BATCH_SIZE)) {
+    const attemptId = event?.attemptId;
+    if (!attemptId) {
+      continue;
     }
-  } catch (error) {
-    // Retry later.
+    try {
+      await postJson(`/api/attempts/${encodeURIComponent(attemptId)}/events`, event);
+    } catch (error) {
+      remaining.push(event);
+    }
+  }
+  const rest = queue.slice(BATCH_SIZE).concat(remaining);
+  writeQueue(EVENT_QUEUE_KEY, rest);
+  if (rest.length) {
+    setTimeout(() => {
+      flushEventQueue();
+    }, 0);
+  }
+}
+
+async function flushSummaryQueue() {
+  if (!navigator.onLine) {
+    return;
+  }
+  const queue = readQueue(SUMMARY_QUEUE_KEY);
+  if (!queue.length) {
+    return;
+  }
+  const remaining = [];
+  for (const summary of queue.slice(0, BATCH_SIZE)) {
+    const attemptId = summary?.attemptId;
+    if (!attemptId) {
+      continue;
+    }
+    try {
+      await postJson(
+        `/api/attempts/${encodeURIComponent(attemptId)}/finalize`,
+        summary
+      );
+    } catch (error) {
+      remaining.push(summary);
+    }
+  }
+  const rest = queue.slice(BATCH_SIZE).concat(remaining);
+  writeQueue(SUMMARY_QUEUE_KEY, rest);
+  if (rest.length) {
+    setTimeout(() => {
+      flushSummaryQueue();
+    }, 0);
   }
 }
 
 export function flushQueues() {
-  flushQueue(EVENT_QUEUE_KEY, "/api/telemetry/events");
-  flushQueue(SUMMARY_QUEUE_KEY, "/api/telemetry/attempts/finalize");
+  flushEventQueue();
+  flushSummaryQueue();
 }
 
 export function initTelemetry() {
@@ -139,7 +177,7 @@ export function trackEvent(
   } = {}
 ) {
   const payload = {
-    type,
+    eventType: type,
     ...basePayload(session),
     questionId: questionEntry?.questionId ?? null,
     questionIndex,

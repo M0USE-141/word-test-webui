@@ -61,6 +61,7 @@ import {
   buildAttemptSummary,
   createAttemptId,
   finalizeActiveQuestionTiming,
+  flushQueues,
   getClientId,
   initTelemetry,
   trackAttemptAbandoned,
@@ -538,6 +539,7 @@ function finishTest() {
   });
   const summary = buildAttemptSummary(state.session);
   trackAttemptFinished(state.session, summary);
+  flushQueues();
   renderTestCardsWithHandlers(state.testsCache, state.session.testId);
   renderResultSummary({ correct, total, answered, percent });
   renderQuestion();
