@@ -45,6 +45,11 @@
   min-width: 140px;
 }
 
+.language-select select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
 .language-select select:focus {
   outline: 2px solid rgba(255, 255, 255, 0.6);
   outline-offset: 2px;
@@ -53,6 +58,11 @@
 :root[data-theme="dark"] .language-select select {
   background: rgba(255, 255, 255, 0.22);
   border-color: rgba(255, 255, 255, 0.5);
+}
+
+:root[data-theme="dark"] .language-select select option {
+  color: #e2e8f0;
+  background: #1f2937;
 }
 
 .theme-toggle {
