@@ -99,7 +99,6 @@ const settingMaxOptions = document.getElementById("setting-max-options");
 const DOCX_ONLY_WARNING = "Поддерживаются только .docx";
 
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".wmf", ".emf"];
- main
 
 const testsCacheKey = "tests-cache";
 
