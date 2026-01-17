@@ -227,13 +227,50 @@
                   </label>
                   <div id="editor-object-image-fields" class="editor-field">
                     <span>Файл изображения (png, jpg, wmf, emf)</span>
-                    <input id="editor-object-image-file" type="file" />
+                    <label
+                      class="editor-object-dropzone"
+                      for="editor-object-image-file"
+                    >
+                      <span class="editor-object-dropzone__title">
+                        Перетащите файл изображения сюда
+                      </span>
+                      <span class="editor-object-dropzone__hint">
+                        или выберите на устройстве
+                      </span>
+                      <span class="editor-object-dropzone__action">
+                        Выбрать файл
+                      </span>
+                    </label>
+                    <input
+                      id="editor-object-image-file"
+                      type="file"
+                      class="editor-object-input"
+                    />
                   </div>
                   <div id="editor-object-formula-fields" class="editor-field is-hidden">
                     <span>XML формулы</span>
                     <textarea id="editor-object-formula-text" rows="4" placeholder="<math>...</math>"></textarea>
                     <span class="muted">или импортируйте XML файл</span>
-                    <input id="editor-object-formula-file" type="file" accept=".xml" />
+                    <label
+                      class="editor-object-dropzone"
+                      for="editor-object-formula-file"
+                    >
+                      <span class="editor-object-dropzone__title">
+                        Перетащите XML файл сюда
+                      </span>
+                      <span class="editor-object-dropzone__hint">
+                        или выберите на устройстве
+                      </span>
+                      <span class="editor-object-dropzone__action">
+                        Выбрать файл
+                      </span>
+                    </label>
+                    <input
+                      id="editor-object-formula-file"
+                      type="file"
+                      accept=".xml"
+                      class="editor-object-input"
+                    />
                   </div>
                   <button id="editor-add-object" type="button" class="secondary">
                     Добавить объект
@@ -269,16 +306,30 @@
           </div>
         </div>
         <form id="upload-form" class="upload-form">
-          <div class="upload-dropzone">
-            <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
-            <div class="upload-dropzone__content">
-              <p>Перетащите Word-файл сюда</p>
-              <p class="muted">или выберите вручную на устройстве</p>
+          <div id="upload-dropzone" class="upload-dropzone is-empty">
+            <div class="upload-dropzone__area">
+              <div class="upload-dropzone__icon" aria-hidden="true">⭳</div>
+              <div class="upload-dropzone__content">
+                <p>Перетащите Word-файл сюда</p>
+                <p class="muted">или выберите вручную на устройстве</p>
+              </div>
+            </div>
+            <div id="upload-file-name" class="upload-file-name is-empty">
+              <span class="upload-file-name__label">Выбранный файл</span>
+              <span class="upload-file-name__value">Файл не выбран</span>
             </div>
             <div class="upload-dropzone__actions">
               <label class="upload-select-button" for="upload-file">
                 Выбрать файл
               </label>
+              <button
+                id="upload-clear-file"
+                type="button"
+                class="upload-clear-button"
+                disabled
+              >
+                Очистить
+              </button>
               <span class="upload-hint">Форматы .doc / .docx</span>
             </div>
             <input
@@ -288,9 +339,6 @@
               accept=".doc,.docx"
               required
             />
-          </div>
-          <div id="upload-file-name" class="upload-file-name is-empty">
-            Файл не выбран
           </div>
           <div class="upload-actions">
             <label class="upload-field" for="upload-symbol">

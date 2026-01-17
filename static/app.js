@@ -4,7 +4,10 @@ const questionContainer = document.getElementById("question-container");
 const optionsContainer = document.getElementById("options-container");
 const uploadForm = document.getElementById("upload-form");
 const uploadFileInput = document.getElementById("upload-file");
+const uploadDropzone = document.getElementById("upload-dropzone");
 const uploadFileName = document.getElementById("upload-file-name");
+const uploadFileNameValue = document.querySelector(".upload-file-name__value");
+const uploadClearButton = document.getElementById("upload-clear-file");
 const uploadSymbolInput = document.getElementById("upload-symbol");
 const uploadLogSmallTablesInput = document.getElementById(
   "upload-log-small-tables"
@@ -281,12 +284,28 @@ function updateUploadFileState(file) {
     return;
   }
   if (file) {
-    uploadFileName.textContent = file.name;
+    if (uploadFileNameValue) {
+      uploadFileNameValue.textContent = file.name;
+    } else {
+      uploadFileName.textContent = file.name;
+    }
     uploadFileName.classList.remove("is-empty");
+    uploadDropzone?.classList.remove("is-empty");
+    if (uploadClearButton) {
+      uploadClearButton.disabled = false;
+    }
     return;
   }
-  uploadFileName.textContent = "Файл не выбран";
+  if (uploadFileNameValue) {
+    uploadFileNameValue.textContent = "Файл не выбран";
+  } else {
+    uploadFileName.textContent = "Файл не выбран";
+  }
   uploadFileName.classList.add("is-empty");
+  uploadDropzone?.classList.add("is-empty");
+  if (uploadClearButton) {
+    uploadClearButton.disabled = true;
+  }
 }
 
 function renderBlocks(container, blocks) {
@@ -1514,13 +1533,28 @@ function setEditorObjectStatus(message, isError = false) {
   editorObjectStatus.classList.toggle("is-error", isError);
 }
 
+function updateEditorObjectToggles(showList, showUpload) {
+  if (editorObjectsToggle) {
+    editorObjectsToggle.textContent = showList
+      ? "Скрыть объекты"
+      : "Показать объекты";
+  }
+  if (editorObjectUploadToggle) {
+    editorObjectUploadToggle.textContent = showUpload
+      ? "Скрыть добавление"
+      : "Добавить объект";
+  }
+}
+
 function setEditorObjectSection(section) {
   if (!editorObjectUploadSection || !editorObjectListSection) {
     return;
   }
   const showUpload = section === "upload";
+  const showList = section === "list";
   editorObjectUploadSection.classList.toggle("is-hidden", !showUpload);
-  editorObjectListSection.classList.toggle("is-hidden", showUpload);
+  editorObjectListSection.classList.toggle("is-hidden", !showList);
+  updateEditorObjectToggles(showList, showUpload);
 }
 
 function syncEditorObjectFields() {
@@ -1756,6 +1790,7 @@ function initializeManagementScreenEvents() {
   updateUploadFileState(uploadFileInput?.files?.[0]);
   editorMobileQuery.addEventListener("change", syncEditorPanelLocation);
   syncEditorObjectFields();
+  setEditorObjectSection(null);
 
   closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
@@ -1819,11 +1854,15 @@ function initializeManagementScreenEvents() {
   });
 
   editorObjectsToggle?.addEventListener("click", () => {
-    setEditorObjectSection("list");
+    const isVisible = !editorObjectListSection?.classList.contains("is-hidden");
+    setEditorObjectSection(isVisible ? null : "list");
   });
 
   editorObjectUploadToggle?.addEventListener("click", () => {
-    setEditorObjectSection("upload");
+    const isVisible = !editorObjectUploadSection?.classList.contains(
+      "is-hidden"
+    );
+    setEditorObjectSection(isVisible ? null : "upload");
   });
 
   editorResetButton?.addEventListener("click", () => {
@@ -1918,6 +1957,12 @@ function initializeManagementScreenEvents() {
 
   uploadFileInput?.addEventListener("change", () => {
     updateUploadFileState(uploadFileInput.files?.[0] || null);
+  });
+  uploadClearButton?.addEventListener("click", () => {
+    if (uploadFileInput) {
+      uploadFileInput.value = "";
+    }
+    updateUploadFileState(null);
   });
 
   uploadForm?.addEventListener("submit", async (event) => {
