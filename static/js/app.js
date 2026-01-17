@@ -271,6 +271,8 @@ function buildSession(test, settings) {
     startedAt: Date.now(),
     activeQuestionId: null,
     activeQuestionStartedAt: null,
+    questionShownAt: null,
+    lastRenderedQuestionId: null,
     questionTimings: new Map(),
   };
 }
@@ -917,8 +919,10 @@ function initializeTestingScreenEvents() {
       const selected = state.session.answers.get(currentEntry.questionId);
       if (selected === undefined || selected === -1) {
         const durationMs =
-          typeof state.session.activeQuestionStartedAt === "number"
-            ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
+          typeof state.session.questionShownAt === "number"
+            ? Math.max(0, Date.now() - state.session.questionShownAt)
+            : typeof state.session.activeQuestionStartedAt === "number"
+              ? Math.max(0, Date.now() - state.session.activeQuestionStartedAt)
             : 0;
         trackQuestionSkipped(
           state.session,
