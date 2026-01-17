@@ -131,3 +131,24 @@ export async function uploadObjectAsset(testId, file) {
   }
   return payload;
 }
+
+export async function fetchAnalytics(testId) {
+  const response = await fetch(`/api/tests/${testId}/analytics`);
+  if (!response.ok) {
+    throw new Error(t("errorFetchAnalytics"));
+  }
+  return response.json();
+}
+
+export async function recordAttempt(testId, payload) {
+  const response = await fetch(`/api/tests/${testId}/attempts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || t("errorRecordAttempt"));
+  }
+  return response.json();
+}

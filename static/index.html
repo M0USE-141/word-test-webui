@@ -56,7 +56,17 @@
       <section id="screen-management" class="app-screen is-active">
         <section class="panel panel--management">
           <div class="card card--collections">
-            <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
+            <div class="collections-header">
+              <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
+              <button
+                id="open-analytics"
+                type="button"
+                class="secondary"
+                data-i18n="analyticsButton"
+              >
+                Статистика
+              </button>
+            </div>
             <div class="controls">
               <div id="test-cards" class="test-collections">
                 <button type="button" class="test-card test-card--new">
@@ -594,6 +604,49 @@
           </div>
           <p id="create-test-status" class="muted"></p>
         </form>
+      </div>
+    </div>
+
+    <div id="analytics-modal" class="modal" aria-hidden="true">
+      <div class="modal-content analytics-modal">
+        <div class="modal-header">
+          <div>
+            <h2 data-i18n="analyticsTitle">Статистика</h2>
+            <p class="muted" data-i18n="analyticsSubtitle">
+              Сводные показатели по попыткам и ошибкам.
+            </p>
+          </div>
+          <div class="modal-actions">
+            <button
+              id="close-analytics"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <p id="analytics-status" class="muted"></p>
+        <div id="analytics-metrics" class="analytics-metrics"></div>
+        <div class="analytics-charts">
+          <div class="analytics-card">
+            <h3 data-i18n="analyticsErrorRateChartTitle">
+              Частота ошибок по вопросам
+            </h3>
+            <div id="analytics-error-chart" class="analytics-chart"></div>
+          </div>
+          <div class="analytics-card">
+            <h3 data-i18n="analyticsTopErrorsTitle">Топ ошибок</h3>
+            <ol id="analytics-top-errors" class="analytics-list"></ol>
+          </div>
+          <div class="analytics-card">
+            <h3 data-i18n="analyticsTimeDistributionTitle">
+              Распределение времени
+            </h3>
+            <div id="analytics-time-chart" class="analytics-chart"></div>
+          </div>
+        </div>
       </div>
     </div>
   </body>

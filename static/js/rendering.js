@@ -159,6 +159,36 @@ export function updateProgressHint() {
   });
 }
 
+export function recordCurrentQuestionDuration() {
+  if (!state.session) {
+    return;
+  }
+  const now = Date.now();
+  const startedAt = state.session.questionStartedAt;
+  if (typeof startedAt !== "number") {
+    state.session.questionStartedAt = now;
+    return;
+  }
+  const entry = state.session.questions[state.session.currentIndex];
+  if (!entry) {
+    state.session.questionStartedAt = now;
+    return;
+  }
+  const elapsedMs = Math.max(0, now - startedAt);
+  const previous = state.session.questionTimings.get(entry.questionId) || 0;
+  state.session.questionTimings.set(entry.questionId, previous + elapsedMs);
+  state.session.questionStartedAt = now;
+}
+
+export function setCurrentQuestion(index) {
+  if (!state.session) {
+    return;
+  }
+  recordCurrentQuestionDuration();
+  state.session.currentIndex = index;
+  renderQuestion();
+}
+
 function shuffle(items) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -228,8 +258,7 @@ export function renderQuestionNav() {
     }
 
     button.addEventListener("click", () => {
-      state.session.currentIndex = index;
-      renderQuestion();
+      setCurrentQuestion(index);
     });
 
     dom.questionList.appendChild(button);
@@ -253,6 +282,9 @@ export function renderQuestion() {
   }
 
   const entry = state.session.questions[state.session.currentIndex];
+  if (typeof state.session.questionStartedAt !== "number") {
+    state.session.questionStartedAt = Date.now();
+  }
   const options = getOptionsForQuestion(entry);
   const selectedIndex = state.session.answers.get(entry.questionId) ?? -1;
   const correctIndex = options.findIndex((option) => option.isCorrect);
@@ -504,4 +536,180 @@ export function renderTestCards(
 
     dom.testCardsContainer.appendChild(card);
   });
+}
+
+function renderAnalyticsEmpty(container) {
+  clearElement(container);
+  const empty = document.createElement("p");
+  empty.className = "analytics-empty";
+  empty.textContent = t("analyticsNoData");
+  container.appendChild(empty);
+}
+
+function buildMetric(label, value) {
+  const card = document.createElement("div");
+  card.className = "analytics-metric";
+  const labelEl = document.createElement("span");
+  labelEl.className = "analytics-metric__label";
+  labelEl.textContent = label;
+  const valueEl = document.createElement("div");
+  valueEl.className = "analytics-metric__value";
+  valueEl.textContent = value;
+  card.append(labelEl, valueEl);
+  return card;
+}
+
+function renderBarChart(container, items, { maxValue = null, unit = "" } = {}) {
+  clearElement(container);
+  if (!items.length) {
+    renderAnalyticsEmpty(container);
+    return;
+  }
+
+  const width = 420;
+  const barHeight = 22;
+  const gap = 10;
+  const labelWidth = 140;
+  const height = items.length * (barHeight + gap) + gap;
+  const max =
+    maxValue ??
+    Math.max(...items.map((item) => (Number.isFinite(item.value) ? item.value : 0)));
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+
+  items.forEach((item, index) => {
+    const y = gap + index * (barHeight + gap);
+    const barMaxWidth = width - labelWidth - 24;
+    const value = Number.isFinite(item.value) ? item.value : 0;
+    const barWidth = max > 0 ? (value / max) * barMaxWidth : 0;
+
+    const label = document.createElementNS(svg.namespaceURI, "text");
+    label.setAttribute("x", "0");
+    label.setAttribute("y", String(y + barHeight - 6));
+    label.textContent = item.label;
+
+    const rect = document.createElementNS(svg.namespaceURI, "rect");
+    rect.setAttribute("x", String(labelWidth));
+    rect.setAttribute("y", String(y));
+    rect.setAttribute("width", String(barWidth));
+    rect.setAttribute("height", String(barHeight));
+    rect.setAttribute("rx", "6");
+    rect.setAttribute("fill", "var(--primary)");
+
+    const valueLabel = document.createElementNS(svg.namespaceURI, "text");
+    valueLabel.setAttribute("x", String(labelWidth + barWidth + 8));
+    valueLabel.setAttribute("y", String(y + barHeight - 6));
+    valueLabel.textContent = `${item.formatted ?? formatNumber(value)}${unit}`;
+
+    svg.append(label, rect, valueLabel);
+  });
+
+  container.appendChild(svg);
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) {
+    return "0";
+  }
+  const minutes = Math.round(seconds / 60);
+  return t("analyticsDurationLabel", {
+    minutes: formatNumber(minutes),
+  });
+}
+
+export function renderAnalytics(analytics) {
+  if (!dom.analyticsMetrics || !dom.analyticsErrorChart || !dom.analyticsTimeChart) {
+    return;
+  }
+
+  clearElement(dom.analyticsMetrics);
+  if (dom.analyticsTopErrors) {
+    clearElement(dom.analyticsTopErrors);
+  }
+
+  if (!analytics || !analytics.attempts_count) {
+    dom.analyticsMetrics.appendChild(
+      buildMetric(t("analyticsAttempts"), formatNumber(0))
+    );
+    renderAnalyticsEmpty(dom.analyticsErrorChart);
+    renderAnalyticsEmpty(dom.analyticsTimeChart);
+    if (dom.analyticsTopErrors) {
+      const emptyItem = document.createElement("li");
+      emptyItem.className = "analytics-empty";
+      emptyItem.textContent = t("analyticsNoData");
+      dom.analyticsTopErrors.appendChild(emptyItem);
+    }
+    return;
+  }
+
+  const averagePercent = analytics.average_percent ?? 0;
+  const averageAnswered = analytics.average_answered ?? 0;
+  const averageDurationSeconds = analytics.average_duration_seconds;
+
+  dom.analyticsMetrics.append(
+    buildMetric(t("analyticsAttempts"), formatNumber(analytics.attempts_count)),
+    buildMetric(
+      t("analyticsAvgScore"),
+      `${formatNumber(averagePercent, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })}%`
+    ),
+    buildMetric(
+      t("analyticsAvgAnswered"),
+      formatNumber(averageAnswered, { maximumFractionDigits: 1 })
+    ),
+    buildMetric(
+      t("analyticsAvgTime"),
+      averageDurationSeconds ? formatDuration(averageDurationSeconds) : "—"
+    )
+  );
+
+  const questionStats = analytics.question_stats ?? [];
+  const errorRateItems = questionStats.map((entry) => ({
+    label: `#${formatNumber(entry.question_id)}`,
+    value: (entry.error_rate ?? 0) * 100,
+    formatted: formatNumber((entry.error_rate ?? 0) * 100, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }),
+  }));
+  renderBarChart(dom.analyticsErrorChart, errorRateItems, { unit: "%" });
+
+  if (dom.analyticsTopErrors) {
+    const topErrors = analytics.top_errors ?? [];
+    if (!topErrors.length) {
+      const emptyItem = document.createElement("li");
+      emptyItem.className = "analytics-empty";
+      emptyItem.textContent = t("analyticsNoData");
+      dom.analyticsTopErrors.appendChild(emptyItem);
+    } else {
+      topErrors.forEach((entry) => {
+        const item = document.createElement("li");
+        item.textContent = t("analyticsTopErrorItem", {
+          id: formatNumber(entry.question_id),
+          rate: formatNumber((entry.error_rate ?? 0) * 100, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          }),
+        });
+        dom.analyticsTopErrors.appendChild(item);
+      });
+    }
+  }
+
+  const timeDistribution = analytics.time_distribution ?? [];
+  const timeLabels = {
+    under_2_min: t("analyticsTimeUnder2"),
+    "2_to_5_min": t("analyticsTime2to5"),
+    "5_to_10_min": t("analyticsTime5to10"),
+    over_10_min: t("analyticsTimeOver10"),
+  };
+  const timeItems = timeDistribution.map((entry) => ({
+    label: timeLabels[entry.bucket] || entry.bucket,
+    value: entry.count ?? 0,
+  }));
+  renderBarChart(dom.analyticsTimeChart, timeItems, { maxValue: null });
 }

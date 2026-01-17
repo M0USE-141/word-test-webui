@@ -3,8 +3,10 @@ import {
   createEmptyTest,
   deleteQuestion as deleteQuestionApi,
   deleteTest as deleteTestApi,
+  fetchAnalytics,
   fetchTest,
   fetchTests,
+  recordAttempt,
   renameTest as renameTestApi,
   updateQuestion,
 } from "./api.js";
@@ -38,6 +40,9 @@ import {
   renderResultSummary,
   renderTestCards,
   renderUploadLogs,
+  renderAnalytics,
+  recordCurrentQuestionDuration,
+  setCurrentQuestion,
   setActiveScreen,
   updateEditorTestActions,
   updateProgressHint,
@@ -245,6 +250,9 @@ function buildSession(test, settings) {
     answers: new Map(),
     answerStatus: new Map(),
     optionOrders: new Map(),
+    questionTimings: new Map(),
+    questionStartedAt: Date.now(),
+    startedAt: new Date().toISOString(),
     finished: false,
     settings,
   };
@@ -416,6 +424,7 @@ function finishTest() {
   if (!state.session || state.session.finished) {
     return;
   }
+  recordCurrentQuestionDuration();
   state.session.finished = true;
 
   let correct = 0;
@@ -446,6 +455,41 @@ function finishTest() {
   renderTestCardsWithHandlers(state.testsCache, state.session.testId);
   renderResultSummary({ correct, total, answered, percent });
   renderQuestion();
+
+  const attemptPayload = {
+    started_at: state.session.startedAt,
+    completed_at: new Date().toISOString(),
+    correct,
+    total,
+    answered,
+    percent,
+    duration_seconds: Array.from(state.session.questionTimings.values()).reduce(
+      (sum, value) => sum + value,
+      0
+    ) / 1000,
+    question_stats: state.session.questions.map((entry) => {
+      const selectedIndex =
+        state.session.answers.get(entry.questionId) ?? null;
+      const options =
+        state.session.optionOrders.get(entry.questionId) ??
+        entry.question.options;
+      const correctIndex = options.findIndex((option) => option.isCorrect);
+      const isCorrect =
+        selectedIndex === null ||
+        selectedIndex === -1 ||
+        correctIndex === -1
+          ? null
+          : selectedIndex === correctIndex;
+      return {
+        question_id: entry.questionId,
+        selected_index: selectedIndex,
+        is_correct: isCorrect,
+        duration_seconds:
+          (state.session.questionTimings.get(entry.questionId) || 0) / 1000,
+      };
+    }),
+  };
+  recordAttempt(state.session.testId, attemptPayload).catch(() => {});
 }
 
 function startTest() {
@@ -467,6 +511,44 @@ function startTest() {
     return;
   }
   renderQuestion();
+}
+
+function openAnalyticsModal() {
+  if (!dom.analyticsModal) {
+    return;
+  }
+  if (!state.currentTest) {
+    window.alert(t("analyticsSelectTest"));
+    return;
+  }
+  dom.analyticsModal.classList.add("is-open");
+  dom.analyticsModal.setAttribute("aria-hidden", "false");
+  if (dom.analyticsStatus) {
+    dom.analyticsStatus.textContent = t("analyticsLoading");
+  }
+  fetchAnalytics(state.currentTest.id)
+    .then((analytics) => {
+      if (dom.analyticsStatus) {
+        dom.analyticsStatus.textContent = analytics.attempts_count
+          ? ""
+          : t("analyticsEmpty");
+      }
+      renderAnalytics(analytics);
+    })
+    .catch((error) => {
+      if (dom.analyticsStatus) {
+        dom.analyticsStatus.textContent = error.message;
+      }
+      renderAnalytics(null);
+    });
+}
+
+function closeAnalyticsModal() {
+  if (!dom.analyticsModal) {
+    return;
+  }
+  dom.analyticsModal.classList.remove("is-open");
+  dom.analyticsModal.setAttribute("aria-hidden", "true");
 }
 
 function initializeManagementScreenEvents() {
@@ -600,6 +682,20 @@ function initializeManagementScreenEvents() {
   dom.editorModal?.addEventListener("click", (event) => {
     if (event.target === dom.editorModal) {
       closeEditorModal();
+    }
+  });
+
+  dom.openAnalyticsButton?.addEventListener("click", () => {
+    openAnalyticsModal();
+  });
+
+  dom.closeAnalyticsButton?.addEventListener("click", () => {
+    closeAnalyticsModal();
+  });
+
+  dom.analyticsModal?.addEventListener("click", (event) => {
+    if (event.target === dom.analyticsModal) {
+      closeAnalyticsModal();
     }
   });
 
@@ -801,19 +897,17 @@ function initializeTestingScreenEvents() {
     if (!state.session) {
       return;
     }
-    state.session.currentIndex = Math.max(0, state.session.currentIndex - 1);
-    renderQuestion();
+    setCurrentQuestion(Math.max(0, state.session.currentIndex - 1));
   });
 
   dom.nextQuestionButton?.addEventListener("click", () => {
     if (!state.session) {
       return;
     }
-    state.session.currentIndex = Math.min(
+    setCurrentQuestion(Math.min(
       state.session.questions.length - 1,
       state.session.currentIndex + 1
-    );
-    renderQuestion();
+    ));
   });
 
   dom.finishTestButton?.addEventListener("click", () => {
