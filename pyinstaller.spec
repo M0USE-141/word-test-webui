@@ -1,17 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
-
 from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
-
-project_root = Path.cwd()
-
+project_root = Path(SPECPATH)
 
 datas = [
     (str(project_root / "static"), "static"),
     (str(project_root / "templates"), "templates"),
-    (str(project_root / "data"), "data"),
+    (str(project_root / "omml2mml.xsl"), "."),
 ]
 
 hiddenimports = []
@@ -19,11 +16,9 @@ hiddenimports += collect_submodules("fastapi")
 hiddenimports += collect_submodules("uvicorn")
 hiddenimports += collect_submodules("python_multipart")
 hiddenimports += collect_submodules("starlette")
-hiddenimports += collect_submodules("pydantic")
-
 
 a = Analysis(
-    ["main.py"],
+    ["run_app.py"],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
@@ -32,11 +27,10 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -51,4 +45,13 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    name="bsu-test-master",
 )
