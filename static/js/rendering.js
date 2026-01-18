@@ -1,7 +1,10 @@
 import {
   dom,
+  getErrorCount,
+  loadErrorCounts,
   loadLastResult,
   loadProgress,
+  saveErrorCounts,
   saveProgress,
   state,
 } from "./state.js";
@@ -496,6 +499,18 @@ export function renderQuestion() {
           resolvedCorrectIndex === null
             ? null
             : Boolean(options[index]?.isCorrect);
+        const errorCounts = loadErrorCounts(state.session.testId);
+        if (isCorrect === true) {
+          const current = getErrorCount(errorCounts, entry.questionId);
+          if (current > -1) {
+            errorCounts[String(entry.questionId)] = current - 1;
+            saveErrorCounts(state.session.testId, errorCounts);
+          }
+        } else if (isCorrect === false) {
+          const current = getErrorCount(errorCounts, entry.questionId);
+          errorCounts[String(entry.questionId)] = current + 1;
+          saveErrorCounts(state.session.testId, errorCounts);
+        }
         const eventType =
           previousAnswer === undefined || previousAnswer === -1
             ? "answer_selected"
@@ -557,23 +572,65 @@ export function renderResultSummary(stats) {
   clearElement(dom.resultDetails);
   if (!stats) {
     dom.resultSummary.textContent = t("noCompletedAttempts");
+  } else {
+    const { correct, total, answered, percent } = stats;
+    const formattedPercent = formatNumber(percent, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+    dom.resultSummary.textContent = t("resultSummary", {
+      correct: formatNumber(correct),
+      total: formatNumber(total),
+      percent: formattedPercent,
+    });
+    const detailItems = [
+      t("resultDetailAttemptAnswered", { answered: formatNumber(answered) }),
+    ];
+    detailItems.forEach((text) => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      dom.resultDetails.appendChild(item);
+    });
+  }
+  if (!state.currentTest) {
     return;
   }
-  const { correct, total, answered, percent } = stats;
-  const formattedPercent = formatNumber(percent, {
+  const totalQuestions = state.currentTest.questions.length;
+  const progress = loadProgress(state.currentTest.id);
+  const errorCounts = loadErrorCounts(state.currentTest.id);
+  let correctOverall = 0;
+  let studiedCount = 0;
+  state.currentTest.questions.forEach((question, index) => {
+    const questionId = question.id ?? index + 1;
+    const errorCount = getErrorCount(errorCounts, questionId);
+    if (errorCount <= -1) {
+      studiedCount += 1;
+    }
+    if (progress.has(questionId) && errorCount <= 0) {
+      correctOverall += 1;
+    }
+  });
+  const studiedPercent = totalQuestions
+    ? (studiedCount / totalQuestions) * 100
+    : 0;
+  const formattedStudiedPercent = formatNumber(studiedPercent, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
-  dom.resultSummary.textContent = t("resultSummary", {
-    correct: formatNumber(correct),
-    total: formatNumber(total),
-    answered: formatNumber(answered),
-    percent: formattedPercent,
-  });
   const detailItems = [
-    t("resultDetailTotal", { total: formatNumber(total) }),
-    t("resultDetailAnswered", { answered: formatNumber(answered) }),
-    t("resultDetailAccuracy", { percent: formattedPercent }),
+    t("resultDetailViewed", {
+      viewed: formatNumber(progress.size),
+      total: formatNumber(totalQuestions),
+    }),
+    t("resultDetailCorrectOverall", {
+      correct: formatNumber(correctOverall),
+      total: formatNumber(totalQuestions),
+    }),
+    t("resultDetailStudied", {
+      percent: formattedStudiedPercent,
+      studied: formatNumber(studiedCount),
+      total: formatNumber(totalQuestions),
+    }),
   ];
   detailItems.forEach((text) => {
     const item = document.createElement("li");

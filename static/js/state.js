@@ -124,6 +124,7 @@ const TESTS_CACHE_KEY = "tests-cache";
 const TESTS_CACHE_VERSION = "v1";
 const TESTS_CACHE_TTL_MS = 10 * 60 * 1000;
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
+const ERROR_COUNTS_KEY_PREFIX = "test-error-counts:";
 
 export const state = {
   currentTest: null,
@@ -217,6 +218,51 @@ export function saveProgress(testId, answeredIds) {
   }
   const payload = Array.from(answeredIds);
   localStorage.setItem(`test-progress:${testId}`, JSON.stringify(payload));
+}
+
+export function loadErrorCounts(testId) {
+  if (!testId) {
+    return {};
+  }
+  const raw = localStorage.getItem(`${ERROR_COUNTS_KEY_PREFIX}${testId}`);
+  if (!raw) {
+    return {};
+  }
+  try {
+    const payload = JSON.parse(raw);
+    return typeof payload === "object" && payload !== null ? payload : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+export function saveErrorCounts(testId, counts) {
+  if (!testId) {
+    return;
+  }
+  localStorage.setItem(
+    `${ERROR_COUNTS_KEY_PREFIX}${testId}`,
+    JSON.stringify(counts ?? {})
+  );
+}
+
+export function clearErrorCounts(testId) {
+  if (!testId) {
+    return;
+  }
+  localStorage.removeItem(`${ERROR_COUNTS_KEY_PREFIX}${testId}`);
+}
+
+export function getErrorCount(counts, questionId) {
+  if (!counts || (typeof counts !== "object" && typeof counts !== "function")) {
+    return 0;
+  }
+  const key = String(questionId ?? "");
+  const raw = counts[key];
+  if (typeof raw === "number" && !Number.isNaN(raw)) {
+    return Math.trunc(raw);
+  }
+  return 0;
 }
 
 export function loadLastResult(testId) {

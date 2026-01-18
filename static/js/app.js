@@ -47,11 +47,14 @@ import {
 } from "./rendering.js";
 import { defaultLocale, formatNumber, setLocale, t } from "./i18n.js";
 import {
+  clearErrorCounts,
   clearLastResult,
   clearTestsCache,
   dom,
   editorMobileQuery,
+  getErrorCount,
   getSettings,
+  loadErrorCounts,
   loadLastResult,
   loadProgress,
   saveLastResult,
@@ -241,6 +244,7 @@ function setupDropzone(dropzone, input, { validate, onInvalid } = {}) {
 
 function buildSession(test, settings) {
   const progress = loadProgress(test.id);
+  const errorCounts = loadErrorCounts(test.id);
   let questions = test.questions.map((question, index) => ({
     question,
     questionId: question.id ?? index + 1,
@@ -248,7 +252,9 @@ function buildSession(test, settings) {
   }));
 
   if (settings.onlyUnanswered) {
-    questions = questions.filter((entry) => !progress.has(entry.questionId));
+    questions = questions.filter(
+      (entry) => getErrorCount(errorCounts, entry.questionId) >= 0
+    );
   }
   if (settings.randomQuestions) {
     questions = shuffle(questions);
@@ -685,6 +691,7 @@ function initializeManagementScreenEvents() {
     try {
       await deleteTestApi(state.currentTest.id);
       localStorage.removeItem(`test-progress:${state.currentTest.id}`);
+      clearErrorCounts(state.currentTest.id);
       clearLastResult(state.currentTest.id);
       clearTestsCache();
       state.testsCache = await fetchTests({ force: true });
