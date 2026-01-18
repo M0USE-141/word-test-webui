@@ -6,6 +6,46 @@
   border: 1px solid var(--border);
 }
 
+.panel-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.panel-card__toggle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  flex: 1;
+  cursor: pointer;
+  color: inherit;
+}
+
+.panel-card__toggle h2 {
+  margin: 0;
+}
+
+.panel-card__toggle p {
+  margin: 0.25rem 0 0;
+}
+
+.panel-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.panel-card__content {
+  margin-top: 1rem;
+}
+
+.panel-card:not(.is-open) .panel-card__content {
+  display: none;
+}
+
 .question-card__header {
   display: flex;
   justify-content: space-between;

@@ -84,124 +84,167 @@
       </section>
 
       <section id="screen-testing" class="app-screen is-hidden">
-        <section class="panel panel--controls">
-          <div class="card">
-            <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
-            <div class="settings-grid">
-              <div class="settings-item">
-                <label for="setting-question-count">
-                  <span data-i18n="questionCountLabel">
-                    Количество вопросов (0 = все)
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  id="setting-question-count"
-                  min="0"
-                  value="0"
-                />
-              </div>
-
-              <div class="settings-item">
-                <label for="setting-max-options">
-                  <span data-i18n="maxOptionsLabel">Макс. вариантов ответа</span>
-                </label>
-                <input
-                  type="number"
-                  id="setting-max-options"
-                  min="1"
-                  value="4"
-                />
-              </div>
-
-              <label
-                class="checkbox-row settings-item settings-item--checkbox"
-                for="setting-random-questions"
+        <section class="panel panel--testing">
+          <div id="panel-settings" class="card panel-card is-open" data-panel="settings">
+            <div class="panel-card__header">
+              <button
+                id="panel-settings-toggle"
+                class="panel-card__toggle"
+                type="button"
+                aria-expanded="true"
               >
-                <input type="checkbox" id="setting-random-questions" />
-                <span data-i18n="randomQuestionsLabel">
-                  Случайный порядок вопросов
-                </span>
-              </label>
-              <label
-                class="checkbox-row settings-item settings-item--checkbox"
-                for="setting-random-options"
-              >
-                <input type="checkbox" id="setting-random-options" />
-                <span data-i18n="randomOptionsLabel">
-                  Случайный порядок вариантов ответов
-                </span>
-              </label>
-              <label
-                class="checkbox-row settings-item settings-item--checkbox"
-                for="setting-only-unanswered"
-              >
-                <input type="checkbox" id="setting-only-unanswered" />
-                <span data-i18n="onlyUnansweredLabel">
-                  Только нерешённые вопросы
-                </span>
-              </label>
-              <label
-                class="checkbox-row settings-item settings-item--checkbox"
-                for="setting-show-answers"
-              >
-                <input type="checkbox" id="setting-show-answers" checked />
-                <span data-i18n="showAnswersLabel">
-                  Показывать правильный ответ сразу
-                </span>
-              </label>
-            </div>
-            <button
-              id="start-test"
-              class="primary"
-              type="button"
-              data-i18n="startTestButton"
-            >
-              Начать тестирование
-            </button>
-          </div>
-
-          <div class="card">
-            <h2 data-i18n="resultsTitle">Результаты</h2>
-            <p id="result-summary" data-i18n="noCompletedAttempts">
-              Ещё нет завершённых попыток.
-            </p>
-            <ul id="result-details" class="result-details"></ul>
-            <p class="hint" id="progress-hint"></p>
-          </div>
-        </section>
-
-        <section class="panel panel--test">
-          <div class="card question-card">
-            <div class="question-card__header">
-              <div>
-                <h2 id="question-progress" data-i18n="questionProgressZero">
-                  Вопрос 0 из 0
-                </h2>
-                <p id="question-status" class="muted"></p>
-              </div>
-              <div class="question-actions">
+                <div>
+                  <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
+                </div>
+              </button>
+              <div class="panel-card__actions">
                 <button id="exit-test" type="button" class="ghost">
                   <span data-i18n="exitButton">Выйти</span>
-                </button>
-                <button id="prev-question" type="button" data-i18n="prevButton">
-                  Назад
-                </button>
-                <button id="next-question" type="button" data-i18n="nextButton">
-                  Дальше
                 </button>
                 <button id="finish-test" type="button" class="danger">
                   <span data-i18n="finishTestButton">Завершить тест</span>
                 </button>
               </div>
             </div>
-            <div id="question-container"></div>
-          </div>
-          <div id="options-container" class="card is-hidden"></div>
+            <div class="panel-card__content">
+              <div class="settings-grid">
+                <div class="settings-item">
+                  <label for="setting-question-count">
+                    <span data-i18n="questionCountLabel">
+                      Количество вопросов (0 = все)
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    id="setting-question-count"
+                    min="0"
+                    value="0"
+                  />
+                </div>
 
-          <div class="card">
-            <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
-            <div id="question-nav" class="question-nav"></div>
+                <div class="settings-item">
+                  <label for="setting-max-options">
+                    <span data-i18n="maxOptionsLabel">Макс. вариантов ответа</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="setting-max-options"
+                    min="1"
+                    value="4"
+                  />
+                </div>
+
+                <label
+                  class="checkbox-row settings-item settings-item--checkbox"
+                  for="setting-random-questions"
+                >
+                  <input type="checkbox" id="setting-random-questions" />
+                  <span data-i18n="randomQuestionsLabel">
+                    Случайный порядок вопросов
+                  </span>
+                </label>
+                <label
+                  class="checkbox-row settings-item settings-item--checkbox"
+                  for="setting-random-options"
+                >
+                  <input type="checkbox" id="setting-random-options" />
+                  <span data-i18n="randomOptionsLabel">
+                    Случайный порядок вариантов ответов
+                  </span>
+                </label>
+                <label
+                  class="checkbox-row settings-item settings-item--checkbox"
+                  for="setting-only-unanswered"
+                >
+                  <input type="checkbox" id="setting-only-unanswered" />
+                  <span data-i18n="onlyUnansweredLabel">
+                    Только нерешённые вопросы
+                  </span>
+                </label>
+                <label
+                  class="checkbox-row settings-item settings-item--checkbox"
+                  for="setting-show-answers"
+                >
+                  <input type="checkbox" id="setting-show-answers" checked />
+                  <span data-i18n="showAnswersLabel">
+                    Показывать правильный ответ сразу
+                  </span>
+                </label>
+              </div>
+              <button
+                id="start-test"
+                class="primary"
+                type="button"
+                data-i18n="startTestButton"
+              >
+                Начать тестирование
+              </button>
+            </div>
+          </div>
+
+          <div id="panel-results" class="card panel-card" data-panel="results">
+            <div class="panel-card__header">
+              <button
+                id="panel-results-toggle"
+                class="panel-card__toggle"
+                type="button"
+                aria-expanded="false"
+              >
+                <div>
+                  <h2 data-i18n="resultsTitle">Результаты</h2>
+                </div>
+              </button>
+            </div>
+            <div class="panel-card__content">
+              <p id="result-summary" data-i18n="noCompletedAttempts">
+                Ещё нет завершённых попыток.
+              </p>
+              <ul id="result-details" class="result-details"></ul>
+              <p class="hint" id="progress-hint"></p>
+            </div>
+          </div>
+
+          <div id="panel-questions" class="card panel-card" data-panel="questions">
+            <div class="panel-card__header">
+              <button
+                id="panel-questions-toggle"
+                class="panel-card__toggle"
+                type="button"
+                aria-expanded="false"
+              >
+                <div>
+                  <h2 data-i18n="questionsPanelTitle">Вопросы</h2>
+                  <p id="question-count" class="muted"></p>
+                </div>
+              </button>
+            </div>
+            <div class="panel-card__content">
+              <div class="card question-card">
+                <div class="question-card__header">
+                  <div>
+                    <h2 id="question-progress" data-i18n="questionProgressZero">
+                      Вопрос 0 из 0
+                    </h2>
+                    <p id="question-status" class="muted"></p>
+                  </div>
+                  <div class="question-actions">
+                    <button id="prev-question" type="button" data-i18n="prevButton">
+                      Назад
+                    </button>
+                    <button id="next-question" type="button" data-i18n="nextButton">
+                      Дальше
+                    </button>
+                  </div>
+                </div>
+                <div id="question-container"></div>
+              </div>
+              <div id="options-container" class="card is-hidden"></div>
+
+              <div class="card">
+                <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
+                <div id="question-nav" class="question-nav"></div>
+              </div>
+            </div>
           </div>
         </section>
       </section>

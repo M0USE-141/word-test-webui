@@ -24,6 +24,13 @@ export const dom = {
   answerFeedback: document.getElementById("answer-feedback"),
   startTestButton: document.getElementById("start-test"),
   exitTestButton: document.getElementById("exit-test"),
+  settingsPanel: document.getElementById("panel-settings"),
+  resultsPanel: document.getElementById("panel-results"),
+  questionsPanel: document.getElementById("panel-questions"),
+  settingsPanelToggle: document.getElementById("panel-settings-toggle"),
+  resultsPanelToggle: document.getElementById("panel-results-toggle"),
+  questionsPanelToggle: document.getElementById("panel-questions-toggle"),
+  questionCountLabel: document.getElementById("question-count"),
   resultSummary: document.getElementById("result-summary"),
   resultDetails: document.getElementById("result-details"),
   progressHint: document.getElementById("progress-hint"),
@@ -138,6 +145,7 @@ export const state = {
   uiState: {
     activeScreen: "management",
     locale: "ru",
+    activeTestingPanel: "settings",
   },
   stats: {
     attempts: [],
