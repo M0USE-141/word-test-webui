@@ -132,6 +132,10 @@
   grid-template-columns: 1fr;
 }
 
+#screen-testing {
+  grid-template-columns: 1fr;
+}
+
 #screen-stats {
   grid-template-columns: minmax(280px, 360px) 1fr;
 }

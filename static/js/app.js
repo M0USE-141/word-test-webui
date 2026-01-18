@@ -77,6 +77,7 @@ import {
 const THEME_STORAGE_KEY = "ui-theme";
 const DEFAULT_THEME = "light";
 const LOCALE_STORAGE_KEY = "ui-locale";
+const TESTING_PANELS = ["settings", "results", "questions"];
 
 function applyLocale(lang) {
   const nextLocale = setLocale(lang);
@@ -124,11 +125,62 @@ function applyLocale(lang) {
   renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
   renderEditorObjects();
   updateUploadFileState(dom.uploadFileInput?.files?.[0] || null);
+  updateTestingPanelsStatus();
   if (state.uiState.activeScreen === "stats" || state.stats.attempts.length) {
     renderStatsView();
   }
 
   return nextLocale;
+}
+
+function updateQuestionCountLabel() {
+  if (!dom.questionCountLabel) {
+    return;
+  }
+  const count = state.currentTest?.questions?.length ?? 0;
+  dom.questionCountLabel.textContent = t("testCount", {
+    count: formatNumber(count),
+  });
+}
+
+function setActiveTestingPanel(panelKey) {
+  if (!TESTING_PANELS.includes(panelKey)) {
+    return;
+  }
+  state.uiState.activeTestingPanel = panelKey;
+  const panelMap = {
+    settings: dom.settingsPanel,
+    results: dom.resultsPanel,
+    questions: dom.questionsPanel,
+  };
+  const toggleMap = {
+    settings: dom.settingsPanelToggle,
+    results: dom.resultsPanelToggle,
+    questions: dom.questionsPanelToggle,
+  };
+  TESTING_PANELS.forEach((key) => {
+    const panel = panelMap[key];
+    const toggle = toggleMap[key];
+    if (panel) {
+      panel.classList.toggle("is-open", key === panelKey);
+    }
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", String(key === panelKey));
+    }
+  });
+}
+
+function updateTestingPanelsStatus() {
+  const isTesting = Boolean(state.session && !state.session.finished);
+  if (dom.finishTestButton) {
+    dom.finishTestButton.classList.toggle("is-hidden", !isTesting);
+    dom.finishTestButton.disabled = !isTesting;
+  }
+  if (dom.exitTestButton) {
+    dom.exitTestButton.classList.toggle("is-hidden", isTesting);
+    dom.exitTestButton.disabled = isTesting;
+  }
+  updateQuestionCountLabel();
 }
 
 function applyThemePreference(theme) {
@@ -456,6 +508,8 @@ async function refreshCurrentTest(testId = state.currentTest?.id) {
   renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
   state.session = null;
   updateProgressHint();
+  updateTestingPanelsStatus();
+  setActiveTestingPanel("settings");
   dom.questionContainer.textContent = t("startTestingHint");
   dom.optionsContainer.textContent = "";
   dom.questionProgress.textContent = t("questionProgress", {
@@ -470,6 +524,8 @@ async function selectTest(testId) {
     state.currentTest = null;
     state.session = null;
     updateProgressHint();
+    updateTestingPanelsStatus();
+    setActiveTestingPanel("settings");
     dom.questionContainer.textContent = t("noTestsLoaded");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
@@ -489,6 +545,8 @@ async function selectTest(testId) {
   updateProgressHint();
   if (!isSameTest) {
     state.session = null;
+    updateTestingPanelsStatus();
+    setActiveTestingPanel("settings");
     dom.questionContainer.textContent = t("startTestingHint");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
@@ -551,6 +609,8 @@ function finishTest() {
   renderTestCardsWithHandlers(state.testsCache, state.session.testId);
   renderResultSummary({ correct, total, answered, percent });
   renderQuestion();
+  updateTestingPanelsStatus();
+  setActiveTestingPanel("results");
 }
 
 function startTest() {
@@ -562,6 +622,8 @@ function startTest() {
   state.session = buildSession(state.currentTest, settings);
   trackAttemptStarted(state.session);
   renderResultSummary(null);
+  updateTestingPanelsStatus();
+  setActiveTestingPanel("questions");
   if (!state.session.questions.length) {
     dom.questionContainer.textContent = t("noQuestionsForTesting");
     dom.optionsContainer.textContent = "";
@@ -904,6 +966,18 @@ function initializeManagementScreenEvents() {
 }
 
 function initializeTestingScreenEvents() {
+  dom.settingsPanelToggle?.addEventListener("click", () => {
+    setActiveTestingPanel("settings");
+  });
+
+  dom.resultsPanelToggle?.addEventListener("click", () => {
+    setActiveTestingPanel("results");
+  });
+
+  dom.questionsPanelToggle?.addEventListener("click", () => {
+    setActiveTestingPanel("questions");
+  });
+
   dom.prevQuestionButton?.addEventListener("click", () => {
     if (!state.session) {
       return;
@@ -1019,6 +1093,8 @@ async function initialize() {
   initializeTestingScreenEvents();
   initializeStatsScreenEvents();
   renderManagementScreen();
+  updateTestingPanelsStatus();
+  setActiveTestingPanel("settings");
 
   dom.langSelect?.addEventListener("change", (event) => {
     applyLocale(event.target.value);
