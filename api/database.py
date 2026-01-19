@@ -1,32 +1,34 @@
-"""Database utilities and setup.
+"""Database utilities and setup."""
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-This module is a placeholder for future database integration.
-When implementing user authentication (Task #1), this module will contain:
-- Database connection setup (SQLAlchemy/SQLite/PostgreSQL)
-- Database models (User, Session, TestShare, ChangeRequest, etc.)
-- Database migrations (Alembic)
-- CRUD operations
-"""
+from api.config import DATABASE_URL
 
-# TODO: Implement database setup in Phase 1.1 (User Authentication)
-# Example structure:
-#
-# from sqlalchemy import create_engine
-# from sqlalchemy.ext.declarative import declarative_base
-# from sqlalchemy.orm import sessionmaker
-#
-# DATABASE_URL = os.environ.get(
-#     "DATABASE_URL",
-#     "sqlite:///./data/testmaster.db"
-# )
-#
-# engine = create_engine(DATABASE_URL)
-# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# Base = declarative_base()
-#
-# def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
+# Create engine
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+
+# Create session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# Base class for models
+class Base(DeclarativeBase):
+    """Base class for all database models."""
+    pass
+
+
+def get_db():
+    """Dependency to get database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db():
+    """Initialize database (create all tables)."""
+    Base.metadata.create_all(bind=engine)

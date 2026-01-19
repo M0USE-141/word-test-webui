@@ -5,7 +5,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.config import STATIC_DIR
-from api.routes import assets, attempts, questions, statistics, tests
+from api.database import init_db
+from api.routes import assets, attempts, auth, questions, statistics, tests
 from api.services.cleanup_service import schedule_events_cleanup
 from logging_setup import setup_console_logging
 
@@ -25,7 +26,8 @@ app.add_middleware(
 # Startup events
 @app.on_event("startup")
 def startup_events() -> None:
-    """Schedule cleanup tasks on startup."""
+    """Initialize database and schedule cleanup tasks on startup."""
+    init_db()
     schedule_events_cleanup()
 
 
@@ -45,6 +47,7 @@ def index() -> FileResponse:
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(tests.router)
 app.include_router(assets.router)
 app.include_router(questions.router)

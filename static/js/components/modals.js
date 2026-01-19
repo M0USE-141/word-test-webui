@@ -3,7 +3,8 @@
  */
 
 import { dom } from "../state.js";
-import { updateEditorTestActions, renderEditorObjects } from "../rendering.js";
+import { updateEditorTestActions } from "../rendering.js";
+import { renderEditorObjects } from "../editor.js";
 
 /**
  * Open editor modal
