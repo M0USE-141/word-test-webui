@@ -232,6 +232,10 @@ export function renderAuthScreen() {
     dom.screenStats.classList.add("is-hidden");
     dom.screenStats.classList.remove("is-active");
   }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.add("is-hidden");
+    dom.screenProfile.classList.remove("is-active");
+  }
 }
 
 /**
@@ -251,12 +255,16 @@ export function hideAuthScreen() {
 export function updateUserDisplay(user) {
   if (dom.userDisplay) {
     if (user) {
-      dom.userDisplay.textContent = user.username;
+      // Show display_name if available, otherwise username
+      dom.userDisplay.textContent = user.display_name || user.username;
       dom.userDisplay.classList.remove("is-hidden");
     } else {
       dom.userDisplay.textContent = "";
       dom.userDisplay.classList.add("is-hidden");
     }
+  }
+  if (dom.profileButton) {
+    dom.profileButton.classList.toggle("is-hidden", !user);
   }
   if (dom.logoutButton) {
     dom.logoutButton.classList.toggle("is-hidden", !user);

@@ -58,3 +58,10 @@ SECRET_KEY = os.environ.get(
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = _parse_int_env("ACCESS_TOKEN_EXPIRE_MINUTES", 60)
 SESSION_EXTEND_MINUTES = _parse_int_env("SESSION_EXTEND_MINUTES", 60)
+
+# Avatars
+AVATARS_DIR = Path(os.environ.get("AVATARS_DIR", Path.cwd() / "data" / "avatars"))
+AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+AVATAR_MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+AVATAR_MAX_DIMENSION = 512  # pixels
+AVATAR_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif"}

@@ -30,6 +30,10 @@ import {
   checkAuthOnLoad,
   updateUserDisplay,
 } from "./screens/auth.js";
+import {
+  initializeProfileScreenEvents,
+  navigateToProfile,
+} from "./screens/profile.js";
 
 /**
  * Load app content after successful auth.
@@ -90,7 +94,26 @@ async function initialize() {
   initializeManagementScreenEvents();
   initializeTestingScreenEvents();
   initializeStatsScreenEvents();
+  initializeProfileScreenEvents();
   console.log("[App] Screen events initialized");
+
+  // Profile button handler
+  dom.profileButton?.addEventListener("click", () => {
+    navigateToProfile();
+  });
+
+  // Listen for profile updates to refresh user display
+  window.addEventListener("profileUpdated", (event) => {
+    const profile = event.detail;
+    if (profile) {
+      state.currentUser = {
+        ...state.currentUser,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+      };
+      updateUserDisplay(state.currentUser);
+    }
+  });
 
   // Setup language selector
   dom.langSelect?.addEventListener("change", (event) => {

@@ -175,6 +175,10 @@ export function renderAuthScreen() {
     dom.screenStats.classList.add("is-hidden");
     dom.screenStats.classList.remove("is-active");
   }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.add("is-hidden");
+    dom.screenProfile.classList.remove("is-active");
+  }
 }
 
 export function renderManagementScreen() {
@@ -193,6 +197,10 @@ export function renderManagementScreen() {
   if (dom.screenStats) {
     dom.screenStats.classList.add("is-hidden");
     dom.screenStats.classList.remove("is-active");
+  }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.add("is-hidden");
+    dom.screenProfile.classList.remove("is-active");
   }
 }
 
@@ -213,6 +221,10 @@ export function renderTestingScreen() {
     dom.screenStats.classList.add("is-hidden");
     dom.screenStats.classList.remove("is-active");
   }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.add("is-hidden");
+    dom.screenProfile.classList.remove("is-active");
+  }
 }
 
 export function renderStatsScreen() {
@@ -232,6 +244,33 @@ export function renderStatsScreen() {
     dom.screenTesting.classList.add("is-hidden");
     dom.screenTesting.classList.remove("is-active");
   }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.add("is-hidden");
+    dom.screenProfile.classList.remove("is-active");
+  }
+}
+
+export function renderProfileScreen() {
+  if (dom.screenAuth) {
+    dom.screenAuth.classList.add("is-hidden");
+    dom.screenAuth.classList.remove("is-active");
+  }
+  if (dom.screenProfile) {
+    dom.screenProfile.classList.remove("is-hidden");
+    dom.screenProfile.classList.add("is-active");
+  }
+  if (dom.screenManagement) {
+    dom.screenManagement.classList.add("is-hidden");
+    dom.screenManagement.classList.remove("is-active");
+  }
+  if (dom.screenTesting) {
+    dom.screenTesting.classList.add("is-hidden");
+    dom.screenTesting.classList.remove("is-active");
+  }
+  if (dom.screenStats) {
+    dom.screenStats.classList.add("is-hidden");
+    dom.screenStats.classList.remove("is-active");
+  }
 }
 
 export function setActiveScreen(screen) {
@@ -245,6 +284,8 @@ export function setActiveScreen(screen) {
     renderTestingScreen();
   } else if (screen === "stats") {
     renderStatsScreen();
+  } else if (screen === "profile") {
+    renderProfileScreen();
   } else {
     renderManagementScreen();
   }
