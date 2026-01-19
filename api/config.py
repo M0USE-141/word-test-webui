@@ -42,3 +42,19 @@ EVENTS_RETENTION_DAYS = _parse_int_env("EVENTS_RETENTION_DAYS", 30)
 EVENTS_CLEANUP_INTERVAL_SECONDS = _parse_int_env(
     "EVENTS_CLEANUP_INTERVAL_SECONDS", 24 * 60 * 60
 )
+
+# Database
+DB_DIR = Path(os.environ.get("DB_DIR", Path.cwd() / "data"))
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", f"sqlite:///{DB_DIR / 'testmaster.db'}"
+)
+
+# Authentication
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "CHANGE_ME_IN_PRODUCTION_USE_openssl_rand_hex_32"
+)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = _parse_int_env("ACCESS_TOKEN_EXPIRE_MINUTES", 60)
+SESSION_EXTEND_MINUTES = _parse_int_env("SESSION_EXTEND_MINUTES", 60)

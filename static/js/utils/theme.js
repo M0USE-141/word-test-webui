@@ -12,16 +12,24 @@ export function applyThemePreference(theme) {
   return resolvedTheme;
 }
 
-export function setupThemeToggle(toggleButton) {
-  if (!toggleButton) return;
+export function setupThemeToggle(toggleElement) {
+  if (!toggleElement) return;
 
   const saved = localStorage.getItem(THEME_STORAGE_KEY);
   const current = applyThemePreference(saved || DEFAULT_THEME);
 
-  toggleButton.addEventListener("click", () => {
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    applyThemePreference(isDark ? "light" : "dark");
-  });
+  // Set initial checkbox state
+  if (toggleElement.type === "checkbox") {
+    toggleElement.checked = current === "dark";
+    toggleElement.addEventListener("change", () => {
+      applyThemePreference(toggleElement.checked ? "dark" : "light");
+    });
+  } else {
+    toggleElement.addEventListener("click", () => {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      applyThemePreference(isDark ? "light" : "dark");
+    });
+  }
 }
 
 export function getStoredTheme() {

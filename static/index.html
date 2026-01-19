@@ -32,12 +32,18 @@
           </p>
         </div>
         <div class="app-header__controls">
+          <div class="user-controls">
+            <span id="user-display" class="user-display is-hidden"></span>
+            <button id="logout-button" type="button" class="ghost is-hidden" data-i18n="logoutButton">
+              Выйти
+            </button>
+          </div>
           <div class="language-select">
             <label for="lang-select" data-i18n="languageLabel">Язык</label>
             <select id="lang-select">
               <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
               <option value="en" data-i18n="languageEn">🇬🇧 English</option>
-              <option value="uz" data-i18n="languageUz">🇺🇿 O‘zbek</option>
+              <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
             </select>
           </div>
           <label class="theme-toggle" for="theme-toggle">
@@ -57,7 +63,103 @@
     </header>
 
     <main class="app">
-      <section id="screen-management" class="app-screen is-active">
+      <section id="screen-auth" class="app-screen is-active">
+        <div class="auth-container">
+          <div class="auth-card card">
+            <div class="auth-header">
+              <h2 data-i18n="authTitle">Авторизация</h2>
+              <p class="muted" data-i18n="authSubtitle">
+                Войдите в систему или создайте новый аккаунт
+              </p>
+            </div>
+            <div class="auth-tabs">
+              <button id="auth-login-tab" type="button" class="auth-tab is-active" data-i18n="loginTab">
+                Вход
+              </button>
+              <button id="auth-register-tab" type="button" class="auth-tab" data-i18n="registerTab">
+                Регистрация
+              </button>
+            </div>
+            <div id="auth-status" class="auth-status is-hidden"></div>
+            <form id="auth-login-form" class="auth-form">
+              <label class="auth-field">
+                <span data-i18n="usernameLabel">Имя пользователя</span>
+                <input
+                  id="auth-login-username"
+                  type="text"
+                  placeholder="Введите имя пользователя"
+                  data-i18n-placeholder="usernamePlaceholder"
+                  required
+                />
+              </label>
+              <label class="auth-field">
+                <span data-i18n="passwordLabel">Пароль</span>
+                <input
+                  id="auth-login-password"
+                  type="password"
+                  placeholder="Введите пароль"
+                  data-i18n-placeholder="passwordPlaceholder"
+                  required
+                />
+              </label>
+              <button id="auth-login-button" type="submit" class="primary" data-i18n="loginButton">
+                Войти
+              </button>
+            </form>
+            <form id="auth-register-form" class="auth-form is-hidden">
+              <label class="auth-field">
+                <span data-i18n="usernameLabel">Имя пользователя</span>
+                <input
+                  id="auth-register-username"
+                  type="text"
+                  placeholder="Введите имя пользователя"
+                  data-i18n-placeholder="usernamePlaceholder"
+                  required
+                  minlength="3"
+                  maxlength="50"
+                />
+              </label>
+              <label class="auth-field">
+                <span data-i18n="emailLabel">Email</span>
+                <input
+                  id="auth-register-email"
+                  type="email"
+                  placeholder="Введите email"
+                  data-i18n-placeholder="emailPlaceholder"
+                  required
+                />
+              </label>
+              <label class="auth-field">
+                <span data-i18n="passwordLabel">Пароль</span>
+                <input
+                  id="auth-register-password"
+                  type="password"
+                  placeholder="Введите пароль"
+                  data-i18n-placeholder="passwordPlaceholder"
+                  required
+                  minlength="6"
+                  maxlength="100"
+                />
+              </label>
+              <label class="auth-field">
+                <span data-i18n="confirmPasswordLabel">Подтвердите пароль</span>
+                <input
+                  id="auth-register-confirm-password"
+                  type="password"
+                  placeholder="Введите пароль ещё раз"
+                  data-i18n-placeholder="confirmPasswordPlaceholder"
+                  required
+                />
+              </label>
+              <button id="auth-register-button" type="submit" class="primary" data-i18n="registerButton">
+                Зарегистрироваться
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-management" class="app-screen is-hidden">
         <section class="panel panel--management">
           <div class="card card--collections">
             <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
