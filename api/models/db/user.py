@@ -23,6 +23,11 @@ class User(Base):
         nullable=False
     )
 
+    # Profile fields
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    avatar_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    avatar_size: Mapped[int | None] = mapped_column(nullable=True)
+
     # Relationships
     sessions: Mapped[list["Session"]] = relationship(
         "Session",

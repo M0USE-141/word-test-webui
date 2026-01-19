@@ -34,6 +34,9 @@
         <div class="app-header__controls">
           <div class="user-controls">
             <span id="user-display" class="user-display is-hidden"></span>
+            <button id="profile-button" type="button" class="ghost is-hidden" data-i18n="profileButton">
+              Профиль
+            </button>
             <button id="logout-button" type="button" class="ghost is-hidden" data-i18n="logoutButton">
               Выйти
             </button>
@@ -347,6 +350,114 @@
                 <div id="question-nav" class="question-nav"></div>
               </div>
             </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="screen-profile" class="app-screen is-hidden">
+        <section class="panel panel--profile">
+          <div class="card profile-card">
+            <div class="profile-header">
+              <div>
+                <h2 data-i18n="profileTitle">Профиль</h2>
+                <p class="muted" data-i18n="profileSubtitle">
+                  Управление профилем и настройки аккаунта.
+                </p>
+              </div>
+              <button
+                id="profile-back"
+                type="button"
+                class="ghost"
+                data-i18n="profileBackButton"
+              >
+                К тестам
+              </button>
+            </div>
+
+            <div class="profile-content">
+              <div class="profile-avatar-section">
+                <div class="profile-avatar">
+                  <img
+                    id="profile-avatar-image"
+                    src=""
+                    alt=""
+                    class="profile-avatar__image"
+                  />
+                  <div id="profile-avatar-placeholder" class="profile-avatar__placeholder">
+                    <span id="profile-avatar-initials"></span>
+                  </div>
+                </div>
+                <div class="profile-avatar-actions">
+                  <label class="profile-avatar-upload" for="profile-avatar-input">
+                    <span data-i18n="profileAvatarUpload">Загрузить аватар</span>
+                  </label>
+                  <input
+                    type="file"
+                    id="profile-avatar-input"
+                    class="profile-avatar-input"
+                    accept=".png,.jpg,.jpeg,.gif"
+                  />
+                  <button
+                    id="profile-avatar-delete"
+                    type="button"
+                    class="ghost danger-text"
+                    data-i18n="profileAvatarDelete"
+                  >
+                    Удалить
+                  </button>
+                </div>
+                <p class="hint" data-i18n="profileAvatarHint">
+                  PNG, JPG или GIF. Максимум 2 МБ.
+                </p>
+              </div>
+
+              <div class="profile-fields">
+                <div class="profile-field">
+                  <label for="profile-display-name" data-i18n="profileDisplayNameLabel">
+                    Отображаемое имя
+                  </label>
+                  <div class="profile-field-row">
+                    <input
+                      type="text"
+                      id="profile-display-name"
+                      placeholder="Введите отображаемое имя"
+                      data-i18n-placeholder="profileDisplayNamePlaceholder"
+                      maxlength="100"
+                    />
+                    <button
+                      id="profile-display-name-save"
+                      type="button"
+                      data-i18n="profileSaveButton"
+                    >
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+
+                <div class="profile-info">
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileUsernameLabel">
+                      Имя пользователя
+                    </span>
+                    <span id="profile-username" class="profile-info-value"></span>
+                  </div>
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileEmailLabel">
+                      Email
+                    </span>
+                    <span id="profile-email" class="profile-info-value"></span>
+                  </div>
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileCreatedAtLabel">
+                      Дата регистрации
+                    </span>
+                    <span id="profile-created-at" class="profile-info-value"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="profile-status" class="profile-status is-hidden"></div>
           </div>
         </section>
       </section>
