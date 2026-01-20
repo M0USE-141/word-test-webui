@@ -7,7 +7,7 @@ from pathlib import Path
 
 import uvicorn
 
-from api import app
+from main import app
 
 
 def wait_for_server(host, port, timeout=10):
