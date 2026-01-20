@@ -2,6 +2,9 @@ import { readTestsCache, state, writeTestsCache } from "./state.js";
 import { t } from "./i18n.js";
 import { getAuthHeaders } from "./api/auth.js";
 
+// Re-export for use by other modules
+export { getAuthHeaders };
+
 export async function fetchTests({ force = false, filter = null, limit = null, offset = 0 } = {}) {
   // Only use cache when no filter is specified
   if (!force && !filter) {

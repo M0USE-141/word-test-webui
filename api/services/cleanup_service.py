@@ -1,58 +1,67 @@
 """Service for cleanup operations."""
+import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from api.config import ATTEMPTS_DIR, EVENTS_CLEANUP_INTERVAL_SECONDS, EVENTS_RETENTION_DAYS
+from sqlalchemy import delete
+
+from api.database import SessionLocal
+from api.models.db.attempt import Attempt, AttemptStatus
 
 
-def cleanup_old_events() -> int:
-    """Remove old event files based on retention policy."""
-    if EVENTS_RETENTION_DAYS <= 0:
+# Default retention: 90 days for abandoned attempts, unlimited for completed
+ABANDONED_RETENTION_DAYS = 90
+
+
+def cleanup_abandoned_attempts() -> int:
+    """Remove old abandoned attempts from database."""
+    if ABANDONED_RETENTION_DAYS <= 0:
         return 0
-    if not ATTEMPTS_DIR.exists():
-        return 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=EVENTS_RETENTION_DAYS)
-    removed = 0
+    cutoff = datetime.now(timezone.utc) - timedelta(days=ABANDONED_RETENTION_DAYS)
+    logger = logging.getLogger(__name__)
 
-    for attempt_dir in ATTEMPTS_DIR.iterdir():
-        if not attempt_dir.is_dir():
-            continue
-        events_path = attempt_dir / "events.ndjson"
-        if not events_path.exists():
-            continue
+    try:
+        db = SessionLocal()
         try:
-            modified = datetime.fromtimestamp(
-                events_path.stat().st_mtime, timezone.utc
+            # Delete abandoned attempts older than retention period
+            result = db.execute(
+                delete(Attempt).where(
+                    Attempt.status == AttemptStatus.ABANDONED.value,
+                    Attempt.started_at < cutoff,
+                )
             )
-        except OSError:
-            continue
-        if modified < cutoff:
-            try:
-                events_path.unlink()
-            except OSError:
-                continue
-            removed += 1
-    return removed
+            db.commit()
+            deleted = result.rowcount
+            if deleted > 0:
+                logger.info(f"Cleaned up {deleted} abandoned attempts")
+            return deleted
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to cleanup abandoned attempts: {e}")
+        return 0
 
 
 def schedule_events_cleanup() -> None:
-    """Schedule periodic cleanup of old events."""
-    if EVENTS_RETENTION_DAYS <= 0:
-        return
+    """Schedule periodic cleanup of old attempts."""
+    # Run cleanup once per day
+    cleanup_interval = 24 * 60 * 60
 
     def _worker() -> None:
+        # Initial delay before first cleanup
+        time.sleep(60)
         while True:
             try:
-                cleanup_old_events()
+                cleanup_abandoned_attempts()
             except Exception:
                 pass
-            time.sleep(max(60, EVENTS_CLEANUP_INTERVAL_SECONDS))
+            time.sleep(cleanup_interval)
 
     thread = threading.Thread(
         target=_worker,
-        name="events_cleanup",
+        name="attempts_cleanup",
         daemon=True,
     )
     thread.start()

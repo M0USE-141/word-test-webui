@@ -951,7 +951,12 @@ function resolveAttemptAggregate(attempt) {
   if (!attempt || typeof attempt !== "object") {
     return {};
   }
-  return attempt.summary ?? attempt.aggregates ?? {};
+  // New API format returns stats directly on attempt object
+  // Old API format has stats nested under summary or aggregates
+  if (attempt.percentCorrect !== undefined || attempt.correctCount !== undefined) {
+    return attempt;
+  }
+  return attempt.summary ?? attempt.aggregates ?? attempt;
 }
 
 /**
@@ -1276,8 +1281,13 @@ function renderStatsQuestionStream(selectedAttempt) {
   // Hide preview when changing attempts
   hideStatsQuestionPreview();
 
-  const summary = selectedAttempt?.summary;
-  const items = Array.isArray(summary?.perQuestion) ? summary.perQuestion : [];
+  // New API format: perQuestion is directly on attempt object
+  // Old API format: perQuestion is nested under summary
+  const items = Array.isArray(selectedAttempt?.perQuestion)
+    ? selectedAttempt.perQuestion
+    : Array.isArray(selectedAttempt?.summary?.perQuestion)
+      ? selectedAttempt.summary.perQuestion
+      : [];
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "muted";
@@ -1353,8 +1363,8 @@ function renderStatsQuestionStream(selectedAttempt) {
 
 /**
  * Show question preview panel
- * @param {Object} item - Question item from perQuestion array
- * @param {string} testId - Test ID to fetch question data
+ * @param {Object} item - Question item from perQuestion array (contains questionText, options, correctOption)
+ * @param {string} testId - Test ID (for fallback lookup)
  */
 function showStatsQuestionPreview(item, testId) {
   if (!dom.statsQuestionPreview || !dom.statsPreviewContent) return;
@@ -1362,11 +1372,17 @@ function showStatsQuestionPreview(item, testId) {
   dom.statsQuestionPreview.classList.remove("is-hidden");
   clearElement(dom.statsPreviewContent);
 
-  // Find the question in the test data
-  const test = state.testsCache.find((t) => t.id === testId);
-  const question = test?.questions?.find((q) => q.id === item.questionId);
+  // Use question data directly from perQuestion item (stored during attempt)
+  const questionText = item.questionText;
+  const options = item.options || [];
+  // New API uses correctOptionIndex, old API used correctOption
+  const correctOptionIndex = item.correctOptionIndex;
+  const correctOption = item.correctOption;
 
-  if (!question) {
+  // Check if we have question data
+  const hasQuestionData = questionText && (questionText.blocks?.length || questionText.text);
+
+  if (!hasQuestionData) {
     const notice = document.createElement("p");
     notice.className = "muted";
     notice.textContent = t("statsPreviewNoQuestion");
@@ -1385,18 +1401,15 @@ function showStatsQuestionPreview(item, testId) {
 
   const questionContent = document.createElement("div");
   questionContent.className = "stats-preview-question";
-  if (question.question?.blocks && question.question.blocks.length) {
-    renderBlocks(questionContent, question.question.blocks);
+  if (questionText.blocks && questionText.blocks.length) {
+    renderBlocks(questionContent, questionText.blocks);
   } else {
-    questionContent.textContent = question.question?.text || "";
+    questionContent.textContent = questionText.text || "";
   }
   questionSection.appendChild(questionContent);
   dom.statsPreviewContent.appendChild(questionSection);
 
   // Options section
-  const options = question.options || [];
-  const correctOption = question.correct;
-
   if (options.length > 0) {
     const optionsSection = document.createElement("div");
     optionsSection.className = "stats-preview-section";
@@ -1415,12 +1428,26 @@ function showStatsQuestionPreview(item, testId) {
 
       // Check if this is the correct option
       let isCorrect = false;
-      if (correctOption?.blocks && option.blocks) {
-        const optionText = option.blocks.map((b) => b.text || "").join("");
-        const correctText = correctOption.blocks.map((b) => b.text || "").join("");
-        isCorrect = optionText === correctText;
-      } else if (correctOption === option) {
+
+      // First check: use correctOptionIndex (new API format)
+      if (typeof correctOptionIndex === "number") {
+        isCorrect = index === correctOptionIndex;
+      }
+      // Second check: option has isCorrect flag
+      else if (option.isCorrect) {
         isCorrect = true;
+      }
+      // Third check: compare with correctOption object (old API format)
+      else if (correctOption) {
+        if (correctOption.blocks && option.blocks) {
+          const optionText = option.blocks.map((b) => b.text || "").join("");
+          const correctText = correctOption.blocks.map((b) => b.text || "").join("");
+          isCorrect = optionText === correctText;
+        } else if (typeof correctOption === "object" && typeof option === "object") {
+          const optStr = JSON.stringify(option);
+          const corrStr = JSON.stringify(correctOption);
+          isCorrect = optStr === corrStr;
+        }
       }
 
       // Check if this is the selected option
@@ -1437,7 +1464,7 @@ function showStatsQuestionPreview(item, testId) {
       if (option.blocks && option.blocks.length) {
         renderBlocks(li, option.blocks);
       } else {
-        li.textContent = option.text || option;
+        li.textContent = option.text || String(option);
       }
 
       // Add badges
@@ -1452,8 +1479,6 @@ function showStatsQuestionPreview(item, testId) {
         badge.className = "stats-preview-badge stats-preview-badge--wrong";
         badge.textContent = t("statsPreviewWrong");
         li.appendChild(badge);
-      } else if (isSelected && isCorrect) {
-        // Already has correct badge, just mark as selected visually
       }
 
       optionsList.appendChild(li);

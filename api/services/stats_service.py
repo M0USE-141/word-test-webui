@@ -1,509 +1,301 @@
-"""Service layer for statistics calculation."""
-from api.config import ATTEMPTS_INDEX_PATH, STATS_VERSION
-from api.utils import (
-    attempt_stats_path,
-    parse_iso_timestamp,
-    read_json_file,
-    utc_now,
-    write_json_file,
-)
-from api.services.attempt_service import iter_attempt_metas
+"""Service layer for statistics using SQLite database."""
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import select, func, and_
+from sqlalchemy.orm import Session as DBSession
+
+from api.models.db.attempt import Attempt, AttemptAnswer, AttemptStatus
 
 
-def load_attempt_stats(attempt_id: str) -> dict[str, object]:
-    """Load attempt statistics."""
-    data = read_json_file(attempt_stats_path(attempt_id), {})
-    return data if isinstance(data, dict) else {}
-
-
-def load_attempt_index() -> list[dict[str, object]]:
-    """Load attempt index."""
-    payload = read_json_file(ATTEMPTS_INDEX_PATH, [])
-    if not isinstance(payload, list):
-        return []
-    return [item for item in payload if isinstance(item, dict)]
-
-
-def write_attempt_index(entries: list[dict[str, object]]) -> None:
-    """Write attempt index."""
-    write_json_file(ATTEMPTS_INDEX_PATH, entries)
-
-
-def resolve_metric(
-    source: dict[str, object] | None,
-    keys: list[str],
-) -> float | int | None:
-    """Resolve metric from source by trying multiple keys."""
-    if not isinstance(source, dict):
+def get_attempt_stats(db: DBSession, attempt_id: str) -> dict[str, Any] | None:
+    """
+    Get statistics for a single attempt.
+    Returns formatted statistics dict or None if attempt not found.
+    """
+    attempt = db.get(Attempt, attempt_id)
+    if not attempt:
         return None
-    for key in keys:
-        value = source.get(key)
-        if isinstance(value, bool):
-            continue
-        if isinstance(value, (int, float)):
-            return value
-    return None
 
-
-def extract_cached_metrics(
-    aggregates: dict[str, object] | None,
-    summary: dict[str, object] | None,
-) -> dict[str, float | int | None]:
-    """Extract cached metrics from aggregates or summary."""
-    return {
-        "score": resolve_metric(aggregates, ["score", "correct"])
-        or resolve_metric(summary, ["score", "correct"]),
-        "percent": resolve_metric(aggregates, ["percent", "percentCorrect"])
-        or resolve_metric(summary, ["percent", "percentCorrect"]),
-        "accuracy": resolve_metric(aggregates, ["accuracy"])
-        or resolve_metric(summary, ["accuracy"]),
-        "answerRate": resolve_metric(aggregates, ["answerRate"])
-        or resolve_metric(summary, ["answerRate"]),
-        "answeredCount": resolve_metric(aggregates, ["answeredCount", "answered"])
-        or resolve_metric(summary, ["answeredCount", "answered"]),
-        "incorrectCount": resolve_metric(aggregates, ["incorrectCount"])
-        or resolve_metric(summary, ["incorrectCount"]),
-        "skippedCount": resolve_metric(aggregates, ["skippedCount", "skipped"])
-        or resolve_metric(summary, ["skippedCount", "skipped"]),
-        "avgTimePerQuestion": resolve_metric(
-            aggregates, ["avgTimePerQuestion", "avgTime"]
-        )
-        or resolve_metric(summary, ["avgTimePerQuestion", "avgTime"]),
-        "fatiguePoint": resolve_metric(aggregates, ["fatiguePoint"])
-        or resolve_metric(summary, ["fatiguePoint"]),
-        "focusStabilityIndex": resolve_metric(aggregates, ["focusStabilityIndex"])
-        or resolve_metric(summary, ["focusStabilityIndex"]),
-        "personalDifficultyScore": resolve_metric(
-            aggregates, ["personalDifficultyScore"]
-        )
-        or resolve_metric(summary, ["personalDifficultyScore"]),
-        "questionCountUsed": resolve_metric(aggregates, ["questionCountUsed"])
-        or resolve_metric(summary, ["questionCountUsed"]),
-    }
-
-
-def upsert_attempt_index_entry(
-    attempt_id: str,
-    test_id: str,
-    client_id: str,
-    started_at: str | None = None,
-    completed_at: str | None = None,
-    score: float | int | None = None,
-    percent: float | int | None = None,
-    accuracy: float | int | None = None,
-    answered_count: float | int | None = None,
-    skipped_count: float | int | None = None,
-    avg_time_per_question: float | int | None = None,
-    fatigue_point: float | int | None = None,
-    focus_stability_index: float | int | None = None,
-    personal_difficulty_score: float | int | None = None,
-    question_count_used: float | int | None = None,
-    stats_version: int | None = None,
-) -> dict[str, object]:
-    """Upsert entry in attempt index."""
-    entries = load_attempt_index()
-    entry = next(
-        (item for item in entries if item.get("attemptId") == attempt_id),
-        None,
+    # Get answers for per-question data
+    answers = list(
+        db.execute(
+            select(AttemptAnswer)
+            .where(AttemptAnswer.attempt_id == attempt_id)
+            .order_by(AttemptAnswer.question_index)
+        ).scalars().all()
     )
 
-    if entry is None:
-        entry = {
-            "attemptId": attempt_id,
-            "testId": test_id,
-            "clientId": client_id,
-            "startedAt": started_at,
-            "completedAt": completed_at,
-            "score": score,
-            "percent": percent,
-            "accuracy": accuracy,
-            "answeredCount": answered_count,
-            "skippedCount": skipped_count,
-            "avgTimePerQuestion": avg_time_per_question,
-            "fatiguePoint": fatigue_point,
-            "focusStabilityIndex": focus_stability_index,
-            "personalDifficultyScore": personal_difficulty_score,
-            "questionCountUsed": question_count_used,
-            "statsVersion": stats_version,
-        }
-        entries.append(entry)
-        write_attempt_index(entries)
-        return entry
-
-    if started_at and not entry.get("startedAt"):
-        entry["startedAt"] = started_at
-    if completed_at:
-        entry["completedAt"] = completed_at
-    if score is not None:
-        entry["score"] = score
-    if percent is not None:
-        entry["percent"] = percent
-    if accuracy is not None:
-        entry["accuracy"] = accuracy
-    if answered_count is not None:
-        entry["answeredCount"] = answered_count
-    if skipped_count is not None:
-        entry["skippedCount"] = skipped_count
-    if avg_time_per_question is not None:
-        entry["avgTimePerQuestion"] = avg_time_per_question
-    if fatigue_point is not None:
-        entry["fatiguePoint"] = fatigue_point
-    if focus_stability_index is not None:
-        entry["focusStabilityIndex"] = focus_stability_index
-    if personal_difficulty_score is not None:
-        entry["personalDifficultyScore"] = personal_difficulty_score
-    if question_count_used is not None:
-        entry["questionCountUsed"] = question_count_used
-    if stats_version is not None:
-        entry["statsVersion"] = stats_version
-    write_attempt_index(entries)
-    return entry
+    return format_attempt_stats(attempt, answers)
 
 
-def rebuild_attempt_index() -> list[dict[str, object]]:
-    """Rebuild attempt index from all attempt metadata."""
-    entries: list[dict[str, object]] = []
-    for attempt_payload in iter_attempt_metas():
-        attempt_id = attempt_payload.get("attemptId")
-        test_id = attempt_payload.get("testId")
-        client_id = attempt_payload.get("clientId")
-        if not attempt_id or not test_id or not client_id:
-            continue
-
-        stats_payload = load_attempt_stats(str(attempt_id))
-        aggregates = stats_payload.get("aggregates")
-        summary = stats_payload.get("summary")
-        metrics = extract_cached_metrics(aggregates, summary)
-
-        timestamps = attempt_payload.get("timestamps", {})
-        if not isinstance(timestamps, dict):
-            timestamps = {}
-
-        entries.append(
-            {
-                "attemptId": attempt_id,
-                "testId": test_id,
-                "clientId": client_id,
-                "startedAt": timestamps.get("createdAt"),
-                "completedAt": timestamps.get("finalizedAt"),
-                "score": metrics["score"],
-                "percent": metrics["percent"],
-                "accuracy": metrics["accuracy"],
-                "answeredCount": metrics["answeredCount"],
-                "skippedCount": metrics["skippedCount"],
-                "avgTimePerQuestion": metrics["avgTimePerQuestion"],
-                "fatiguePoint": metrics["fatiguePoint"],
-                "focusStabilityIndex": metrics["focusStabilityIndex"],
-                "personalDifficultyScore": metrics["personalDifficultyScore"],
-                "questionCountUsed": metrics["questionCountUsed"],
-                "statsVersion": stats_payload.get("statsVersion"),
-            }
-        )
-    write_attempt_index(entries)
-    return entries
-
-
-def build_attempt_summary_from_events(
-    attempt_id: str,
-    attempt_meta: dict[str, object],
-    test_payload: dict[str, object],
-    events: list[dict[str, object]],
-) -> dict[str, object]:
-    """Build attempt summary from events."""
-    questions = test_payload.get("questions", [])
-    if not isinstance(questions, list):
-        questions = []
-
-    answer_events: dict[int, dict[str, object]] = {}
-    attempt_started = None
-    attempt_finished = None
-    attempt_finished_duration = None
-
-    for event in events:
-        if not isinstance(event, dict):
-            continue
-        event_type = event.get("eventType")
-        question_id = event.get("questionId")
-
-        if event_type in {"answer_selected", "answer_changed", "question_skipped"}:
-            if isinstance(question_id, int):
-                answer_events[question_id] = event
-        if event_type == "attempt_started":
-            attempt_started = parse_iso_timestamp(event.get("ts"))
-        if event_type == "attempt_finished":
-            attempt_finished = parse_iso_timestamp(event.get("ts"))
-            duration = event.get("durationMs")
-            if isinstance(duration, (int, float)) and not isinstance(duration, bool):
-                attempt_finished_duration = int(duration)
-
-    total = len(questions)
-    answered_count = 0
-    correct_count = 0
-    per_question = []
-    durations = []
-
-    for index, entry in enumerate(questions):
-        if not isinstance(entry, dict):
-            continue
-        question_id = entry.get("id")
-        if not isinstance(question_id, int):
-            continue
-
-        event = answer_events.get(question_id)
-        is_answered = False
-        is_correct = None
-        duration_ms = 0
-        answer_index = None
-
-        if event:
-            event_type = event.get("eventType")
-            if event_type in {"answer_selected", "answer_changed"}:
-                is_answered = True
-                is_correct = event.get("isCorrect")
-                if not isinstance(is_correct, bool):
-                    is_correct = None
-                # Get selected answer index
-                answer_idx = event.get("answerIndex")
-                if isinstance(answer_idx, int):
-                    answer_index = answer_idx
-            if event_type == "question_skipped":
-                is_answered = False
-            duration_value = event.get("durationMs")
-            if isinstance(duration_value, (int, float)) and not isinstance(
-                duration_value, bool
-            ):
-                duration_ms = int(duration_value)
-
-        if is_answered:
-            answered_count += 1
-            if is_correct is True:
-                correct_count += 1
-
-        durations.append(duration_ms)
-        per_question.append(
-            {
-                "questionId": question_id,
-                "index": index,
-                "isCorrect": is_correct if is_answered else None,
-                "durationMs": duration_ms,
-                "isSkipped": not is_answered,
-                "answerIndex": answer_index,
-            }
-        )
-
-    skipped_count = total - answered_count
-
-    # Get questionCount from settings (0 means all questions)
-    settings = attempt_meta.get("settings", {})
-    if not isinstance(settings, dict):
-        settings = {}
-    question_count_setting = settings.get("questionCount", 0)
-    if not isinstance(question_count_setting, int) or question_count_setting <= 0:
-        question_count_setting = 0
-
-    # Determine the base for percentage calculations
-    # If questionCount is set, use it; otherwise use total questions
-    question_count_used = question_count_setting if question_count_setting > 0 else total
-
-    # Calculate percentages based on questionCount
-    percent_correct = (correct_count / question_count_used) * 100 if question_count_used else 0
+def format_attempt_stats(
+    attempt: Attempt,
+    answers: list[AttemptAnswer] | None = None,
+) -> dict[str, Any]:
+    """Format attempt into statistics dict."""
+    question_count = attempt.question_count or 0
+    answered_count = attempt.answered_count or 0
+    correct_count = attempt.correct_count or 0
     incorrect_count = answered_count - correct_count
-    percent_incorrect = (incorrect_count / question_count_used) * 100 if question_count_used else 0
-    unanswered_count = question_count_used - answered_count if question_count_used > answered_count else 0
-    percent_unanswered = (unanswered_count / question_count_used) * 100 if question_count_used else 0
+    skipped_count = question_count - answered_count
 
-    # Accuracy is correct / answered (how accurate were the answers given)
-    accuracy = (correct_count / answered_count) * 100 if answered_count else 0
-    # Answer rate is answered / questionCount (completion rate)
-    answer_rate = (answered_count / question_count_used) * 100 if question_count_used else 0
+    # Calculate percentages
+    percent_correct = (correct_count / question_count * 100) if question_count else 0
+    percent_incorrect = (incorrect_count / question_count * 100) if question_count else 0
+    percent_unanswered = (skipped_count / question_count * 100) if question_count else 0
 
-    accuracy_by_index: list[float | None] = []
-    tempo_by_index: list[int] = []
+    # Accuracy = correct / answered (how accurate the given answers were)
+    accuracy = (correct_count / answered_count * 100) if answered_count else 0
 
-    for item in per_question:
-        if not isinstance(item, dict):
-            continue
-        is_correct = item.get("isCorrect")
-        if isinstance(is_correct, bool):
-            accuracy_by_index.append(100.0 if is_correct else 0.0)
-        else:
-            accuracy_by_index.append(None)
-        duration_value = item.get("durationMs")
-        if isinstance(duration_value, (int, float)) and not isinstance(
-            duration_value, bool
-        ):
-            tempo_by_index.append(int(duration_value))
-        else:
-            tempo_by_index.append(0)
+    # Answer rate = answered / total
+    answer_rate = (answered_count / question_count * 100) if question_count else 0
 
-    total_duration_ms = 0
-    if attempt_finished_duration is not None:
-        total_duration_ms = attempt_finished_duration
-    else:
-        start_time = attempt_started
-        end_time = attempt_finished
-        if start_time and end_time:
-            total_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+    # Average time per question
+    avg_time = 0
+    if answers:
+        total_duration = sum(a.duration_ms for a in answers if a.duration_ms)
+        avg_time = total_duration / len(answers) if answers else 0
 
-    question_duration_total_ms = sum(durations)
-    avg_time_per_question = question_duration_total_ms / total if total else 0
+    # Build per-question data
+    per_question = []
+    if answers:
+        for answer in answers:
+            per_question.append({
+                "questionId": answer.question_id,
+                "index": answer.question_index,
+                "isCorrect": answer.is_correct,
+                "isSkipped": answer.is_skipped,
+                "durationMs": answer.duration_ms,
+                "answerIndex": answer.answer_index,
+                # Question snapshot for preview
+                "questionText": answer.question_text,
+                "options": answer.options,
+                "correctOptionIndex": answer.correct_option_index,
+            })
 
-    def _average(values: list[int]) -> float:
-        if not values:
-            return 0.0
-        return sum(values) / len(values)
-
-    def _average_optional(values: list[float | None]) -> float | None:
-        filtered = [value for value in values if isinstance(value, (int, float))]
-        if not filtered:
-            return None
-        return sum(filtered) / len(filtered)
-
-    def _standard_deviation(values: list[int]) -> float:
-        if len(values) < 2:
-            return 0.0
-        mean = _average(values)
-        variance = sum((value - mean) ** 2 for value in values) / len(values)
-        return variance**0.5
-
-    # Calculate fatigue point
-    accuracy_series: list[float | None] = []
-    for item in per_question:
-        is_correct = item.get("isCorrect")
-        if isinstance(is_correct, bool):
-            accuracy_series.append(1.0 if is_correct else 0.0)
-        else:
-            accuracy_series.append(None)
-
-    window_size = max(1, len(accuracy_series) // 3) if accuracy_series else 1
-    best_average: float | None = None
-    fatigue_index: int | None = None
-
-    for index in range(len(accuracy_series)):
-        start = max(0, index - window_size + 1)
-        window_avg = _average_optional(accuracy_series[start : index + 1])
-        if window_avg is None:
-            continue
-        if best_average is None or window_avg > best_average:
-            best_average = window_avg
-        elif fatigue_index is None and window_avg < best_average:
-            fatigue_index = index
-
-    fatigue_point = (
-        (fatigue_index + 1) / len(accuracy_series)
-        if fatigue_index is not None and accuracy_series
-        else 0
-    )
-
-    mean = _average(durations)
-    focus_stability_index = (
-        max(0.0, 1 - _standard_deviation(durations) / mean) if mean else 0.0
-    )
-    personal_difficulty_score = (
-        max(0.0, 1 - correct_count / total) if total else 0.0
-    )
-
-    timestamps = attempt_meta.get("timestamps", {})
-    if not isinstance(timestamps, dict):
-        timestamps = {}
-    completed = bool(
-        timestamps.get("finalizedAt")
-        or attempt_finished
-        or any(event.get("eventType") == "attempt_finished" for event in events)
-    )
-
-    summary = {
-        "attemptId": attempt_id,
-        "testId": attempt_meta.get("testId"),
-        "clientId": attempt_meta.get("clientId"),
-        "ts": utc_now(),
-        "timezone": "UTC",
-        "settings": attempt_meta.get("settings", {}),
-        "score": correct_count,
-        "percentCorrect": percent_correct,
-        "accuracy": accuracy,
-        "answerRate": answer_rate,
-        "completed": completed,
+    return {
+        "attemptId": attempt.id,
+        "testId": attempt.test_id,
+        "clientId": attempt.client_id,
+        "userId": attempt.user_id,
+        "status": attempt.status,
+        "startedAt": attempt.started_at.isoformat() if attempt.started_at else None,
+        "finishedAt": attempt.finished_at.isoformat() if attempt.finished_at else None,
+        "totalDurationMs": attempt.total_duration_ms,
+        "questionCount": question_count,
         "answeredCount": answered_count,
+        "correctCount": correct_count,
         "incorrectCount": incorrect_count,
-        "unansweredCount": unanswered_count,
         "skippedCount": skipped_count,
-        "totalDurationMs": total_duration_ms,
-        "avgTimePerQuestion": avg_time_per_question,
+        "percentCorrect": round(percent_correct, 1),
+        "percentIncorrect": round(percent_incorrect, 1),
+        "percentUnanswered": round(percent_unanswered, 1),
+        "accuracy": round(accuracy, 1),
+        "answerRate": round(answer_rate, 1),
+        "avgTimePerQuestion": round(avg_time, 0),
+        "settings": attempt.settings,
         "perQuestion": per_question,
-        "fatiguePoint": fatigue_point,
-        "focusStabilityIndex": focus_stability_index,
-        "personalDifficultyScore": personal_difficulty_score,
-        "accuracyByIndex": accuracy_by_index,
-        "tempoByIndex": tempo_by_index,
-        "timeByIndex": tempo_by_index,
-        "totalCount": total,
-        "questionCountUsed": question_count_used,
-        "percentIncorrect": percent_incorrect,
-        "percentUnanswered": percent_unanswered,
     }
-    return summary
 
 
-def write_attempt_stats_from_summary(
-    attempt_id: str,
+def get_attempts_list(
+    db: DBSession,
+    client_id: str | None = None,
+    user_id: int | None = None,
+    test_id: str | None = None,
+    status: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    """
+    Get list of attempts with basic stats (for attempt list view).
+    Returns tuple of (attempts_list, total_count).
+    """
+    # Build base query
+    query = select(Attempt)
+    count_query = select(func.count(Attempt.id))
+
+    # Apply filters
+    conditions = []
+    if client_id:
+        conditions.append(Attempt.client_id == client_id)
+    if user_id:
+        conditions.append(Attempt.user_id == user_id)
+    if test_id:
+        conditions.append(Attempt.test_id == test_id)
+    if status:
+        conditions.append(Attempt.status == status)
+    if start_date:
+        conditions.append(Attempt.started_at >= start_date)
+    if end_date:
+        conditions.append(Attempt.started_at <= end_date)
+
+    if conditions:
+        query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
+
+    # Get total count
+    total = db.execute(count_query).scalar() or 0
+
+    # Get paginated results
+    query = query.order_by(Attempt.started_at.desc()).limit(limit).offset(offset)
+    attempts = list(db.execute(query).scalars().all())
+
+    # Format results (without per-question data for list view)
+    results = []
+    for attempt in attempts:
+        results.append({
+            "attemptId": attempt.id,
+            "testId": attempt.test_id,
+            "clientId": attempt.client_id,
+            "userId": attempt.user_id,
+            "status": attempt.status,
+            "startedAt": attempt.started_at.isoformat() if attempt.started_at else None,
+            "finishedAt": attempt.finished_at.isoformat() if attempt.finished_at else None,
+            "totalDurationMs": attempt.total_duration_ms,
+            "questionCount": attempt.question_count,
+            "answeredCount": attempt.answered_count,
+            "correctCount": attempt.correct_count,
+            "percentCorrect": attempt.percent_correct,
+        })
+
+    return results, total
+
+
+def get_aggregate_stats(
+    db: DBSession,
+    client_id: str | None = None,
+    user_id: int | None = None,
+    test_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict[str, Any]:
+    """
+    Calculate aggregate statistics across multiple attempts.
+    """
+    # Build base query for completed attempts only
+    query = select(Attempt).where(Attempt.status == AttemptStatus.COMPLETED.value)
+
+    # Apply filters
+    conditions = []
+    if client_id:
+        conditions.append(Attempt.client_id == client_id)
+    if user_id:
+        conditions.append(Attempt.user_id == user_id)
+    if test_id:
+        conditions.append(Attempt.test_id == test_id)
+    if start_date:
+        conditions.append(Attempt.started_at >= start_date)
+    if end_date:
+        conditions.append(Attempt.started_at <= end_date)
+
+    if conditions:
+        query = query.where(and_(*conditions))
+
+    attempts = list(db.execute(query).scalars().all())
+
+    if not attempts:
+        return {
+            "attemptCount": 0,
+            "totalQuestions": 0,
+            "totalAnswered": 0,
+            "totalCorrect": 0,
+            "avgPercentCorrect": 0,
+            "avgTimePerQuestion": 0,
+            "totalDurationMs": 0,
+        }
+
+    # Calculate aggregates
+    total_questions = sum(a.question_count for a in attempts)
+    total_answered = sum(a.answered_count for a in attempts)
+    total_correct = sum(a.correct_count for a in attempts)
+    total_duration = sum(a.total_duration_ms for a in attempts)
+
+    # Average percent correct across attempts
+    percents = [a.percent_correct for a in attempts]
+    avg_percent = sum(percents) / len(percents) if percents else 0
+
+    # Average time per question (across all answers)
+    avg_time = total_duration / total_questions if total_questions else 0
+
+    return {
+        "attemptCount": len(attempts),
+        "totalQuestions": total_questions,
+        "totalAnswered": total_answered,
+        "totalCorrect": total_correct,
+        "avgPercentCorrect": round(avg_percent, 1),
+        "avgTimePerQuestion": round(avg_time, 0),
+        "totalDurationMs": total_duration,
+    }
+
+
+def get_test_owner_stats(
+    db: DBSession,
     test_id: str,
-    client_id: str,
-    summary: dict[str, object],
-    event_count: int,
-) -> dict[str, object]:
-    """Write attempt statistics from summary."""
-    aggregates = {
-        "score": summary.get("score"),
-        "percentCorrect": summary.get("percentCorrect"),
-        "percentIncorrect": summary.get("percentIncorrect"),
-        "percentUnanswered": summary.get("percentUnanswered"),
-        "accuracy": summary.get("accuracy"),
-        "answerRate": summary.get("answerRate"),
-        "answeredCount": summary.get("answeredCount"),
-        "incorrectCount": summary.get("incorrectCount"),
-        "unansweredCount": summary.get("unansweredCount"),
-        "skippedCount": summary.get("skippedCount"),
-        "avgTimePerQuestion": summary.get("avgTimePerQuestion"),
-        "totalDurationMs": summary.get("totalDurationMs"),
-        "fatiguePoint": summary.get("fatiguePoint"),
-        "focusStabilityIndex": summary.get("focusStabilityIndex"),
-        "personalDifficultyScore": summary.get("personalDifficultyScore"),
-        "accuracyByIndex": summary.get("accuracyByIndex"),
-        "tempoByIndex": summary.get("tempoByIndex") or summary.get("timeByIndex"),
-        "timeByIndex": summary.get("timeByIndex"),
-        "totalCount": summary.get("totalCount"),
-        "questionCountUsed": summary.get("questionCountUsed"),
-    }
-
-    stats_payload = {
-        "attemptId": attempt_id,
-        "testId": test_id,
-        "clientId": client_id,
-        "statsVersion": STATS_VERSION,
-        "aggregates": aggregates,
-        "summary": summary,
-        "perQuestion": summary.get("perQuestion", []),
-        "eventCount": event_count,
-    }
-
-    write_json_file(attempt_stats_path(attempt_id), stats_payload)
-
-    metrics = extract_cached_metrics(aggregates, summary)
-    upsert_attempt_index_entry(
-        attempt_id,
-        test_id,
-        client_id,
-        score=metrics["score"],
-        percent=metrics["percent"],
-        accuracy=metrics["accuracy"],
-        answered_count=metrics["answeredCount"],
-        skipped_count=metrics["skippedCount"],
-        avg_time_per_question=metrics["avgTimePerQuestion"],
-        fatigue_point=metrics["fatiguePoint"],
-        focus_stability_index=metrics["focusStabilityIndex"],
-        personal_difficulty_score=metrics["personalDifficultyScore"],
-        question_count_used=metrics["questionCountUsed"],
-        stats_version=STATS_VERSION,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """
+    Get statistics for a test (for test owners).
+    Shows all users who attempted the test.
+    """
+    # Build query
+    query = select(Attempt).where(
+        Attempt.test_id == test_id,
+        Attempt.status == AttemptStatus.COMPLETED.value,
     )
-    return stats_payload
+    count_query = select(func.count(Attempt.id)).where(
+        Attempt.test_id == test_id,
+        Attempt.status == AttemptStatus.COMPLETED.value,
+    )
+
+    if start_date:
+        query = query.where(Attempt.started_at >= start_date)
+        count_query = count_query.where(Attempt.started_at >= start_date)
+    if end_date:
+        query = query.where(Attempt.started_at <= end_date)
+        count_query = count_query.where(Attempt.started_at <= end_date)
+
+    total = db.execute(count_query).scalar() or 0
+
+    query = query.order_by(Attempt.started_at.desc()).limit(limit).offset(offset)
+    attempts = list(db.execute(query).scalars().all())
+
+    # Calculate overall stats
+    if attempts:
+        total_correct = sum(a.correct_count for a in attempts)
+        total_questions = sum(a.question_count for a in attempts)
+        avg_percent = sum(a.percent_correct for a in attempts) / len(attempts)
+    else:
+        total_correct = 0
+        total_questions = 0
+        avg_percent = 0
+
+    # Format attempt list
+    attempt_list = []
+    for attempt in attempts:
+        attempt_list.append({
+            "attemptId": attempt.id,
+            "userId": attempt.user_id,
+            "clientId": attempt.client_id,
+            "startedAt": attempt.started_at.isoformat() if attempt.started_at else None,
+            "finishedAt": attempt.finished_at.isoformat() if attempt.finished_at else None,
+            "questionCount": attempt.question_count,
+            "correctCount": attempt.correct_count,
+            "percentCorrect": attempt.percent_correct,
+            "totalDurationMs": attempt.total_duration_ms,
+        })
+
+    return {
+        "testId": test_id,
+        "totalAttempts": total,
+        "totalCorrect": total_correct,
+        "totalQuestions": total_questions,
+        "avgPercentCorrect": round(avg_percent, 1),
+        "attempts": attempt_list,
+    }

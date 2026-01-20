@@ -28,20 +28,7 @@ def _parse_int_env(name: str, default: int) -> int:
 DATA_DIR = Path(os.environ.get("TEST_DATA_DIR", Path.cwd() / "data" / "tests"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-ATTEMPTS_DIR = Path(
-    os.environ.get("TEST_ATTEMPTS_DIR", Path.cwd() / "data" / "attempts")
-)
-ATTEMPTS_DIR.mkdir(parents=True, exist_ok=True)
-
-ATTEMPTS_INDEX_PATH = ATTEMPTS_DIR / "index.json"
 STATIC_DIR = _resource_path("static")
-
-# Constants
-STATS_VERSION = 1
-EVENTS_RETENTION_DAYS = _parse_int_env("EVENTS_RETENTION_DAYS", 30)
-EVENTS_CLEANUP_INTERVAL_SECONDS = _parse_int_env(
-    "EVENTS_CLEANUP_INTERVAL_SECONDS", 24 * 60 * 60
-)
 
 # Database
 DB_DIR = Path(os.environ.get("DB_DIR", Path.cwd() / "data"))

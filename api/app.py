@@ -9,6 +9,7 @@ from api.database import init_db
 from api.routes import access, assets, attempts, auth, change_requests, questions, statistics, tests, users
 from api.services.cleanup_service import schedule_events_cleanup
 from logging_setup import setup_console_logging
+import logging
 
 setup_console_logging()
 
@@ -27,8 +28,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_events() -> None:
     """Initialize database and schedule cleanup tasks on startup."""
+    logger = logging.getLogger(__name__)
     init_db()
     schedule_events_cleanup()
+    logger.info("Application started with SQLite-based attempts storage")
 
 
 # Root endpoint
