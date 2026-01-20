@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session as DbSession
 
 from api.config import DATA_DIR
@@ -26,8 +26,21 @@ router = APIRouter(prefix="/api/tests", tags=["tests"])
 def list_tests(
     current_user: Annotated[User | None, Depends(get_optional_user)],
     db: Annotated[DbSession, Depends(get_db)],
-) -> list[dict[str, object]]:
-    """List all tests accessible to the current user."""
+    filter_type: str | None = Query(None, alias="filter"),
+    limit: int | None = Query(None, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict[str, object]:
+    """List all tests accessible to the current user.
+
+    Args:
+        filter_type: Filter type - "my" (owned by user), "shared" (shared with user),
+                    "public" (public tests), or None for all accessible tests
+        limit: Maximum number of tests to return
+        offset: Number of tests to skip (for pagination)
+
+    Returns:
+        Dictionary with tests list and pagination info
+    """
     # Get accessible test IDs from database
     accessible_ids = set(access_service.get_accessible_test_ids(db, current_user))
 
@@ -52,7 +65,20 @@ def list_tests(
             metadata["access_level"] = collection.access_level
             metadata["owner_id"] = collection.owner_id
             metadata["owner_username"] = collection.owner.username
-            metadata["is_owner"] = current_user and collection.owner_id == current_user.id
+            is_owner = current_user and collection.owner_id == current_user.id
+            metadata["is_owner"] = is_owner
+
+            # Apply filter
+            if filter_type == "my":
+                if not is_owner:
+                    continue
+            elif filter_type == "shared":
+                # Shared means: not owner and not public
+                if is_owner or collection.access_level == AccessLevel.PUBLIC:
+                    continue
+            elif filter_type == "public":
+                if collection.access_level != AccessLevel.PUBLIC:
+                    continue
         else:
             # No access control record - show to everyone (backwards compatibility)
             metadata["access_level"] = "public"
@@ -60,8 +86,25 @@ def list_tests(
             metadata["owner_username"] = None
             metadata["is_owner"] = False
 
+            # Apply filter for legacy tests (no owner)
+            if filter_type == "my" or filter_type == "shared":
+                continue  # Legacy tests without owner don't match "my" or "shared"
+
         tests.append(metadata)
-    return tests
+
+    # Apply pagination
+    total = len(tests)
+    if offset:
+        tests = tests[offset:]
+    if limit:
+        tests = tests[:limit]
+
+    return {
+        "tests": tests,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 @router.post("")

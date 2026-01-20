@@ -4,6 +4,7 @@
 
 import { dom, state } from "../state.js";
 import { t } from "../i18n.js";
+import { renderBlocks } from "../rendering.js";
 import {
   fetchChangeRequests,
   fetchChangeRequestStats,
@@ -179,12 +180,31 @@ function createChangeRequestCard(cr) {
 
   meta.append(userEl, dateEl);
 
-  // Payload preview
+  // Payload preview (short)
   const preview = document.createElement("div");
   preview.className = "cr-card__preview";
   preview.innerHTML = renderPayloadPreview(cr);
 
-  card.append(header, meta, preview);
+  // Full preview section (initially hidden)
+  const fullPreview = document.createElement("div");
+  fullPreview.className = "cr-card__full-preview is-hidden";
+
+  // Preview toggle button
+  const previewToggle = document.createElement("button");
+  previewToggle.type = "button";
+  previewToggle.className = "cr-preview-toggle";
+  previewToggle.textContent = t("crShowPreview");
+  previewToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = !fullPreview.classList.contains("is-hidden");
+    fullPreview.classList.toggle("is-hidden", isExpanded);
+    previewToggle.textContent = isExpanded ? t("crShowPreview") : t("crHidePreview");
+    if (!isExpanded && fullPreview.children.length === 0) {
+      renderFullPreview(fullPreview, cr);
+    }
+  });
+
+  card.append(header, meta, preview, previewToggle, fullPreview);
 
   // Actions (only for pending)
   if (cr.status === "pending") {
@@ -264,7 +284,7 @@ function getStatusLabel(status) {
 }
 
 /**
- * Render payload preview.
+ * Render payload preview (short summary).
  * @param {Object} cr
  * @returns {string}
  */
@@ -301,6 +321,113 @@ function renderPayloadPreview(cr) {
   }
 
   return `<span class="muted">${t("crNoPreview")}</span>`;
+}
+
+/**
+ * Render full question preview for add/edit question requests.
+ * @param {HTMLElement} container
+ * @param {Object} cr
+ */
+function renderFullPreview(container, cr) {
+  const payload = cr.payload || {};
+  container.innerHTML = "";
+
+  if (cr.request_type === "delete_question") {
+    const notice = document.createElement("p");
+    notice.className = "muted";
+    notice.textContent = t("crDeleteQuestionPreview", { id: cr.question_id });
+    container.appendChild(notice);
+    return;
+  }
+
+  if (cr.request_type === "edit_settings") {
+    const details = document.createElement("div");
+    details.className = "cr-preview-details";
+    if (payload.title) {
+      details.innerHTML = `<p><strong>${t("crNewTitle")}:</strong> ${payload.title}</p>`;
+    }
+    container.appendChild(details);
+    return;
+  }
+
+  // For add/edit question
+  const questionSection = document.createElement("div");
+  questionSection.className = "cr-preview-section";
+
+  // Question text
+  const questionLabel = document.createElement("div");
+  questionLabel.className = "cr-preview-label";
+  questionLabel.textContent = t("crPreviewQuestion");
+  questionSection.appendChild(questionLabel);
+
+  const questionContent = document.createElement("div");
+  questionContent.className = "cr-preview-content";
+  if (payload.question?.blocks && payload.question.blocks.length) {
+    renderBlocks(questionContent, payload.question.blocks);
+  } else if (payload.questionText) {
+    questionContent.textContent = payload.questionText;
+  } else {
+    questionContent.innerHTML = `<span class="muted">${t("crNoQuestionText")}</span>`;
+  }
+  questionSection.appendChild(questionContent);
+  container.appendChild(questionSection);
+
+  // Options
+  const options = payload.options || [];
+  const correctOption = payload.correct;
+
+  if (options.length > 0) {
+    const optionsSection = document.createElement("div");
+    optionsSection.className = "cr-preview-section";
+
+    const optionsLabel = document.createElement("div");
+    optionsLabel.className = "cr-preview-label";
+    optionsLabel.textContent = t("crPreviewOptions");
+    optionsSection.appendChild(optionsLabel);
+
+    const optionsList = document.createElement("ul");
+    optionsList.className = "cr-preview-options";
+
+    options.forEach((option, index) => {
+      const li = document.createElement("li");
+      li.className = "cr-preview-option";
+
+      // Check if this is the correct option
+      let isCorrect = false;
+      if (correctOption?.blocks && option.blocks) {
+        // Compare blocks
+        const optionText = option.blocks.map(b => b.text || "").join("");
+        const correctText = correctOption.blocks.map(b => b.text || "").join("");
+        isCorrect = optionText === correctText;
+      } else if (correctOption?.index !== undefined) {
+        isCorrect = correctOption.index === index;
+      }
+
+      if (isCorrect) {
+        li.classList.add("cr-preview-option--correct");
+      }
+
+      if (option.blocks && option.blocks.length) {
+        renderBlocks(li, option.blocks);
+      } else if (option.text) {
+        li.textContent = option.text;
+      } else {
+        li.textContent = `${t("crOptionPrefix")} ${index + 1}`;
+      }
+
+      if (isCorrect) {
+        const correctBadge = document.createElement("span");
+        correctBadge.className = "cr-correct-badge";
+        correctBadge.textContent = t("crCorrectAnswer");
+        li.appendChild(correctBadge);
+      }
+
+      optionsList.appendChild(li);
+    });
+
+    optionsSection.appendChild(optionsList);
+    container.appendChild(optionsSection);
+  }
 }
 
 /**

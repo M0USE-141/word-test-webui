@@ -319,6 +319,10 @@ export function updateEditorTestActions() {
   if (dom.editorChangeRequestsButton) {
     dom.editorChangeRequestsButton.classList.toggle("is-hidden", !isOwner);
   }
+  // Only owners can see test statistics
+  if (dom.editorTestStatsButton) {
+    dom.editorTestStatsButton.classList.toggle("is-hidden", !isOwner);
+  }
 }
 
 export function renderUploadLogs(messages, isError = false) {
@@ -950,6 +954,53 @@ function resolveAttemptAggregate(attempt) {
   return attempt.summary ?? attempt.aggregates ?? {};
 }
 
+/**
+ * Compute aggregate statistics across all attempts
+ * @param {Array} attempts
+ * @returns {Object}
+ */
+function computeAggregateStats(attempts) {
+  if (!Array.isArray(attempts) || attempts.length === 0) {
+    return {};
+  }
+
+  let totalScore = 0;
+  let totalQuestions = 0;
+  let totalAnswered = 0;
+  let totalDurationMs = 0;
+  let attemptCount = 0;
+
+  attempts.forEach((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+    const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+    const answered = resolveAggregateValue(aggregate, ["answeredCount"]);
+    const duration = resolveAggregateValue(aggregate, ["totalDurationMs"]);
+
+    if (Number.isFinite(score)) totalScore += score;
+    if (Number.isFinite(total)) totalQuestions += total;
+    if (Number.isFinite(answered)) totalAnswered += answered;
+    else if (Number.isFinite(total)) totalAnswered += total;
+    if (Number.isFinite(duration)) totalDurationMs += duration;
+    attemptCount++;
+  });
+
+  const percentCorrect =
+    totalQuestions > 0 ? (totalScore / totalQuestions) * 100 : null;
+  const avgTimePerQuestion =
+    totalAnswered > 0 ? totalDurationMs / totalAnswered : null;
+
+  return {
+    score: totalScore,
+    total: totalQuestions,
+    answeredCount: totalAnswered,
+    totalDurationMs,
+    percentCorrect,
+    avgTimePerQuestion,
+    attemptCount,
+  };
+}
+
 function createKpiCard({ label, value, hint }) {
   const card = document.createElement("div");
   card.className = "kpi-card";
@@ -1132,24 +1183,42 @@ function renderStatsAttemptSelect(attempts, selectedAttemptId) {
   dom.statsAttemptSelect.value = selectedAttemptId || attempts[0].attemptId;
 }
 
-function renderStatsKpis({ attempts, selectedAttempt }) {
+function renderStatsKpis({ attempts, selectedAttempt, isAggregate = false }) {
   if (!dom.statsKpiGrid) {
     return;
   }
   clearElement(dom.statsKpiGrid);
-  const aggregate = resolveAttemptAggregate(selectedAttempt);
-  const score = resolveAggregateValue(aggregate, ["score", "correct"]);
-  const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
-  const percent =
-    resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
-    (Number.isFinite(score) && Number.isFinite(total) && total > 0
-      ? (score / total) * 100
-      : null);
-  const answered = resolveAggregateValue(aggregate, ["answeredCount"]);
-  const avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
-  const totalDuration = resolveAggregateValue(aggregate, ["totalDurationMs"]);
-  const focusIndex = resolveAggregateValue(aggregate, ["focusStabilityIndex"]);
-  const fatigueIndex = resolveAggregateValue(aggregate, ["fatiguePoint"]);
+
+  let aggregate;
+  let score, total, percent, answered, avgTime, totalDuration, focusIndex, fatigueIndex;
+
+  if (isAggregate) {
+    // Compute aggregate stats across all attempts
+    aggregate = computeAggregateStats(attempts);
+    score = aggregate.score;
+    total = aggregate.total;
+    percent = aggregate.percentCorrect;
+    answered = aggregate.answeredCount;
+    avgTime = aggregate.avgTimePerQuestion;
+    totalDuration = aggregate.totalDurationMs;
+    focusIndex = null;
+    fatigueIndex = null;
+  } else {
+    // Use selected attempt stats
+    aggregate = resolveAttemptAggregate(selectedAttempt);
+    score = resolveAggregateValue(aggregate, ["score", "correct"]);
+    total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+    percent =
+      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+      (Number.isFinite(score) && Number.isFinite(total) && total > 0
+        ? (score / total) * 100
+        : null);
+    answered = resolveAggregateValue(aggregate, ["answeredCount"]);
+    avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
+    totalDuration = resolveAggregateValue(aggregate, ["totalDurationMs"]);
+    focusIndex = resolveAggregateValue(aggregate, ["focusStabilityIndex"]);
+    fatigueIndex = resolveAggregateValue(aggregate, ["fatiguePoint"]);
+  }
 
   const cards = [
     createKpiCard({
@@ -1203,6 +1272,10 @@ function renderStatsQuestionStream(selectedAttempt) {
     return;
   }
   clearElement(dom.statsQuestionStream);
+
+  // Hide preview when changing attempts
+  hideStatsQuestionPreview();
+
   const summary = selectedAttempt?.summary;
   const items = Array.isArray(summary?.perQuestion) ? summary.perQuestion : [];
   if (!items.length) {
@@ -1212,9 +1285,16 @@ function renderStatsQuestionStream(selectedAttempt) {
     dom.statsQuestionStream.appendChild(empty);
     return;
   }
-  items.forEach((item) => {
+
+  // Store test ID for fetching question data
+  const testId = selectedAttempt?.testId || summary?.testId;
+
+  items.forEach((item, idx) => {
     const entry = document.createElement("div");
     entry.className = "stats-question-item";
+    entry.dataset.questionId = item.questionId;
+    entry.dataset.itemIndex = idx;
+
     if (item.isSkipped) {
       entry.classList.add("is-skipped");
     } else if (item.isCorrect) {
@@ -1222,6 +1302,7 @@ function renderStatsQuestionStream(selectedAttempt) {
     } else {
       entry.classList.add("is-incorrect");
     }
+
     const title = document.createElement("strong");
     title.textContent = t("statsQuestionTitle", {
       index: formatNumber((item.index ?? item.questionIndex ?? 0) + 1),
@@ -1255,7 +1336,146 @@ function renderStatsQuestionStream(selectedAttempt) {
     info.className = "stats-question-info";
     info.append(title, subtitle);
     entry.append(info, meta);
+
+    // Make clickable
+    entry.addEventListener("click", () => {
+      // Deselect others
+      dom.statsQuestionStream.querySelectorAll(".stats-question-item").forEach((el) => {
+        el.classList.remove("is-selected");
+      });
+      entry.classList.add("is-selected");
+      showStatsQuestionPreview(item, testId);
+    });
+
     dom.statsQuestionStream.appendChild(entry);
+  });
+}
+
+/**
+ * Show question preview panel
+ * @param {Object} item - Question item from perQuestion array
+ * @param {string} testId - Test ID to fetch question data
+ */
+function showStatsQuestionPreview(item, testId) {
+  if (!dom.statsQuestionPreview || !dom.statsPreviewContent) return;
+
+  dom.statsQuestionPreview.classList.remove("is-hidden");
+  clearElement(dom.statsPreviewContent);
+
+  // Find the question in the test data
+  const test = state.testsCache.find((t) => t.id === testId);
+  const question = test?.questions?.find((q) => q.id === item.questionId);
+
+  if (!question) {
+    const notice = document.createElement("p");
+    notice.className = "muted";
+    notice.textContent = t("statsPreviewNoQuestion");
+    dom.statsPreviewContent.appendChild(notice);
+    return;
+  }
+
+  // Question text section
+  const questionSection = document.createElement("div");
+  questionSection.className = "stats-preview-section";
+
+  const questionLabel = document.createElement("div");
+  questionLabel.className = "stats-preview-label";
+  questionLabel.textContent = t("statsPreviewQuestion");
+  questionSection.appendChild(questionLabel);
+
+  const questionContent = document.createElement("div");
+  questionContent.className = "stats-preview-question";
+  if (question.question?.blocks && question.question.blocks.length) {
+    renderBlocks(questionContent, question.question.blocks);
+  } else {
+    questionContent.textContent = question.question?.text || "";
+  }
+  questionSection.appendChild(questionContent);
+  dom.statsPreviewContent.appendChild(questionSection);
+
+  // Options section
+  const options = question.options || [];
+  const correctOption = question.correct;
+
+  if (options.length > 0) {
+    const optionsSection = document.createElement("div");
+    optionsSection.className = "stats-preview-section";
+
+    const optionsLabel = document.createElement("div");
+    optionsLabel.className = "stats-preview-label";
+    optionsLabel.textContent = t("statsPreviewOptions");
+    optionsSection.appendChild(optionsLabel);
+
+    const optionsList = document.createElement("ul");
+    optionsList.className = "stats-preview-options";
+
+    options.forEach((option, index) => {
+      const li = document.createElement("li");
+      li.className = "stats-preview-option";
+
+      // Check if this is the correct option
+      let isCorrect = false;
+      if (correctOption?.blocks && option.blocks) {
+        const optionText = option.blocks.map((b) => b.text || "").join("");
+        const correctText = correctOption.blocks.map((b) => b.text || "").join("");
+        isCorrect = optionText === correctText;
+      } else if (correctOption === option) {
+        isCorrect = true;
+      }
+
+      // Check if this is the selected option
+      const isSelected = item.answerIndex === index;
+
+      if (isCorrect) {
+        li.classList.add("stats-preview-option--correct");
+      }
+      if (isSelected) {
+        li.classList.add("stats-preview-option--selected");
+      }
+
+      // Render option content
+      if (option.blocks && option.blocks.length) {
+        renderBlocks(li, option.blocks);
+      } else {
+        li.textContent = option.text || option;
+      }
+
+      // Add badges
+      if (isCorrect) {
+        const badge = document.createElement("span");
+        badge.className = "stats-preview-badge stats-preview-badge--correct";
+        badge.textContent = t("statsPreviewCorrect");
+        li.appendChild(badge);
+      }
+      if (isSelected && !isCorrect) {
+        const badge = document.createElement("span");
+        badge.className = "stats-preview-badge stats-preview-badge--wrong";
+        badge.textContent = t("statsPreviewWrong");
+        li.appendChild(badge);
+      } else if (isSelected && isCorrect) {
+        // Already has correct badge, just mark as selected visually
+      }
+
+      optionsList.appendChild(li);
+    });
+
+    optionsSection.appendChild(optionsList);
+    dom.statsPreviewContent.appendChild(optionsSection);
+  }
+}
+
+/**
+ * Hide question preview panel
+ */
+export function hideStatsQuestionPreview() {
+  if (!dom.statsQuestionPreview) return;
+  dom.statsQuestionPreview.classList.add("is-hidden");
+  if (dom.statsPreviewContent) {
+    clearElement(dom.statsPreviewContent);
+  }
+  // Deselect all items
+  dom.statsQuestionStream?.querySelectorAll(".stats-question-item").forEach((el) => {
+    el.classList.remove("is-selected");
   });
 }
 
@@ -1323,8 +1543,9 @@ function renderStatsCharts(selectedAttempt) {
 }
 
 export function renderStatsView() {
-  const { attempts, selectedAttemptId, attemptDetails } = state.stats;
+  const { attempts, selectedAttemptId, attemptDetails, viewMode } = state.stats;
   const filteredAttempts = Array.isArray(attempts) ? attempts : [];
+  const isAggregate = viewMode === "aggregate";
   const selectedAttempt =
     attemptDetails?.attempt ||
     filteredAttempts.find((attempt) => attempt.attemptId === selectedAttemptId) ||
@@ -1343,14 +1564,105 @@ export function renderStatsView() {
     selectedAttemptId,
     state.testsCache
   );
-  renderStatsKpis({ attempts: filteredAttempts, selectedAttempt });
-  renderStatsQuestionStream(selectedAttempt);
-  if (selectedAttempt) {
-    renderStatsCharts(selectedAttempt);
+  renderStatsKpis({ attempts: filteredAttempts, selectedAttempt, isAggregate });
+
+  if (isAggregate) {
+    // In aggregate mode, hide question stream and show aggregate charts
+    if (dom.statsQuestionStream) {
+      clearElement(dom.statsQuestionStream);
+      const notice = document.createElement("p");
+      notice.className = "muted";
+      notice.textContent = t("statsAggregateNoQuestions");
+      dom.statsQuestionStream.appendChild(notice);
+    }
+    renderAggregateCharts(filteredAttempts);
   } else {
+    renderStatsQuestionStream(selectedAttempt);
+    if (selectedAttempt) {
+      renderStatsCharts(selectedAttempt);
+    } else {
+      statsAttemptsChart?.destroy();
+      statsTimeChart?.destroy();
+      statsAttemptsChart = null;
+      statsTimeChart = null;
+    }
+  }
+}
+
+/**
+ * Render charts showing aggregate data across all attempts
+ * @param {Array} attempts
+ */
+function renderAggregateCharts(attempts) {
+  if (!dom.statsChartAttempts || !dom.statsChartTime) return;
+
+  if (!attempts.length) {
     statsAttemptsChart?.destroy();
     statsTimeChart?.destroy();
     statsAttemptsChart = null;
     statsTimeChart = null;
+    return;
   }
+
+  // Sort attempts by date (oldest first)
+  const sortedAttempts = [...attempts].sort((a, b) => {
+    const dateA = new Date(a.completedAt || a.createdAt || 0);
+    const dateB = new Date(b.completedAt || b.createdAt || 0);
+    return dateA - dateB;
+  });
+
+  // Build labels and data
+  const labels = sortedAttempts.map((_, index) => formatNumber(index + 1));
+  const accuracyValues = sortedAttempts.map((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const percent =
+      resolveAggregateValue(aggregate, ["percentCorrect", "accuracy"]) ??
+      (() => {
+        const score = resolveAggregateValue(aggregate, ["score", "correct"]);
+        const total = resolveAggregateValue(aggregate, ["total", "totalCount"]);
+        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+          return (score / total) * 100;
+        }
+        return null;
+      })();
+    return percent !== null ? Number(percent.toFixed(1)) : null;
+  });
+
+  const timeValues = sortedAttempts.map((attempt) => {
+    const aggregate = resolveAttemptAggregate(attempt);
+    const avgTime = resolveAggregateValue(aggregate, ["avgTimePerQuestion"]);
+    if (!Number.isFinite(avgTime)) return 0;
+    return Number((avgTime / 1000).toFixed(1));
+  });
+
+  const styles = getComputedStyle(document.documentElement);
+  const primary = styles.getPropertyValue("--primary").trim();
+  const primarySoft = styles.getPropertyValue("--primary-soft").trim();
+  const success = styles.getPropertyValue("--success").trim();
+  const successSoft = styles.getPropertyValue("--success-soft").trim();
+
+  statsAttemptsChart?.destroy();
+  statsTimeChart?.destroy();
+
+  statsAttemptsChart = new window.Chart(
+    dom.statsChartAttempts.getContext("2d"),
+    buildChartConfig({
+      labels,
+      data: accuracyValues,
+      label: t("statsChartAttemptsLegend"),
+      color: primary,
+      fillColor: primarySoft,
+    })
+  );
+
+  statsTimeChart = new window.Chart(
+    dom.statsChartTime.getContext("2d"),
+    buildChartConfig({
+      labels,
+      data: timeValues,
+      label: t("statsChartTimeLegend"),
+      color: success,
+      fillColor: successSoft,
+    })
+  );
 }
