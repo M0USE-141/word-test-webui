@@ -293,17 +293,31 @@ export function setActiveScreen(screen) {
 
 export function updateEditorTestActions() {
   const hasTest = Boolean(state.currentTest);
+  const isOwner = hasTest && state.currentTest.is_owner;
+
   if (dom.editorRenameTestButton) {
     dom.editorRenameTestButton.disabled = !hasTest;
     dom.editorRenameTestButton.textContent = hasTest
       ? t("editorRenameTitle", { title: state.currentTest.title })
       : t("renameTestButton");
+    // Only owners can rename
+    dom.editorRenameTestButton.classList.toggle("is-hidden", hasTest && !isOwner);
   }
   if (dom.editorDeleteTestButton) {
     dom.editorDeleteTestButton.disabled = !hasTest;
     dom.editorDeleteTestButton.textContent = hasTest
       ? t("editorDeleteTitle", { title: state.currentTest.title })
       : t("deleteTestButton");
+    // Only owners can delete
+    dom.editorDeleteTestButton.classList.toggle("is-hidden", hasTest && !isOwner);
+  }
+  // Only owners can access settings
+  if (dom.editorAccessSettingsButton) {
+    dom.editorAccessSettingsButton.classList.toggle("is-hidden", hasTest && !isOwner);
+  }
+  // Only owners can see change requests
+  if (dom.editorChangeRequestsButton) {
+    dom.editorChangeRequestsButton.classList.toggle("is-hidden", !isOwner);
   }
 }
 
@@ -771,15 +785,47 @@ export function renderTestCards(
       card.classList.add("is-active");
     }
 
+    // Header with title and access badge
+    const header = document.createElement("div");
+    header.className = "test-card__header";
+
     const title = document.createElement("h3");
     title.className = "test-card__title";
     title.textContent = test.title;
+
+    // Access badge
+    const accessBadge = document.createElement("span");
+    accessBadge.className = "test-card__access-badge";
+    const accessLevel = test.access_level || "public";
+    if (accessLevel === "private") {
+      accessBadge.textContent = t("accessPrivateIcon");
+      accessBadge.title = t("accessPrivate");
+      accessBadge.classList.add("test-card__access-badge--private");
+    } else if (accessLevel === "shared") {
+      accessBadge.textContent = t("accessSharedIcon");
+      accessBadge.title = t("accessShared");
+      accessBadge.classList.add("test-card__access-badge--shared");
+    } else {
+      accessBadge.textContent = t("accessPublicIcon");
+      accessBadge.title = t("accessPublic");
+      accessBadge.classList.add("test-card__access-badge--public");
+    }
+
+    header.append(title, accessBadge);
 
     const meta = document.createElement("div");
     meta.className = "test-card__meta";
     meta.textContent = t("testCount", {
       count: formatNumber(test.questionCount),
     });
+
+    // Owner info (show if not the owner)
+    if (test.owner_username && !test.is_owner) {
+      const ownerInfo = document.createElement("span");
+      ownerInfo.className = "test-card__owner";
+      ownerInfo.textContent = ` · ${t("testOwner", { owner: test.owner_username })}`;
+      meta.appendChild(ownerInfo);
+    }
 
     const stats = document.createElement("div");
     stats.className = "test-card__stats";
@@ -812,7 +858,12 @@ export function renderTestCards(
     const editButton = document.createElement("button");
     editButton.type = "button";
     editButton.className = "secondary";
-    editButton.textContent = t("editingButton");
+    // Non-owners see "Propose changes" instead of "Edit"
+    if (test.is_owner === false && test.owner_id !== null) {
+      editButton.textContent = t("proposeChangesButton");
+    } else {
+      editButton.textContent = t("editingButton");
+    }
     editButton.addEventListener("click", async (event) => {
       event.stopPropagation();
       await onEditTest(test.id);
@@ -828,7 +879,7 @@ export function renderTestCards(
     });
 
     actions.append(testingButton, editButton, statsButton);
-    card.append(title, meta, stats, actions);
+    card.append(header, meta, stats, actions);
     card.addEventListener("click", async () => {
       await onSelectTest(test.id);
     });

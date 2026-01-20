@@ -1,7 +1,7 @@
 .venv/
 .idea/
 uv.lock
-data/
+data/*
 !data/
 !data/.gitkeep
 __pycache__/

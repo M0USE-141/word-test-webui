@@ -54,6 +54,7 @@ export const dom = {
   progressHint: document.getElementById("progress-hint"),
   editorModal: document.getElementById("editor-modal"),
   closeEditorButton: document.getElementById("close-editor"),
+  editorAccessSettingsButton: document.getElementById("editor-access-settings"),
   editorRenameTestButton: document.getElementById("editor-rename-test"),
   editorDeleteTestButton: document.getElementById("editor-delete-test"),
   importModal: document.getElementById("import-modal"),
@@ -63,6 +64,7 @@ export const dom = {
   cancelCreateTestButton: document.getElementById("cancel-create-test"),
   createTestForm: document.getElementById("create-test-form"),
   createTestTitleInput: document.getElementById("create-test-title"),
+  createTestAccessSelect: document.getElementById("create-test-access"),
   createTestStatus: document.getElementById("create-test-status"),
   editorQuestionList: document.getElementById("editor-question-list"),
   editorForm: document.getElementById("editor-form"),
@@ -137,6 +139,28 @@ export const dom = {
   statsQuestionStream: document.getElementById("stats-question-stream"),
   statsEmptyState: document.getElementById("stats-empty"),
   statsStartTestButton: document.getElementById("stats-start-test"),
+  // Access settings modal
+  accessSettingsModal: document.getElementById("access-settings-modal"),
+  closeAccessSettingsButton: document.getElementById("close-access-settings"),
+  accessSettingsTestName: document.getElementById("access-settings-test-name"),
+  accessLevelSelect: document.getElementById("access-level-select"),
+  accessLevelStatus: document.getElementById("access-level-status"),
+  sharesSection: document.getElementById("shares-section"),
+  shareUsernameInput: document.getElementById("share-username-input"),
+  addShareButton: document.getElementById("add-share-button"),
+  shareStatus: document.getElementById("share-status"),
+  sharesList: document.getElementById("shares-list"),
+  // Change requests modal
+  changeRequestsModal: document.getElementById("change-requests-modal"),
+  closeChangeRequestsButton: document.getElementById("close-change-requests"),
+  changeRequestsRefreshButton: document.getElementById("change-requests-refresh"),
+  changeRequestsTestName: document.getElementById("change-requests-test-name"),
+  changeRequestsStats: document.getElementById("change-requests-stats"),
+  changeRequestsStatus: document.getElementById("change-requests-status"),
+  changeRequestsList: document.getElementById("change-requests-list"),
+  // Editor change requests button
+  editorChangeRequestsButton: document.getElementById("editor-change-requests"),
+  // Settings
   settingQuestionCount: document.getElementById("setting-question-count"),
   settingRandomQuestions: document.getElementById(
     "setting-random-questions"

@@ -33,37 +33,46 @@ export function assignFileToInput(input, file) {
   const dt = new DataTransfer();
   dt.items.add(file);
   input.files = dt.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 export function setupDropzone(dropzone, input, { validate, onInvalid } = {}) {
   if (!dropzone || !input) return;
 
-  dropzone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropzone.classList.add("dragover");
+  const highlight = () => dropzone.classList.add("is-dragover");
+  const unhighlight = () => dropzone.classList.remove("is-dragover");
+  const prevent = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      highlight();
+    });
   });
 
-  dropzone.addEventListener("dragleave", () => {
-    dropzone.classList.remove("dragover");
+  ["dragleave", "dragend"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      prevent(event);
+      unhighlight();
+    });
   });
 
-  dropzone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover");
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      if (validate && !validate(file)) {
-        if (onInvalid) onInvalid(file);
-        return;
-      }
-      assignFileToInput(input, file);
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+  dropzone.addEventListener("drop", (event) => {
+    prevent(event);
+    unhighlight();
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) {
+      return;
     }
-  });
-
-  dropzone.addEventListener("click", () => {
-    input.click();
+    if (validate && !validate(file)) {
+      if (onInvalid) {
+        onInvalid(file);
+      }
+      return;
+    }
+    assignFileToInput(input, file);
   });
 }
