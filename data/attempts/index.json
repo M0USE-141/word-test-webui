@@ -734,5 +734,21 @@
     "focusStabilityIndex": 0.0,
     "personalDifficultyScore": 0.9054726368159204,
     "statsVersion": 1
+  },
+  {
+    "attemptId": "id-mkmci45a-169drjfi",
+    "testId": "5449cd442a3f47618562363141a4c2f0",
+    "clientId": "id-mkmbnfm0-xddft1st",
+    "startedAt": null,
+    "completedAt": "2026-01-20T09:08:35.773Z",
+    "score": 21,
+    "percent": 10.44776119402985,
+    "answeredCount": 25,
+    "skippedCount": 176,
+    "avgTimePerQuestion": 7466.73631840796,
+    "fatiguePoint": 0.24378109452736318,
+    "focusStabilityIndex": 0.0,
+    "personalDifficultyScore": 0.8955223880597015,
+    "statsVersion": 1
   }
 ]
