@@ -4,7 +4,7 @@
  */
 
 import { t } from "../i18n.js";
-import { dom, state } from "../state.js";
+import { clearTestsCache, dom, state } from "../state.js";
 import {
   checkAuth,
   login,
@@ -278,6 +278,8 @@ export function updateUserDisplay(user) {
 function onAuthSuccess(user) {
   hideAuthScreen();
   updateUserDisplay(user);
+  // Clear tests cache to reload with new user's access
+  clearTestsCache();
   // Trigger app initialization or screen change
   if (typeof window.onAuthSuccess === "function") {
     window.onAuthSuccess(user);
@@ -289,6 +291,8 @@ function onAuthSuccess(user) {
  */
 function onLogout() {
   updateUserDisplay(null);
+  // Clear tests cache so next user gets fresh data
+  clearTestsCache();
   renderAuthScreen();
   // Clear forms
   if (dom.authLoginForm) {

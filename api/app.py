@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.config import STATIC_DIR
 from api.database import init_db
-from api.routes import assets, attempts, auth, questions, statistics, tests, users
+from api.routes import access, assets, attempts, auth, change_requests, questions, statistics, tests, users
 from api.services.cleanup_service import schedule_events_cleanup
 from logging_setup import setup_console_logging
 
@@ -50,6 +50,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(tests.router)
+app.include_router(access.router)
+app.include_router(change_requests.router)
 app.include_router(assets.router)
 app.include_router(questions.router)
 app.include_router(attempts.router)

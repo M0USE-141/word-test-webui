@@ -576,6 +576,22 @@
           </div>
           <div class="modal-actions">
             <button
+              id="editor-change-requests"
+              type="button"
+              class="secondary is-hidden"
+              data-i18n="changeRequestsButton"
+            >
+              Предложения
+            </button>
+            <button
+              id="editor-access-settings"
+              type="button"
+              class="secondary"
+              data-i18n="accessSettingsButton"
+            >
+              Настройки доступа
+            </button>
+            <button
               id="editor-rename-test"
               type="button"
               class="secondary"
@@ -941,6 +957,14 @@
               required
             />
           </label>
+          <label class="upload-field" for="create-test-access">
+            <span data-i18n="accessLevelLabel">Уровень доступа</span>
+            <select id="create-test-access">
+              <option value="private" data-i18n="accessPrivate">Приватный</option>
+              <option value="shared" data-i18n="accessShared">По приглашению</option>
+              <option value="public" data-i18n="accessPublic">Публичный</option>
+            </select>
+          </label>
           <div class="create-test-actions">
             <button type="submit" data-i18n="createCollectionButton">
               Создать коллекцию
@@ -956,6 +980,95 @@
           </div>
           <p id="create-test-status" class="muted"></p>
         </form>
+      </div>
+    </div>
+    <div id="access-settings-modal" class="modal" aria-hidden="true">
+      <div class="modal-content modal-content--small">
+        <div class="modal-header">
+          <div>
+            <h2 data-i18n="accessSettingsTitle">Настройки доступа</h2>
+            <p class="muted" id="access-settings-test-name"></p>
+          </div>
+          <div class="modal-actions">
+            <button
+              id="close-access-settings"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <div class="access-settings-content">
+          <div class="access-settings-level">
+            <label class="upload-field" for="access-level-select">
+              <span data-i18n="accessLevelLabel">Уровень доступа</span>
+              <select id="access-level-select">
+                <option value="private" data-i18n="accessPrivate">Приватный</option>
+                <option value="shared" data-i18n="accessShared">По приглашению</option>
+                <option value="public" data-i18n="accessPublic">Публичный</option>
+              </select>
+            </label>
+            <p id="access-level-status" class="muted"></p>
+          </div>
+          <div id="shares-section" class="shares-section">
+            <h3 data-i18n="sharesTitle">Приглашённые пользователи</h3>
+            <div class="shares-add">
+              <input
+                type="text"
+                id="share-username-input"
+                placeholder="Имя пользователя"
+                data-i18n-placeholder="shareUsernamePlaceholder"
+              />
+              <button
+                id="add-share-button"
+                type="button"
+                data-i18n="addShareButton"
+              >
+                Добавить
+              </button>
+            </div>
+            <p id="share-status" class="muted"></p>
+            <ul id="shares-list" class="shares-list">
+              <li class="muted" data-i18n="noShares">Нет приглашённых пользователей</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="change-requests-modal" class="modal" aria-hidden="true">
+      <div class="modal-content modal-content--medium">
+        <div class="modal-header">
+          <div>
+            <h2 data-i18n="changeRequestsTitle">Предложения изменений</h2>
+            <p class="muted" id="change-requests-test-name"></p>
+          </div>
+          <div class="modal-actions">
+            <button
+              id="change-requests-refresh"
+              type="button"
+              class="secondary"
+              data-i18n="statsRefreshButton"
+            >
+              Обновить
+            </button>
+            <button
+              id="close-change-requests"
+              type="button"
+              class="ghost"
+              data-i18n="closeButton"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <div class="change-requests-content">
+          <div id="change-requests-stats" class="cr-stats"></div>
+          <p id="change-requests-status" class="muted"></p>
+          <div id="change-requests-list" class="cr-list"></div>
+        </div>
       </div>
     </div>
   </body>

@@ -3,22 +3,36 @@
  */
 
 import {
+  addQuestion,
+  createChangeRequest,
+  createEmptyTest,
   deleteQuestion as deleteQuestionApi,
   deleteTest as deleteTestApi,
   fetchTest,
   fetchTests,
   renameTest as renameTestApi,
+  updateQuestion,
 } from "../api.js";
 import {
+  addOptionRow,
+  buildInlineRegistry,
+  clearEditorValidation,
+  collectEditorOptionPayloads,
   findEditorQuestion,
+  formatMissingMarkers,
+  handleAddObject,
   isLegacyDocFile,
   isSupportedImageFile,
   isXmlFile,
+  parseTextToBlocks,
   renderEditorObjects,
   renderEditorQuestionList,
   resetEditorForm,
   setEditorObjectSection,
   setEditorObjectStatus,
+  setEditorState,
+  setFieldError,
+  syncEditorFormFromQuestion,
   syncEditorObjectFields,
   syncEditorPanelLocation,
 } from "../editor.js";
@@ -27,6 +41,7 @@ import {
   renderQuestionNav,
   renderResultSummary,
   renderTestCards,
+  renderUploadLogs,
   setActiveScreen,
   updateEditorTestActions,
   updateProgressHint,
@@ -42,6 +57,14 @@ import {
   openImportModal,
   setCreateTestStatus,
 } from "../components/modals.js";
+import {
+  initializeAccessModalEvents,
+  openAccessSettingsModal,
+} from "../components/access-modal.js";
+import {
+  initializeChangeRequestsModalEvents,
+  openChangeRequestsModal,
+} from "../components/change-requests-modal.js";
 import { setupDropzone } from "../utils/file-upload.js";
 
 /**
@@ -157,10 +180,29 @@ export async function handleDeleteQuestion(questionId) {
   if (!state.currentTest) {
     return;
   }
-  await deleteQuestionApi(state.currentTest.id, questionId);
-  await refreshCurrentTest(state.currentTest.id);
-  renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
-  resetEditorForm();
+
+  const isOwner = state.currentTest.is_owner;
+
+  if (isOwner) {
+    // Owner can directly delete
+    await deleteQuestionApi(state.currentTest.id, questionId);
+    await refreshCurrentTest(state.currentTest.id);
+    renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+    resetEditorForm();
+  } else {
+    // Non-owner creates a change request
+    try {
+      await createChangeRequest(
+        state.currentTest.id,
+        "delete_question",
+        {},
+        questionId
+      );
+      alert(t("changeProposed"));
+    } catch (error) {
+      alert(error.message);
+    }
+  }
 }
 
 /**
@@ -176,28 +218,51 @@ export function initializeManagementScreenEvents() {
   dom.editorObjectFormulaDropzone?.classList.add("is-empty");
 
   dom.editorObjectImageFile?.addEventListener("change", () => {
-    dom.editorObjectImageDropzone?.classList.toggle(
-      "is-empty",
-      !dom.editorObjectImageFile.files?.length
-    );
+    const file = dom.editorObjectImageFile.files?.[0];
+    dom.editorObjectImageDropzone?.classList.toggle("is-empty", !file);
+    // Show file name in dropzone
+    const titleEl = dom.editorObjectImageDropzone?.querySelector(".editor-object-dropzone__title span");
+    if (titleEl) {
+      titleEl.textContent = file ? file.name : t("editorObjectImageDropTitle");
+    }
   });
 
   dom.editorObjectFormulaFile?.addEventListener("change", () => {
-    dom.editorObjectFormulaDropzone?.classList.toggle(
-      "is-empty",
-      !dom.editorObjectFormulaFile.files?.length
-    );
+    const file = dom.editorObjectFormulaFile.files?.[0];
+    dom.editorObjectFormulaDropzone?.classList.toggle("is-empty", !file);
+    // Show file name in dropzone
+    const titleEl = dom.editorObjectFormulaDropzone?.querySelector(".editor-object-dropzone__title span");
+    if (titleEl) {
+      titleEl.textContent = file ? file.name : t("editorObjectFormulaDropTitle");
+    }
   });
 
   dom.uploadFileInput?.addEventListener("change", () => {
-    dom.uploadDropzone?.classList.toggle(
-      "is-empty",
-      !dom.uploadFileInput.files?.length
-    );
+    const file = dom.uploadFileInput.files?.[0] || null;
+    dom.uploadDropzone?.classList.toggle("is-empty", !file);
+    dom.uploadFileName?.classList.toggle("is-empty", !file);
+    if (dom.uploadFileNameValue) {
+      dom.uploadFileNameValue.textContent = file ? file.name : t("uploadNoFileSelected");
+      dom.uploadFileNameValue.title = file ? file.name : "";
+    }
+    if (dom.uploadClearButton) {
+      dom.uploadClearButton.disabled = !file;
+    }
   });
 
   dom.uploadClearButton?.addEventListener("click", () => {
+    if (dom.uploadFileInput) {
+      dom.uploadFileInput.value = "";
+    }
     dom.uploadDropzone?.classList.add("is-empty");
+    dom.uploadFileName?.classList.add("is-empty");
+    if (dom.uploadFileNameValue) {
+      dom.uploadFileNameValue.textContent = t("uploadNoFileSelected");
+      dom.uploadFileNameValue.title = "";
+    }
+    if (dom.uploadClearButton) {
+      dom.uploadClearButton.disabled = true;
+    }
   });
 
   dom.editorObjectFormulaText?.addEventListener("input", () => {
@@ -226,6 +291,148 @@ export function initializeManagementScreenEvents() {
     },
   });
 
+  dom.editorModal?.addEventListener("click", (event) => {
+    if (event.target === dom.editorModal) {
+      closeEditorModal();
+    }
+  });
+
+  dom.editorAddOption?.addEventListener("click", () => {
+    addOptionRow("", false);
+  });
+
+  dom.editorObjectsToggle?.addEventListener("click", () => {
+    const isVisible = !dom.editorObjectListSection?.classList.contains(
+      "is-hidden"
+    );
+    setEditorObjectSection(isVisible ? null : "list");
+  });
+
+  dom.editorObjectUploadToggle?.addEventListener("click", () => {
+    const isVisible = !dom.editorObjectUploadSection?.classList.contains(
+      "is-hidden"
+    );
+    setEditorObjectSection(isVisible ? null : "upload");
+  });
+
+  dom.editorResetButton?.addEventListener("click", () => {
+    resetEditorForm();
+  });
+
+  dom.editorObjectType?.addEventListener("change", () => {
+    syncEditorObjectFields();
+  });
+
+  dom.editorAddObjectButton?.addEventListener("click", () => {
+    handleAddObject();
+  });
+
+  dom.editorForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!state.currentTest) {
+      return;
+    }
+    clearEditorValidation();
+    const questionRaw = dom.editorQuestionText.value ?? "";
+    if (!questionRaw.trim()) {
+      alert(t("alertFillQuestion"));
+      return;
+    }
+    const inlineRegistry = buildInlineRegistry(
+      findEditorQuestion() ?? { objects: state.editorState.objects }
+    );
+    const questionParse = parseTextToBlocks(questionRaw, inlineRegistry);
+    const questionField = dom.editorQuestionText?.closest(".editor-field");
+    if (questionParse.missing.length && questionField) {
+      setFieldError(
+        questionField,
+        t("missingObjects", {
+          objects: formatMissingMarkers(questionParse.missing),
+        })
+      );
+    }
+
+    const optionPayloads = collectEditorOptionPayloads(inlineRegistry);
+    if (!optionPayloads.payloads.length) {
+      alert(t("alertFillQuestion"));
+      return;
+    }
+    optionPayloads.missingByOption.forEach(({ element, missing }) => {
+      setFieldError(
+        element,
+        t("missingObjects", { objects: formatMissingMarkers(missing) })
+      );
+    });
+
+    if (questionParse.missing.length || optionPayloads.missingByOption.length) {
+      alert(t("alertCheckObjects"));
+      return;
+    }
+
+    try {
+      const payload = {
+        question: { blocks: questionParse.blocks },
+        options: optionPayloads.payloads,
+        objects: state.editorState.objects,
+      };
+      if (optionPayloads.correctBlocks) {
+        payload.correct = { blocks: optionPayloads.correctBlocks };
+      }
+
+      const isOwner = state.currentTest.is_owner;
+
+      if (state.editorState.mode === "edit" && state.editorState.questionId) {
+        const editedId = state.editorState.questionId;
+
+        if (isOwner) {
+          // Owner can directly edit
+          await updateQuestion(state.currentTest.id, editedId, payload);
+          await refreshCurrentTest(state.currentTest.id);
+          renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+          const updatedQuestion = state.currentTest?.questions?.find(
+            (question) => question.id === editedId
+          );
+          if (updatedQuestion) {
+            setEditorState("edit", editedId);
+            syncEditorFormFromQuestion(updatedQuestion);
+            renderEditorObjects(updatedQuestion);
+          } else {
+            resetEditorForm();
+          }
+        } else {
+          // Non-owner creates a change request
+          await createChangeRequest(
+            state.currentTest.id,
+            "edit_question",
+            payload,
+            editedId
+          );
+          alert(t("changeProposed"));
+          resetEditorForm();
+        }
+      } else {
+        if (isOwner) {
+          // Owner can directly add
+          await addQuestion(state.currentTest.id, payload);
+          await refreshCurrentTest(state.currentTest.id);
+          renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+          resetEditorForm();
+        } else {
+          // Non-owner creates a change request
+          await createChangeRequest(
+            state.currentTest.id,
+            "add_question",
+            payload
+          );
+          alert(t("changeProposed"));
+          resetEditorForm();
+        }
+      }
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
   dom.closeEditorButton?.addEventListener("click", () => {
     closeEditorModal();
   });
@@ -252,6 +459,26 @@ export function initializeManagementScreenEvents() {
     if (event.target === dom.createTestModal) {
       closeCreateTestModal();
     }
+  });
+
+  // Initialize access modal events
+  initializeAccessModalEvents();
+
+  // Initialize change requests modal events
+  initializeChangeRequestsModalEvents();
+
+  dom.editorAccessSettingsButton?.addEventListener("click", () => {
+    if (!state.currentTest) {
+      return;
+    }
+    openAccessSettingsModal(state.currentTest.id, state.currentTest.title);
+  });
+
+  dom.editorChangeRequestsButton?.addEventListener("click", () => {
+    if (!state.currentTest) {
+      return;
+    }
+    openChangeRequestsModal(state.currentTest.id, state.currentTest.title);
   });
 
   dom.editorRenameTestButton?.addEventListener("click", async () => {
@@ -298,6 +525,100 @@ export function initializeManagementScreenEvents() {
       closeEditorModal();
     } catch (error) {
       window.alert(error.message);
+    }
+  });
+
+  // Upload form (import test)
+  dom.uploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!dom.uploadFileInput.files?.length) {
+      dom.questionContainer.textContent = t("importSelectFileFirst");
+      renderUploadLogs(t("importSelectFileFirst"), true);
+      return;
+    }
+    if (isLegacyDocFile(dom.uploadFileInput.files[0].name)) {
+      dom.questionContainer.textContent = t("docxOnlyWarning");
+      renderUploadLogs(t("docxOnlyWarning"), true);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", dom.uploadFileInput.files[0]);
+    formData.append("symbol", dom.uploadSymbolInput.value.trim());
+    formData.append(
+      "log_small_tables",
+      dom.uploadLogSmallTablesInput.checked ? "true" : "false"
+    );
+
+    try {
+      const response = await fetch("/api/tests/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail || t("importFailed");
+        throw new Error(detail);
+      }
+      const uploadResult = payload ?? {};
+      clearTestsCache();
+      const tests = await fetchTests({ force: true });
+      const newTestId = uploadResult?.metadata?.id;
+      renderUploadLogs(uploadResult?.logs);
+
+      const nextTestId = newTestId || tests[0]?.id;
+      renderTestCardsWithHandlers(tests, nextTestId);
+      await selectTest(nextTestId);
+
+      // Reset form
+      dom.uploadFileInput.value = "";
+      dom.uploadSymbolInput.value = "";
+      dom.uploadLogSmallTablesInput.checked = false;
+      dom.uploadDropzone?.classList.add("is-empty");
+      dom.uploadFileName?.classList.add("is-empty");
+      if (dom.uploadFileNameValue) {
+        dom.uploadFileNameValue.textContent = t("uploadNoFileSelected");
+      }
+      if (dom.uploadClearButton) {
+        dom.uploadClearButton.disabled = true;
+      }
+      closeImportModal();
+    } catch (error) {
+      dom.questionContainer.textContent = error.message;
+      renderUploadLogs(error.message, true);
+    }
+  });
+
+  // Create test form
+  dom.createTestForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!dom.createTestTitleInput) {
+      return;
+    }
+    const title = dom.createTestTitleInput.value.trim();
+    if (!title) {
+      setCreateTestStatus(t("createTestTitleMissing"), true);
+      return;
+    }
+    const accessLevel = dom.createTestAccessSelect?.value || "private";
+    setCreateTestStatus(t("createTestCreating"));
+    try {
+      const payload = await createEmptyTest(title, accessLevel);
+      const newTestId = payload?.metadata?.id || payload?.payload?.id;
+      clearTestsCache();
+      const tests = await fetchTests({ force: true });
+      renderTestCardsWithHandlers(tests, newTestId);
+      if (newTestId) {
+        await selectTest(newTestId);
+      }
+      dom.createTestTitleInput.value = "";
+      if (dom.createTestAccessSelect) {
+        dom.createTestAccessSelect.value = "private";
+      }
+      setCreateTestStatus("");
+      closeCreateTestModal();
+    } catch (error) {
+      setCreateTestStatus(error.message, true);
     }
   });
 }

@@ -1,10 +1,17 @@
 """User and Session database models."""
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.database import Base
+
+if TYPE_CHECKING:
+    from api.models.db.change_request import ChangeRequest
+    from api.models.db.test_collection import TestCollection
 
 
 class User(Base):
@@ -32,6 +39,17 @@ class User(Base):
     sessions: Mapped[list["Session"]] = relationship(
         "Session",
         back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    owned_tests: Mapped[list["TestCollection"]] = relationship(
+        "TestCollection",
+        back_populates="owner",
+        cascade="all, delete-orphan"
+    )
+    change_requests: Mapped[list["ChangeRequest"]] = relationship(
+        "ChangeRequest",
+        back_populates="user",
+        foreign_keys="[ChangeRequest.user_id]",
         cascade="all, delete-orphan"
     )
 

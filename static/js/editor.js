@@ -955,18 +955,17 @@ export async function handleAddObject() {
   const registry = buildInlineRegistry(
     findEditorQuestion() ?? { objects: state.editorState.objects }
   );
-  const usedFormulaIds = new Set();
+  const usedIds = new Set();
   registry.forEach((inline, key) => {
-    if (key.startsWith("formula:")) {
-      usedFormulaIds.add(key.slice("formula:".length));
+    const colonIndex = key.indexOf(":");
+    if (colonIndex >= 0) {
+      usedIds.add(key.slice(colonIndex + 1));
     }
   });
-  if (!id && type !== "formula") {
-    setEditorObjectStatus(t("objectIdRequired"), true);
-    return;
-  }
-  if (!id && type === "formula") {
-    id = generateShortFormulaId(usedFormulaIds);
+
+  // Auto-generate ID if not provided (for both images and formulas)
+  if (!id) {
+    id = generateShortFormulaId(usedIds);
   }
   const existingKey = `${type}:${id}`;
   if (registry.has(existingKey)) {
@@ -1016,9 +1015,11 @@ export async function handleAddObject() {
     }
     if (dom.editorObjectFormulaFile) {
       dom.editorObjectFormulaFile.value = "";
+      dom.editorObjectFormulaFile.dispatchEvent(new Event("change", { bubbles: true }));
     }
     if (dom.editorObjectImageFile) {
       dom.editorObjectImageFile.value = "";
+      dom.editorObjectImageFile.dispatchEvent(new Event("change", { bubbles: true }));
     }
     renderEditorObjects(findEditorQuestion());
   } catch (error) {

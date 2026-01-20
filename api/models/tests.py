@@ -6,6 +6,7 @@ class TestCreate(BaseModel):
     """Model for creating a new test."""
 
     title: str
+    access_level: str | None = None
 
 
 class TestUpdate(BaseModel):
