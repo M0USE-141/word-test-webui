@@ -1,10 +1,21 @@
+/**
+ * Telemetry module for test attempts using SQLite-backed API.
+ *
+ * New API endpoints:
+ * - POST /api/attempts/start - Start a new attempt with question snapshots
+ * - POST /api/attempts/{id}/answer - Record an answer
+ * - POST /api/attempts/{id}/finish - Finish attempt and calculate stats
+ * - POST /api/attempts/{id}/abandon - Mark attempt as abandoned
+ */
+
 import { getSettings } from "./state.js";
+import { getAuthHeaders } from "./api.js";
 
 const CLIENT_ID_KEY = "telemetry-client-id";
-const EVENT_QUEUE_KEY = "telemetry-event-queue-v1";
-const SUMMARY_QUEUE_KEY = "telemetry-summary-queue-v1";
-const FLUSH_INTERVAL_MS = 10000;
-const BATCH_SIZE = 10;
+
+// Pending requests queue for offline support
+const PENDING_QUEUE_KEY = "telemetry-pending-queue-v2";
+const FLUSH_INTERVAL_MS = 5000;
 
 let flushTimer = null;
 
@@ -15,137 +26,6 @@ function generateId() {
   return `id-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;
-}
-
-function readQueue(key) {
-  const raw = localStorage.getItem(key);
-  if (!raw) {
-    return [];
-  }
-  try {
-    const payload = JSON.parse(raw);
-    return Array.isArray(payload) ? payload : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeQueue(key, items) {
-  localStorage.setItem(key, JSON.stringify(items));
-}
-
-function normalizeEventPayload(item) {
-  if (!item || typeof item !== "object") {
-    return item;
-  }
-  if (!item.eventType && item.type) {
-    return { ...item, eventType: item.type };
-  }
-  return item;
-}
-
-function enqueue(queueKey, item) {
-  const queue = readQueue(queueKey);
-  if (queueKey === EVENT_QUEUE_KEY) {
-    queue.push(normalizeEventPayload(item));
-  } else {
-    queue.push(item);
-  }
-  writeQueue(queueKey, queue);
-  if (queue.length >= BATCH_SIZE) {
-    flushQueues();
-  }
-}
-
-async function postJson(url, payload) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-}
-
-async function flushEventQueue() {
-  if (!navigator.onLine) {
-    return;
-  }
-  const queue = readQueue(EVENT_QUEUE_KEY);
-  if (!queue.length) {
-    return;
-  }
-  const remaining = [];
-  for (const rawEvent of queue.slice(0, BATCH_SIZE)) {
-    const event = normalizeEventPayload(rawEvent);
-    const attemptId = event?.attemptId;
-    if (!attemptId) {
-      continue;
-    }
-    const response = await postJson(
-      `/api/attempts/${encodeURIComponent(attemptId)}/events`,
-      event
-    );
-    if (!response.ok) {
-      if (response.status !== 400 && response.status !== 422) {
-        remaining.push(event);
-      }
-    }
-  }
-  const rest = queue.slice(BATCH_SIZE).concat(remaining);
-  writeQueue(EVENT_QUEUE_KEY, rest);
-  if (rest.length) {
-    setTimeout(() => {
-      flushEventQueue();
-    }, 0);
-  }
-}
-
-async function flushSummaryQueue() {
-  if (!navigator.onLine) {
-    return;
-  }
-  const queue = readQueue(SUMMARY_QUEUE_KEY);
-  if (!queue.length) {
-    return;
-  }
-  const remaining = [];
-  for (const summary of queue.slice(0, BATCH_SIZE)) {
-    const attemptId = summary?.attemptId;
-    if (!attemptId) {
-      continue;
-    }
-    const response = await postJson(
-      `/api/attempts/${encodeURIComponent(attemptId)}/finalize`,
-      summary
-    );
-    if (!response.ok) {
-      if (response.status !== 400 && response.status !== 422) {
-        remaining.push(summary);
-      }
-    }
-  }
-  const rest = queue.slice(BATCH_SIZE).concat(remaining);
-  writeQueue(SUMMARY_QUEUE_KEY, rest);
-  if (rest.length) {
-    setTimeout(() => {
-      flushSummaryQueue();
-    }, 0);
-  }
-}
-
-export function flushQueues() {
-  flushEventQueue();
-  flushSummaryQueue();
-}
-
-export function initTelemetry() {
-  if (flushTimer) {
-    return;
-  }
-  flushTimer = window.setInterval(() => {
-    flushQueues();
-  }, FLUSH_INTERVAL_MS);
-  window.addEventListener("online", flushQueues);
-  flushQueues();
 }
 
 export function getClientId() {
@@ -162,82 +42,235 @@ export function createAttemptId() {
   return generateId();
 }
 
-function basePayload(session) {
-  return {
-    attemptId: session?.attemptId ?? null,
-    testId: session?.testId ?? null,
-    clientId: session?.clientId ?? getClientId(),
-    ts: new Date().toISOString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    settings: session?.settings ?? getSettings(),
-  };
-}
-
-function resolveAnswerId(options, index) {
-  if (index === null || index === undefined || index === -1) {
-    return null;
+// Queue management for offline support
+function readQueue() {
+  const raw = localStorage.getItem(PENDING_QUEUE_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) || [];
+  } catch {
+    return [];
   }
-  return options?.[index]?.id ?? index;
 }
 
-export function trackEvent(
-  type,
-  {
-    session,
-    questionEntry,
-    questionIndex = null,
-    answerIndex = null,
-    options = [],
-    isCorrect = null,
-    durationMs = null,
-    isSkipped = null,
-  } = {}
-) {
+function writeQueue(items) {
+  localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(items));
+}
+
+function enqueueRequest(request) {
+  const queue = readQueue();
+  queue.push(request);
+  writeQueue(queue);
+}
+
+async function postJson(url, payload) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...getAuthHeaders(),
+  };
+  return fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
+// Flush pending requests
+async function flushPendingQueue() {
+  if (!navigator.onLine) return;
+
+  const queue = readQueue();
+  if (!queue.length) return;
+
+  const remaining = [];
+
+  for (const request of queue) {
+    try {
+      const response = await postJson(request.url, request.payload);
+      if (!response.ok && response.status >= 500) {
+        // Server error, retry later
+        remaining.push(request);
+      }
+      // 4xx errors are not retried (invalid data)
+    } catch (error) {
+      // Network error, retry later
+      remaining.push(request);
+    }
+  }
+
+  writeQueue(remaining);
+}
+
+export function flushQueues() {
+  flushPendingQueue();
+}
+
+export function initTelemetry() {
+  if (flushTimer) return;
+
+  flushTimer = window.setInterval(flushPendingQueue, FLUSH_INTERVAL_MS);
+  window.addEventListener("online", flushPendingQueue);
+  flushPendingQueue();
+}
+
+/**
+ * Start a new test attempt.
+ * Sends question snapshots for later preview in statistics.
+ */
+export async function startAttempt(session) {
+  if (!session?.attemptId || !session?.testId) return;
+
   const payload = {
-    eventType: type,
-    ...basePayload(session),
-    questionId: questionEntry?.questionId ?? null,
-    questionIndex,
-    answerId: resolveAnswerId(options, answerIndex),
+    attemptId: session.attemptId,
+    testId: session.testId,
+    clientId: session.clientId || getClientId(),
+    settings: session.settings || getSettings(),
+    questions: session.questions.map((entry) => ({
+      questionId: entry.questionId,
+      question: entry.question,
+    })),
+  };
+
+  const url = "/api/attempts/start";
+
+  try {
+    const response = await postJson(url, payload);
+    if (!response.ok) {
+      console.warn("Failed to start attempt:", response.status);
+      enqueueRequest({ url, payload });
+    }
+  } catch (error) {
+    console.warn("Failed to start attempt:", error);
+    enqueueRequest({ url, payload });
+  }
+}
+
+/**
+ * Record an answer for a question.
+ */
+export async function recordAnswer(
+  session,
+  questionId,
+  answerIndex,
+  isCorrect,
+  durationMs = 0
+) {
+  if (!session?.attemptId || !session?.testId) return;
+
+  const payload = {
+    testId: session.testId,
+    clientId: session.clientId || getClientId(),
+    questionId,
+    answerIndex,
     isCorrect,
     durationMs,
-    isSkipped,
+    isSkipped: false,
   };
-  if (!payload.attemptId || !payload.testId || !payload.clientId) {
-    return;
+
+  const url = `/api/attempts/${encodeURIComponent(session.attemptId)}/answer`;
+
+  try {
+    const response = await postJson(url, payload);
+    if (!response.ok && response.status >= 500) {
+      enqueueRequest({ url, payload });
+    }
+  } catch (error) {
+    enqueueRequest({ url, payload });
   }
-  enqueue(EVENT_QUEUE_KEY, payload);
 }
 
+/**
+ * Record a skipped question.
+ */
+export async function recordSkip(session, questionId, durationMs = 0) {
+  if (!session?.attemptId || !session?.testId) return;
+
+  const payload = {
+    testId: session.testId,
+    clientId: session.clientId || getClientId(),
+    questionId,
+    answerIndex: null,
+    isCorrect: null,
+    durationMs,
+    isSkipped: true,
+  };
+
+  const url = `/api/attempts/${encodeURIComponent(session.attemptId)}/answer`;
+
+  try {
+    const response = await postJson(url, payload);
+    if (!response.ok && response.status >= 500) {
+      enqueueRequest({ url, payload });
+    }
+  } catch (error) {
+    enqueueRequest({ url, payload });
+  }
+}
+
+/**
+ * Finish an attempt and calculate final statistics.
+ */
+export async function finishAttempt(session, totalDurationMs = 0) {
+  if (!session?.attemptId || !session?.testId) return;
+
+  const payload = {
+    testId: session.testId,
+    clientId: session.clientId || getClientId(),
+    totalDurationMs,
+  };
+
+  const url = `/api/attempts/${encodeURIComponent(session.attemptId)}/finish`;
+
+  try {
+    const response = await postJson(url, payload);
+    if (!response.ok) {
+      console.warn("Failed to finish attempt:", response.status);
+      enqueueRequest({ url, payload });
+    }
+    return response.ok ? await response.json() : null;
+  } catch (error) {
+    console.warn("Failed to finish attempt:", error);
+    enqueueRequest({ url, payload });
+    return null;
+  }
+}
+
+/**
+ * Mark an attempt as abandoned.
+ */
+export async function abandonAttempt(session) {
+  if (!session?.attemptId) return;
+
+  const url = `/api/attempts/${encodeURIComponent(session.attemptId)}/abandon`;
+
+  try {
+    await postJson(url, {});
+  } catch (error) {
+    // Abandon failures are not critical
+    console.warn("Failed to abandon attempt:", error);
+  }
+}
+
+// Legacy compatibility - these functions are called by existing code
+
 export function trackAttemptStarted(session) {
-  trackEvent("attempt_started", { session });
+  startAttempt(session);
 }
 
 export function trackAttemptFinished(session, summary) {
-  trackEvent("attempt_finished", { session, durationMs: summary.totalDurationMs });
-  enqueue(SUMMARY_QUEUE_KEY, summary);
+  finishAttempt(session, summary.totalDurationMs);
 }
 
 export function trackAttemptAbandoned(session) {
-  trackEvent("attempt_abandoned", { session });
+  abandonAttempt(session);
 }
 
 export function trackQuestionShown(session, questionEntry, questionIndex) {
-  trackEvent("question_shown", {
-    session,
-    questionEntry,
-    questionIndex,
-  });
+  // No longer tracked as separate event - timing handled client-side
 }
 
 export function trackQuestionSkipped(session, questionEntry, questionIndex, durationMs) {
-  trackEvent("question_skipped", {
-    session,
-    questionEntry,
-    questionIndex,
-    durationMs,
-    isSkipped: true,
-  });
+  recordSkip(session, questionEntry.questionId, durationMs);
 }
 
 export function trackAnswerEvent(
@@ -250,22 +283,14 @@ export function trackAnswerEvent(
   isCorrect,
   durationMs
 ) {
-  trackEvent(type, {
-    session,
-    questionEntry,
-    questionIndex,
-    answerIndex,
-    options,
-    isCorrect,
-    durationMs,
-    isSkipped: false,
-  });
+  recordAnswer(session, questionEntry.questionId, answerIndex, isCorrect, durationMs);
 }
 
+// Timing utilities (still used client-side for duration tracking)
+
 export function updateQuestionTiming(session, nextQuestionId) {
-  if (!session) {
-    return;
-  }
+  if (!session) return;
+
   const now = Date.now();
   if (
     session.activeQuestionId !== null &&
@@ -289,9 +314,8 @@ export function updateQuestionTiming(session, nextQuestionId) {
 }
 
 export function finalizeActiveQuestionTiming(session) {
-  if (!session) {
-    return;
-  }
+  if (!session) return;
+
   const now = Date.now();
   if (
     session.activeQuestionId !== null &&
@@ -310,141 +334,43 @@ export function finalizeActiveQuestionTiming(session) {
   session.activeQuestionStartedAt = null;
 }
 
-function average(values) {
-  if (!values.length) {
-    return 0;
-  }
-  const sum = values.reduce((total, value) => total + value, 0);
-  return sum / values.length;
-}
-
-function averageNullable(values) {
-  const filtered = values.filter((value) => Number.isFinite(value));
-  if (!filtered.length) {
-    return null;
-  }
-  return average(filtered);
-}
-
-function standardDeviation(values) {
-  if (values.length < 2) {
-    return 0;
-  }
-  const mean = average(values);
-  const variance =
-    values.reduce((total, value) => total + (value - mean) ** 2, 0) /
-    values.length;
-  return Math.sqrt(variance);
-}
-
+/**
+ * Build attempt summary (still used for local result display).
+ */
 export function buildAttemptSummary(session) {
   const now = Date.now();
   const total = session.questions.length;
   let answeredCount = 0;
   let correctCount = 0;
-  const accuracyByIndex = [];
-  const tempoByIndex = [];
 
-  const perQuestion = session.questions.map((entry, index) => {
+  session.questions.forEach((entry) => {
     const selectedIndex = session.answers.get(entry.questionId);
-    const options =
-      session.optionOrders.get(entry.questionId) ?? entry.question.options;
-    const correctIndex = options.findIndex((option) => option.isCorrect);
     const isAnswered = selectedIndex !== undefined && selectedIndex !== -1;
-    const isCorrect =
-      isAnswered && correctIndex !== -1
-        ? Boolean(options[selectedIndex]?.isCorrect)
-        : null;
-    const timing = session.questionTimings.get(entry.questionId) ?? {
-      totalMs: 0,
-      shownCount: 0,
-    };
     if (isAnswered) {
       answeredCount += 1;
-      if (isCorrect) {
+      const options =
+        session.optionOrders.get(entry.questionId) ?? entry.question.options;
+      if (options[selectedIndex]?.isCorrect) {
         correctCount += 1;
       }
     }
-    if (typeof isCorrect === "boolean") {
-      accuracyByIndex.push(isCorrect ? 100 : 0);
-    } else {
-      accuracyByIndex.push(null);
-    }
-    tempoByIndex.push(timing.totalMs || 0);
-    const isSkipped = !isAnswered;
-    return {
-      questionId: entry.questionId,
-      index,
-      isCorrect,
-      durationMs: timing.totalMs,
-      isSkipped,
-    };
   });
 
-  const skippedCount = total - answeredCount;
-  const percentCorrect = total ? (correctCount / total) * 100 : 0;
-  const questionDurations = perQuestion.map((item) => item.durationMs || 0);
-  const accuracySeries = perQuestion.map((item) => {
-    if (typeof item.isCorrect === "boolean") {
-      return item.isCorrect ? 1 : 0;
-    }
-    return null;
-  });
   const totalDurationMs = session.startedAt ? now - session.startedAt : 0;
-  const questionDurationTotalMs = questionDurations.reduce(
-    (sum, value) => sum + value,
-    0
-  );
-  const avgTimePerQuestion = total
-    ? questionDurationTotalMs / total
-    : 0;
-
-  const windowSize = Math.max(1, Math.floor(accuracySeries.length / 3));
-  let bestAverage = null;
-  let fatigueIndex = null;
-  accuracySeries.forEach((value, index) => {
-    const start = Math.max(0, index - windowSize + 1);
-    const window = accuracySeries.slice(start, index + 1);
-    const avg = averageNullable(window);
-    if (avg === null) {
-      return;
-    }
-    if (bestAverage === null || avg > bestAverage) {
-      bestAverage = avg;
-    } else if (fatigueIndex === null && avg < bestAverage) {
-      fatigueIndex = index;
-    }
-  });
-  const fatiguePoint =
-    fatigueIndex !== null && accuracySeries.length
-      ? (fatigueIndex + 1) / accuracySeries.length
-      : 0;
-
-  const mean = average(questionDurations);
-  const focusStabilityIndex = mean
-    ? Math.max(0, 1 - standardDeviation(questionDurations) / mean)
-    : 0;
-
-  const personalDifficultyScore = total
-    ? Math.max(0, 1 - correctCount / total)
-    : 0;
 
   return {
-    ...basePayload(session),
+    attemptId: session.attemptId,
+    testId: session.testId,
+    clientId: session.clientId || getClientId(),
     score: correctCount,
-    percentCorrect,
-    accuracy: percentCorrect,
-    completed: Boolean(session.finished),
+    total,
     answeredCount,
-    skippedCount,
+    percentCorrect: total ? (correctCount / total) * 100 : 0,
     totalDurationMs,
-    avgTimePerQuestion,
-    perQuestion,
-    fatiguePoint,
-    focusStabilityIndex,
-    personalDifficultyScore,
-    accuracyByIndex,
-    tempoByIndex,
-    timeByIndex: tempoByIndex,
   };
+}
+
+// Legacy trackEvent function (no longer used, but kept for compatibility)
+export function trackEvent() {
+  // No-op - replaced by specific API calls
 }
