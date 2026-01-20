@@ -53,10 +53,16 @@ def extract_cached_metrics(
     return {
         "score": resolve_metric(aggregates, ["score", "correct"])
         or resolve_metric(summary, ["score", "correct"]),
-        "percent": resolve_metric(aggregates, ["percent", "percentCorrect", "accuracy"])
-        or resolve_metric(summary, ["percent", "percentCorrect", "accuracy"]),
+        "percent": resolve_metric(aggregates, ["percent", "percentCorrect"])
+        or resolve_metric(summary, ["percent", "percentCorrect"]),
+        "accuracy": resolve_metric(aggregates, ["accuracy"])
+        or resolve_metric(summary, ["accuracy"]),
+        "answerRate": resolve_metric(aggregates, ["answerRate"])
+        or resolve_metric(summary, ["answerRate"]),
         "answeredCount": resolve_metric(aggregates, ["answeredCount", "answered"])
         or resolve_metric(summary, ["answeredCount", "answered"]),
+        "incorrectCount": resolve_metric(aggregates, ["incorrectCount"])
+        or resolve_metric(summary, ["incorrectCount"]),
         "skippedCount": resolve_metric(aggregates, ["skippedCount", "skipped"])
         or resolve_metric(summary, ["skippedCount", "skipped"]),
         "avgTimePerQuestion": resolve_metric(
@@ -71,6 +77,8 @@ def extract_cached_metrics(
             aggregates, ["personalDifficultyScore"]
         )
         or resolve_metric(summary, ["personalDifficultyScore"]),
+        "questionCountUsed": resolve_metric(aggregates, ["questionCountUsed"])
+        or resolve_metric(summary, ["questionCountUsed"]),
     }
 
 
@@ -82,12 +90,14 @@ def upsert_attempt_index_entry(
     completed_at: str | None = None,
     score: float | int | None = None,
     percent: float | int | None = None,
+    accuracy: float | int | None = None,
     answered_count: float | int | None = None,
     skipped_count: float | int | None = None,
     avg_time_per_question: float | int | None = None,
     fatigue_point: float | int | None = None,
     focus_stability_index: float | int | None = None,
     personal_difficulty_score: float | int | None = None,
+    question_count_used: float | int | None = None,
     stats_version: int | None = None,
 ) -> dict[str, object]:
     """Upsert entry in attempt index."""
@@ -106,12 +116,14 @@ def upsert_attempt_index_entry(
             "completedAt": completed_at,
             "score": score,
             "percent": percent,
+            "accuracy": accuracy,
             "answeredCount": answered_count,
             "skippedCount": skipped_count,
             "avgTimePerQuestion": avg_time_per_question,
             "fatiguePoint": fatigue_point,
             "focusStabilityIndex": focus_stability_index,
             "personalDifficultyScore": personal_difficulty_score,
+            "questionCountUsed": question_count_used,
             "statsVersion": stats_version,
         }
         entries.append(entry)
@@ -126,6 +138,8 @@ def upsert_attempt_index_entry(
         entry["score"] = score
     if percent is not None:
         entry["percent"] = percent
+    if accuracy is not None:
+        entry["accuracy"] = accuracy
     if answered_count is not None:
         entry["answeredCount"] = answered_count
     if skipped_count is not None:
@@ -138,6 +152,8 @@ def upsert_attempt_index_entry(
         entry["focusStabilityIndex"] = focus_stability_index
     if personal_difficulty_score is not None:
         entry["personalDifficultyScore"] = personal_difficulty_score
+    if question_count_used is not None:
+        entry["questionCountUsed"] = question_count_used
     if stats_version is not None:
         entry["statsVersion"] = stats_version
     write_attempt_index(entries)
@@ -172,12 +188,14 @@ def rebuild_attempt_index() -> list[dict[str, object]]:
                 "completedAt": timestamps.get("finalizedAt"),
                 "score": metrics["score"],
                 "percent": metrics["percent"],
+                "accuracy": metrics["accuracy"],
                 "answeredCount": metrics["answeredCount"],
                 "skippedCount": metrics["skippedCount"],
                 "avgTimePerQuestion": metrics["avgTimePerQuestion"],
                 "fatiguePoint": metrics["fatiguePoint"],
                 "focusStabilityIndex": metrics["focusStabilityIndex"],
                 "personalDifficultyScore": metrics["personalDifficultyScore"],
+                "questionCountUsed": metrics["questionCountUsed"],
                 "statsVersion": stats_payload.get("statsVersion"),
             }
         )
@@ -235,6 +253,7 @@ def build_attempt_summary_from_events(
         is_answered = False
         is_correct = None
         duration_ms = 0
+        answer_index = None
 
         if event:
             event_type = event.get("eventType")
@@ -243,6 +262,10 @@ def build_attempt_summary_from_events(
                 is_correct = event.get("isCorrect")
                 if not isinstance(is_correct, bool):
                     is_correct = None
+                # Get selected answer index
+                answer_idx = event.get("answerIndex")
+                if isinstance(answer_idx, int):
+                    answer_index = answer_idx
             if event_type == "question_skipped":
                 is_answered = False
             duration_value = event.get("durationMs")
@@ -264,11 +287,35 @@ def build_attempt_summary_from_events(
                 "isCorrect": is_correct if is_answered else None,
                 "durationMs": duration_ms,
                 "isSkipped": not is_answered,
+                "answerIndex": answer_index,
             }
         )
 
     skipped_count = total - answered_count
-    percent_correct = (correct_count / total) * 100 if total else 0
+
+    # Get questionCount from settings (0 means all questions)
+    settings = attempt_meta.get("settings", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    question_count_setting = settings.get("questionCount", 0)
+    if not isinstance(question_count_setting, int) or question_count_setting <= 0:
+        question_count_setting = 0
+
+    # Determine the base for percentage calculations
+    # If questionCount is set, use it; otherwise use total questions
+    question_count_used = question_count_setting if question_count_setting > 0 else total
+
+    # Calculate percentages based on questionCount
+    percent_correct = (correct_count / question_count_used) * 100 if question_count_used else 0
+    incorrect_count = answered_count - correct_count
+    percent_incorrect = (incorrect_count / question_count_used) * 100 if question_count_used else 0
+    unanswered_count = question_count_used - answered_count if question_count_used > answered_count else 0
+    percent_unanswered = (unanswered_count / question_count_used) * 100 if question_count_used else 0
+
+    # Accuracy is correct / answered (how accurate were the answers given)
+    accuracy = (correct_count / answered_count) * 100 if answered_count else 0
+    # Answer rate is answered / questionCount (completion rate)
+    answer_rate = (answered_count / question_count_used) * 100 if question_count_used else 0
 
     accuracy_by_index: list[float | None] = []
     tempo_by_index: list[int] = []
@@ -374,9 +421,12 @@ def build_attempt_summary_from_events(
         "settings": attempt_meta.get("settings", {}),
         "score": correct_count,
         "percentCorrect": percent_correct,
-        "accuracy": percent_correct,
+        "accuracy": accuracy,
+        "answerRate": answer_rate,
         "completed": completed,
         "answeredCount": answered_count,
+        "incorrectCount": incorrect_count,
+        "unansweredCount": unanswered_count,
         "skippedCount": skipped_count,
         "totalDurationMs": total_duration_ms,
         "avgTimePerQuestion": avg_time_per_question,
@@ -388,6 +438,9 @@ def build_attempt_summary_from_events(
         "tempoByIndex": tempo_by_index,
         "timeByIndex": tempo_by_index,
         "totalCount": total,
+        "questionCountUsed": question_count_used,
+        "percentIncorrect": percent_incorrect,
+        "percentUnanswered": percent_unanswered,
     }
     return summary
 
@@ -403,8 +456,13 @@ def write_attempt_stats_from_summary(
     aggregates = {
         "score": summary.get("score"),
         "percentCorrect": summary.get("percentCorrect"),
+        "percentIncorrect": summary.get("percentIncorrect"),
+        "percentUnanswered": summary.get("percentUnanswered"),
         "accuracy": summary.get("accuracy"),
+        "answerRate": summary.get("answerRate"),
         "answeredCount": summary.get("answeredCount"),
+        "incorrectCount": summary.get("incorrectCount"),
+        "unansweredCount": summary.get("unansweredCount"),
         "skippedCount": summary.get("skippedCount"),
         "avgTimePerQuestion": summary.get("avgTimePerQuestion"),
         "totalDurationMs": summary.get("totalDurationMs"),
@@ -415,6 +473,7 @@ def write_attempt_stats_from_summary(
         "tempoByIndex": summary.get("tempoByIndex") or summary.get("timeByIndex"),
         "timeByIndex": summary.get("timeByIndex"),
         "totalCount": summary.get("totalCount"),
+        "questionCountUsed": summary.get("questionCountUsed"),
     }
 
     stats_payload = {
@@ -437,12 +496,14 @@ def write_attempt_stats_from_summary(
         client_id,
         score=metrics["score"],
         percent=metrics["percent"],
+        accuracy=metrics["accuracy"],
         answered_count=metrics["answeredCount"],
         skipped_count=metrics["skippedCount"],
         avg_time_per_question=metrics["avgTimePerQuestion"],
         fatigue_point=metrics["fatiguePoint"],
         focus_stability_index=metrics["focusStabilityIndex"],
         personal_difficulty_score=metrics["personalDifficultyScore"],
+        question_count_used=metrics["questionCountUsed"],
         stats_version=STATS_VERSION,
     )
     return stats_payload

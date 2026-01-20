@@ -46,7 +46,8 @@ async function loadAppContent() {
 
   // Load initial tests
   try {
-    const tests = await fetchTests();
+    const { tests } = await fetchTests();
+    state.testsCache = tests;
     if (!tests.length) {
       renderTestCardsWithHandlers(tests);
       await selectTest(null);

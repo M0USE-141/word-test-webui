@@ -543,6 +543,14 @@ function showEditorPanelInCard(card, key = null) {
   setActiveEditorCard(card, key);
 }
 
+// Prevent clicks inside editor panel from bubbling to parent card
+// This is important for mobile where the panel is inside the card
+if (dom.editorPanel) {
+  dom.editorPanel.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+}
+
 export function syncEditorPanelLocation() {
   if (!dom.editorPanel) {
     return;

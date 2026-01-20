@@ -166,6 +166,26 @@
         <section class="panel panel--management">
           <div class="card card--collections">
             <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
+            <div class="test-tabs" id="test-tabs">
+              <button type="button" class="test-tab is-active" data-filter="" data-i18n="tabAllTests">Все</button>
+              <button type="button" class="test-tab" data-filter="my" data-i18n="tabMyTests">Мои</button>
+              <button type="button" class="test-tab" data-filter="shared" data-i18n="tabSharedTests">Доступные</button>
+              <button type="button" class="test-tab" data-filter="public" data-i18n="tabPublicTests">Публичные</button>
+            </div>
+            <div class="access-legend">
+              <span class="access-legend__item" title="">
+                <span class="access-legend__icon">🔒</span>
+                <span class="access-legend__label" data-i18n="accessPrivate">Приватный</span>
+              </span>
+              <span class="access-legend__item">
+                <span class="access-legend__icon">👥</span>
+                <span class="access-legend__label" data-i18n="accessShared">Доступен избранным</span>
+              </span>
+              <span class="access-legend__item">
+                <span class="access-legend__icon">🌐</span>
+                <span class="access-legend__label" data-i18n="accessPublic">Публичный</span>
+              </span>
+            </div>
             <div class="controls">
               <div id="test-cards" class="test-collections">
                 <button type="button" class="test-card test-card--new">
@@ -481,7 +501,49 @@
                 К тестам
               </button>
             </div>
-            <div class="stats-controls">
+            <div class="stats-filters">
+              <label class="stats-filter">
+                <span data-i18n="statsFilterTest">Тест</span>
+                <select id="stats-filter-test">
+                  <option value="" data-i18n="statsFilterAllTests">Все тесты</option>
+                </select>
+              </label>
+              <label class="stats-filter">
+                <span data-i18n="statsFilterStartDate">С даты</span>
+                <input type="date" id="stats-filter-start-date" />
+              </label>
+              <label class="stats-filter">
+                <span data-i18n="statsFilterEndDate">По дату</span>
+                <input type="date" id="stats-filter-end-date" />
+              </label>
+              <button
+                id="stats-filter-reset"
+                type="button"
+                class="ghost"
+                data-i18n="statsFilterReset"
+              >
+                Сбросить
+              </button>
+            </div>
+            <div class="stats-view-tabs">
+              <button
+                id="stats-view-single"
+                type="button"
+                class="stats-view-tab is-active"
+                data-i18n="statsViewSingle"
+              >
+                Попытка
+              </button>
+              <button
+                id="stats-view-aggregate"
+                type="button"
+                class="stats-view-tab"
+                data-i18n="statsViewAggregate"
+              >
+                Все попытки
+              </button>
+            </div>
+            <div id="stats-single-controls" class="stats-controls">
               <label class="stats-control">
                 <span data-i18n="statsAttemptLabel">Попытка</span>
                 <select id="stats-attempt-select"></select>
@@ -559,7 +621,16 @@
                 Детализация по выбранной попытке.
               </p>
             </div>
-            <div id="stats-question-stream" class="stats-question-stream"></div>
+            <div class="stats-questions-layout">
+              <div id="stats-question-stream" class="stats-question-stream"></div>
+              <div id="stats-question-preview" class="stats-question-preview is-hidden">
+                <div class="stats-question-preview__header">
+                  <h4 id="stats-preview-title" data-i18n="statsPreviewTitle">Предпросмотр вопроса</h4>
+                  <button id="stats-preview-close" type="button" class="ghost" aria-label="Close">×</button>
+                </div>
+                <div id="stats-preview-content" class="stats-question-preview__content"></div>
+              </div>
+            </div>
           </div>
         </section>
       </section>
@@ -590,6 +661,14 @@
               data-i18n="accessSettingsButton"
             >
               Настройки доступа
+            </button>
+            <button
+              id="editor-test-stats"
+              type="button"
+              class="secondary"
+              data-i18n="testStatisticsButton"
+            >
+              Статистика теста
             </button>
             <button
               id="editor-rename-test"
@@ -1071,5 +1150,28 @@
         </div>
       </div>
     </div>
+
+    <dialog id="test-stats-modal" class="modal">
+      <div class="modal-content modal-content--medium">
+        <div class="modal-header">
+          <div>
+            <h2 id="test-stats-title" data-i18n="testStatisticsTitle">Статистика теста</h2>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="ghost modal__close"
+              data-i18n="closeButton"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+        <div class="test-stats-content">
+          <p id="test-stats-status" class="muted"></p>
+          <div id="test-stats-content"></div>
+        </div>
+      </div>
+    </dialog>
   </body>
 </html>

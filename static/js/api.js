@@ -2,27 +2,49 @@ import { readTestsCache, state, writeTestsCache } from "./state.js";
 import { t } from "./i18n.js";
 import { getAuthHeaders } from "./api/auth.js";
 
-export async function fetchTests({ force = false } = {}) {
-  if (!force) {
+export async function fetchTests({ force = false, filter = null, limit = null, offset = 0 } = {}) {
+  // Only use cache when no filter is specified
+  if (!force && !filter) {
     if (state.testsCache.length) {
-      return state.testsCache;
+      return { tests: state.testsCache, total: state.testsCache.length, offset: 0, limit: null };
     }
     const cached = readTestsCache();
     if (cached.length) {
       state.testsCache = cached;
-      return cached;
+      return { tests: cached, total: cached.length, offset: 0, limit: null };
     }
   }
 
-  const response = await fetch("/api/tests", {
+  const params = new URLSearchParams();
+  if (filter) {
+    params.append("filter", filter);
+  }
+  if (limit) {
+    params.append("limit", limit.toString());
+  }
+  if (offset) {
+    params.append("offset", offset.toString());
+  }
+
+  const url = params.toString() ? `/api/tests?${params.toString()}` : "/api/tests";
+  const response = await fetch(url, {
     headers: { ...getAuthHeaders() },
   });
   if (!response.ok) {
     throw new Error(t("errorFetchTests"));
   }
   const data = await response.json();
-  writeTestsCache(data);
-  return data;
+
+  // Handle new response format
+  const tests = data.tests || data;
+  const total = data.total ?? tests.length;
+
+  // Only update cache when fetching all tests without filter
+  if (!filter) {
+    writeTestsCache(tests);
+  }
+
+  return { tests, total, offset: data.offset ?? offset, limit: data.limit ?? limit };
 }
 
 export async function fetchTest(testId) {
@@ -90,7 +112,7 @@ export async function renameTest(testId, title) {
     const detail = payload?.detail || t("errorRenameTest");
     throw new Error(detail);
   }
-  const tests = await fetchTests();
+  const { tests } = await fetchTests();
   state.testsCache = tests;
   return payload;
 }
@@ -140,10 +162,27 @@ export async function uploadObjectAsset(testId, file) {
   return payload;
 }
 
-export async function fetchAttemptStats(clientId) {
-  const response = await fetch(
-    `/api/stats/attempts?clientId=${encodeURIComponent(clientId)}`
-  );
+export async function fetchAttemptStats(clientId, options = {}) {
+  const params = new URLSearchParams();
+  params.append("clientId", clientId);
+
+  if (options.testId) {
+    params.append("testId", options.testId);
+  }
+  if (options.startDate) {
+    params.append("startDate", options.startDate);
+  }
+  if (options.endDate) {
+    params.append("endDate", options.endDate);
+  }
+  if (options.limit) {
+    params.append("limit", options.limit.toString());
+  }
+  if (options.offset) {
+    params.append("offset", options.offset.toString());
+  }
+
+  const response = await fetch(`/api/stats/attempts?${params.toString()}`);
   if (!response.ok) {
     throw new Error(t("errorFetchStats"));
   }
@@ -156,6 +195,17 @@ export async function fetchAttemptDetails(attemptId, clientId) {
   );
   if (!response.ok) {
     throw new Error(t("errorFetchStats"));
+  }
+  return response.json();
+}
+
+export async function fetchTestStatistics(testId) {
+  const response = await fetch(`/api/tests/${testId}/statistics`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || t("errorFetchStats"));
   }
   return response.json();
 }

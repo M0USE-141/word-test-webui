@@ -65,7 +65,12 @@ import {
   initializeChangeRequestsModalEvents,
   openChangeRequestsModal,
 } from "../components/change-requests-modal.js";
+import {
+  initializeTestStatsModalEvents,
+  openTestStatsModal,
+} from "../components/test-stats-modal.js";
 import { setupDropzone } from "../utils/file-upload.js";
+import { getAuthHeaders } from "../api/auth.js";
 
 /**
  * Render test cards with event handlers
@@ -109,7 +114,8 @@ export async function refreshCurrentTest(testId = state.currentTest?.id) {
   const { updateTestingPanelsStatus, setActiveTestingPanel } = await import("./testing.js");
 
   state.currentTest = await fetchTest(testId);
-  state.testsCache = await fetchTests();
+  const { tests } = await fetchTests();
+  state.testsCache = tests;
   renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
   state.session = null;
   updateProgressHint();
@@ -211,6 +217,29 @@ export async function handleDeleteQuestion(questionId) {
 export function initializeManagementScreenEvents() {
   import("../utils/file-upload.js").then(({ updateUploadFileState }) => {
     updateUploadFileState(dom.uploadFileInput?.files?.[0], dom.uploadStatus, dom.uploadFilename);
+  });
+
+  // Tab switching for test collections
+  dom.testTabs?.addEventListener("click", async (event) => {
+    const tab = event.target.closest(".test-tab");
+    if (!tab) return;
+
+    const filter = tab.dataset.filter || null;
+    state.uiState.activeTestFilter = filter;
+
+    // Update active tab
+    dom.testTabs.querySelectorAll(".test-tab").forEach((t) => {
+      t.classList.toggle("is-active", t === tab);
+    });
+
+    // Reload tests with filter
+    try {
+      const { tests } = await fetchTests({ force: true, filter });
+      state.testsCache = tests;
+      renderTestCardsWithHandlers(tests, state.currentTest?.id);
+    } catch (error) {
+      console.error("Failed to load tests:", error);
+    }
   });
 
   dom.uploadDropzone?.classList.add("is-empty");
@@ -467,11 +496,21 @@ export function initializeManagementScreenEvents() {
   // Initialize change requests modal events
   initializeChangeRequestsModalEvents();
 
+  // Initialize test stats modal events
+  initializeTestStatsModalEvents();
+
   dom.editorAccessSettingsButton?.addEventListener("click", () => {
     if (!state.currentTest) {
       return;
     }
     openAccessSettingsModal(state.currentTest.id, state.currentTest.title);
+  });
+
+  dom.editorTestStatsButton?.addEventListener("click", () => {
+    if (!state.currentTest) {
+      return;
+    }
+    openTestStatsModal(state.currentTest.id, state.currentTest.title);
   });
 
   dom.editorChangeRequestsButton?.addEventListener("click", () => {
@@ -496,7 +535,8 @@ export function initializeManagementScreenEvents() {
       await renameTestApi(state.currentTest.id, newTitle.trim());
       state.currentTest = await fetchTest(state.currentTest.id);
       clearTestsCache();
-      state.testsCache = await fetchTests({ force: true });
+      const { tests: freshTests } = await fetchTests({ force: true });
+      state.testsCache = freshTests;
       renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
       updateProgressHint();
       updateEditorTestActions();
@@ -516,7 +556,8 @@ export function initializeManagementScreenEvents() {
     try {
       await deleteTestApi(state.currentTest.id);
       clearTestsCache();
-      state.testsCache = await fetchTests({ force: true });
+      const { tests: remainingTests } = await fetchTests({ force: true });
+      state.testsCache = remainingTests;
       if (state.testsCache.length) {
         await selectTest(state.testsCache[0].id);
       } else {
@@ -553,6 +594,7 @@ export function initializeManagementScreenEvents() {
     try {
       const response = await fetch("/api/tests/upload", {
         method: "POST",
+        headers: { ...getAuthHeaders() },
         body: formData,
       });
       const payload = await response.json().catch(() => null);
@@ -562,12 +604,13 @@ export function initializeManagementScreenEvents() {
       }
       const uploadResult = payload ?? {};
       clearTestsCache();
-      const tests = await fetchTests({ force: true });
+      const { tests: uploadedTests } = await fetchTests({ force: true });
+      state.testsCache = uploadedTests;
       const newTestId = uploadResult?.metadata?.id;
       renderUploadLogs(uploadResult?.logs);
 
-      const nextTestId = newTestId || tests[0]?.id;
-      renderTestCardsWithHandlers(tests, nextTestId);
+      const nextTestId = newTestId || uploadedTests[0]?.id;
+      renderTestCardsWithHandlers(uploadedTests, nextTestId);
       await selectTest(nextTestId);
 
       // Reset form
@@ -606,8 +649,9 @@ export function initializeManagementScreenEvents() {
       const payload = await createEmptyTest(title, accessLevel);
       const newTestId = payload?.metadata?.id || payload?.payload?.id;
       clearTestsCache();
-      const tests = await fetchTests({ force: true });
-      renderTestCardsWithHandlers(tests, newTestId);
+      const { tests: createdTests } = await fetchTests({ force: true });
+      state.testsCache = createdTests;
+      renderTestCardsWithHandlers(createdTests, newTestId);
       if (newTestId) {
         await selectTest(newTestId);
       }
