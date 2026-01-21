@@ -4,7 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title data-i18n="pageTitle">Word Test Extractor — Web UI</title>
-    <link rel="stylesheet" href="/static/css/app.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <link rel="stylesheet" href="/static/css/editor.css" />
+    <link rel="stylesheet" href="/static/css/theme.css" />
     <script
       src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
       defer
@@ -16,8 +20,8 @@
     <script type="module" src="/static/js/app.js"></script>
   </head>
   <body>
-    <header class="page-header">
-      <div class="container header-content">
+    <header class="app-header">
+      <div class="app-header__content">
         <div>
           <h1 data-i18n="headerTitle">Web-интерфейс тестирования</h1>
           <p>
@@ -27,8 +31,8 @@
             </span>
           </p>
         </div>
-        <div class="header-controls">
-          <div class="header-user">
+        <div class="app-header__controls">
+          <div class="user-controls">
             <span id="user-display" class="user-display is-hidden"></span>
             <button id="profile-button" type="button" class="ghost is-hidden" data-i18n="profileButton">
               Профиль
@@ -37,7 +41,7 @@
               Выйти
             </button>
           </div>
-          <div class="field-inline">
+          <div class="language-select">
             <label for="lang-select" data-i18n="languageLabel">Язык</label>
             <select id="lang-select">
               <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
@@ -45,43 +49,43 @@
               <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
             </select>
           </div>
-          <label class="toggle" for="theme-toggle">
-            <span class="toggle-label">🌞 / 🌙</span>
+          <label class="theme-toggle" for="theme-toggle">
+            <span class="theme-toggle__label">🌞 / 🌙</span>
             <input
               id="theme-toggle"
-              class="toggle-input"
+              class="theme-toggle__input"
               type="checkbox"
               role="switch"
               aria-label="Переключить тёмную тему"
               data-i18n-aria-label="themeToggleLabel"
             />
-            <span class="toggle-slider" aria-hidden="true"></span>
+            <span class="theme-toggle__slider" aria-hidden="true"></span>
           </label>
         </div>
       </div>
     </header>
 
-    <main class="page-main">
-      <section id="screen-auth" class="screen is-active">
-        <div class="container narrow">
-          <div class="card stack">
-            <div class="stack-sm">
+    <main class="app">
+      <section id="screen-auth" class="app-screen is-active">
+        <div class="auth-container">
+          <div class="auth-card card">
+            <div class="auth-header">
               <h2 data-i18n="authTitle">Авторизация</h2>
               <p class="muted" data-i18n="authSubtitle">
                 Войдите в систему или создайте новый аккаунт
               </p>
             </div>
-            <div class="tabs">
-              <button id="auth-login-tab" type="button" class="tab is-active" data-i18n="loginTab">
+            <div class="auth-tabs">
+              <button id="auth-login-tab" type="button" class="auth-tab is-active" data-i18n="loginTab">
                 Вход
               </button>
-              <button id="auth-register-tab" type="button" class="tab" data-i18n="registerTab">
+              <button id="auth-register-tab" type="button" class="auth-tab" data-i18n="registerTab">
                 Регистрация
               </button>
             </div>
-            <div id="auth-status" class="status is-hidden"></div>
-            <form id="auth-login-form" class="stack">
-              <label class="field">
+            <div id="auth-status" class="auth-status is-hidden"></div>
+            <form id="auth-login-form" class="auth-form">
+              <label class="auth-field">
                 <span data-i18n="usernameLabel">Имя пользователя</span>
                 <input
                   id="auth-login-username"
@@ -91,7 +95,7 @@
                   required
                 />
               </label>
-              <label class="field">
+              <label class="auth-field">
                 <span data-i18n="passwordLabel">Пароль</span>
                 <input
                   id="auth-login-password"
@@ -105,8 +109,8 @@
                 Войти
               </button>
             </form>
-            <form id="auth-register-form" class="stack is-hidden">
-              <label class="field">
+            <form id="auth-register-form" class="auth-form is-hidden">
+              <label class="auth-field">
                 <span data-i18n="usernameLabel">Имя пользователя</span>
                 <input
                   id="auth-register-username"
@@ -118,7 +122,7 @@
                   maxlength="50"
                 />
               </label>
-              <label class="field">
+              <label class="auth-field">
                 <span data-i18n="emailLabel">Email</span>
                 <input
                   id="auth-register-email"
@@ -128,7 +132,7 @@
                   required
                 />
               </label>
-              <label class="field">
+              <label class="auth-field">
                 <span data-i18n="passwordLabel">Пароль</span>
                 <input
                   id="auth-register-password"
@@ -140,7 +144,7 @@
                   maxlength="100"
                 />
               </label>
-              <label class="field">
+              <label class="auth-field">
                 <span data-i18n="confirmPasswordLabel">Подтвердите пароль</span>
                 <input
                   id="auth-register-confirm-password"
@@ -158,40 +162,40 @@
         </div>
       </section>
 
-      <section id="screen-management" class="screen is-hidden">
-        <section class="container stack">
-          <div class="card stack">
+      <section id="screen-management" class="app-screen is-hidden">
+        <section class="panel panel--management">
+          <div class="card card--collections">
             <h2 data-i18n="collectionsTitle">Коллекции тестов</h2>
-            <div class="tabs" id="test-tabs">
-              <button type="button" class="tab is-active" data-filter="" data-i18n="tabAllTests">Все</button>
-              <button type="button" class="tab" data-filter="my" data-i18n="tabMyTests">Мои</button>
-              <button type="button" class="tab" data-filter="shared" data-i18n="tabSharedTests">Доступные</button>
-              <button type="button" class="tab" data-filter="public" data-i18n="tabPublicTests">Публичные</button>
+            <div class="test-tabs" id="test-tabs">
+              <button type="button" class="test-tab is-active" data-filter="" data-i18n="tabAllTests">Все</button>
+              <button type="button" class="test-tab" data-filter="my" data-i18n="tabMyTests">Мои</button>
+              <button type="button" class="test-tab" data-filter="shared" data-i18n="tabSharedTests">Доступные</button>
+              <button type="button" class="test-tab" data-filter="public" data-i18n="tabPublicTests">Публичные</button>
             </div>
-            <div class="legend">
-              <span class="legend-item" title="">
-                <span class="legend-icon">🔒</span>
-                <span class="legend-label" data-i18n="accessPrivate">Приватный</span>
+            <div class="access-legend">
+              <span class="access-legend__item" title="">
+                <span class="access-legend__icon">🔒</span>
+                <span class="access-legend__label" data-i18n="accessPrivate">Приватный</span>
               </span>
-              <span class="legend-item">
-                <span class="legend-icon">👥</span>
-                <span class="legend-label" data-i18n="accessShared">Доступен избранным</span>
+              <span class="access-legend__item">
+                <span class="access-legend__icon">👥</span>
+                <span class="access-legend__label" data-i18n="accessShared">Доступен избранным</span>
               </span>
-              <span class="legend-item">
-                <span class="legend-icon">🌐</span>
-                <span class="legend-label" data-i18n="accessPublic">Публичный</span>
+              <span class="access-legend__item">
+                <span class="access-legend__icon">🌐</span>
+                <span class="access-legend__label" data-i18n="accessPublic">Публичный</span>
               </span>
             </div>
-            <div class="stack">
-              <div id="test-cards" class="card-grid">
-                <button type="button" class="tile">
+            <div class="controls">
+              <div id="test-cards" class="test-collections">
+                <button type="button" class="test-card test-card--new">
                   <strong data-i18n="newCollectionTitle">Новая коллекция</strong>
                   <span class="muted"
                     data-i18n="newCollectionHint"
                     >Создайте пустой тест и заполните его вручную.</span
                   >
                 </button>
-                <button type="button" class="tile">
+                <button type="button" class="test-card test-card--import">
                   <strong data-i18n="importTestTitle">Импорт теста</strong>
                   <span class="muted"
                     data-i18n="importTestHint"
@@ -204,13 +208,13 @@
         </section>
       </section>
 
-      <section id="screen-testing" class="screen is-hidden">
-        <section class="container stack">
-          <div id="panel-settings" class="card is-open" data-panel="settings">
-            <div class="card-header row">
+      <section id="screen-testing" class="app-screen is-hidden">
+        <section class="panel panel--testing">
+          <div id="panel-settings" class="card panel-card is-open" data-panel="settings">
+            <div class="panel-card__header">
               <button
                 id="panel-settings-toggle"
-                class="card-toggle"
+                class="panel-card__toggle"
                 type="button"
                 aria-expanded="true"
               >
@@ -218,7 +222,7 @@
                   <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
                 </div>
               </button>
-              <div class="row">
+              <div class="panel-card__actions">
                 <button id="exit-test" type="button" class="ghost">
                   <span data-i18n="exitButton">Выйти</span>
                 </button>
@@ -227,9 +231,9 @@
                 </button>
               </div>
             </div>
-            <div class="card-body stack">
-              <div class="grid">
-                <div class="field">
+            <div class="panel-card__content">
+              <div class="settings-grid">
+                <div class="settings-item">
                   <label for="setting-question-count">
                     <span data-i18n="questionCountLabel">
                       Количество вопросов (0 = все)
@@ -243,7 +247,7 @@
                   />
                 </div>
 
-                <div class="field">
+                <div class="settings-item">
                   <label for="setting-max-options">
                     <span data-i18n="maxOptionsLabel">Макс. вариантов ответа</span>
                   </label>
@@ -256,7 +260,7 @@
                 </div>
 
                 <label
-                  class="field checkbox"
+                  class="checkbox-row settings-item settings-item--checkbox"
                   for="setting-random-questions"
                 >
                   <input type="checkbox" id="setting-random-questions" />
@@ -265,7 +269,7 @@
                   </span>
                 </label>
                 <label
-                  class="field checkbox"
+                  class="checkbox-row settings-item settings-item--checkbox"
                   for="setting-random-options"
                 >
                   <input type="checkbox" id="setting-random-options" />
@@ -274,7 +278,7 @@
                   </span>
                 </label>
                 <label
-                  class="field checkbox"
+                  class="checkbox-row settings-item settings-item--checkbox"
                   for="setting-only-unanswered"
                 >
                   <input type="checkbox" id="setting-only-unanswered" />
@@ -283,7 +287,7 @@
                   </span>
                 </label>
                 <label
-                  class="field checkbox"
+                  class="checkbox-row settings-item settings-item--checkbox"
                   for="setting-show-answers"
                 >
                   <input type="checkbox" id="setting-show-answers" checked />
@@ -303,11 +307,11 @@
             </div>
           </div>
 
-          <div id="panel-results" class="card" data-panel="results">
-            <div class="card-header row">
+          <div id="panel-results" class="card panel-card" data-panel="results">
+            <div class="panel-card__header">
               <button
                 id="panel-results-toggle"
-                class="card-toggle"
+                class="panel-card__toggle"
                 type="button"
                 aria-expanded="false"
               >
@@ -316,20 +320,20 @@
                 </div>
               </button>
             </div>
-            <div class="card-body stack">
+            <div class="panel-card__content">
               <p id="result-summary" data-i18n="noCompletedAttempts">
                 Ещё нет завершённых попыток.
               </p>
-              <ul id="result-details" class="stack list"></ul>
+              <ul id="result-details" class="result-details"></ul>
               <p class="hint" id="progress-hint"></p>
             </div>
           </div>
 
-          <div id="panel-questions" class="card" data-panel="questions">
-            <div class="card-header row">
+          <div id="panel-questions" class="card panel-card" data-panel="questions">
+            <div class="panel-card__header">
               <button
                 id="panel-questions-toggle"
-                class="card-toggle"
+                class="panel-card__toggle"
                 type="button"
                 aria-expanded="false"
               >
@@ -339,16 +343,16 @@
                 </div>
               </button>
             </div>
-            <div class="card-body stack">
-              <div class="card stack">
-                <div class="row">
+            <div class="panel-card__content">
+              <div class="card question-card">
+                <div class="question-card__header">
                   <div>
                     <h2 id="question-progress" data-i18n="questionProgressZero">
                       Вопрос 0 из 0
                     </h2>
                     <p id="question-status" class="muted"></p>
                   </div>
-                  <div class="row">
+                  <div class="question-actions">
                     <button id="prev-question" type="button" data-i18n="prevButton">
                       Назад
                     </button>
@@ -363,17 +367,17 @@
 
               <div class="card">
                 <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
-                <div id="question-nav" class="pill-grid"></div>
+                <div id="question-nav" class="question-nav"></div>
               </div>
             </div>
           </div>
         </section>
       </section>
 
-      <section id="screen-profile" class="screen is-hidden">
-        <section class="container">
-          <div class="card stack">
-            <div class="row">
+      <section id="screen-profile" class="app-screen is-hidden">
+        <section class="panel panel--profile">
+          <div class="card profile-card">
+            <div class="profile-header">
               <div>
                 <h2 data-i18n="profileTitle">Профиль</h2>
                 <p class="muted" data-i18n="profileSubtitle">
@@ -390,20 +394,20 @@
               </button>
             </div>
 
-            <div class="grid">
-              <div class="stack">
-                <div class="avatar">
+            <div class="profile-content">
+              <div class="profile-avatar-section">
+                <div class="profile-avatar">
                   <img
                     id="profile-avatar-image"
                     src=""
                     alt=""
-                    class="avatar-image"
+                    class="profile-avatar__image"
                   />
-                  <div id="profile-avatar-placeholder" class="avatar-placeholder">
+                  <div id="profile-avatar-placeholder" class="profile-avatar__placeholder">
                     <span id="profile-avatar-initials"></span>
                   </div>
                 </div>
-                <div class="row">
+                <div class="profile-avatar-actions">
                   <label class="profile-avatar-upload" for="profile-avatar-input">
                     <span data-i18n="profileAvatarUpload">Загрузить аватар</span>
                   </label>
@@ -427,12 +431,12 @@
                 </p>
               </div>
 
-              <div class="stack">
-                <div class="field">
+              <div class="profile-fields">
+                <div class="profile-field">
                   <label for="profile-display-name" data-i18n="profileDisplayNameLabel">
                     Отображаемое имя
                   </label>
-                  <div class="row">
+                  <div class="profile-field-row">
                     <input
                       type="text"
                       id="profile-display-name"
@@ -450,38 +454,38 @@
                   </div>
                 </div>
 
-                <div class="info-grid">
-                  <div class="info-item">
-                    <span class="meta-label" data-i18n="profileUsernameLabel">
+                <div class="profile-info">
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileUsernameLabel">
                       Имя пользователя
                     </span>
-                    <span id="profile-username" class="meta-value"></span>
+                    <span id="profile-username" class="profile-info-value"></span>
                   </div>
-                  <div class="info-item">
-                    <span class="meta-label" data-i18n="profileEmailLabel">
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileEmailLabel">
                       Email
                     </span>
-                    <span id="profile-email" class="meta-value"></span>
+                    <span id="profile-email" class="profile-info-value"></span>
                   </div>
-                  <div class="info-item">
-                    <span class="meta-label" data-i18n="profileCreatedAtLabel">
+                  <div class="profile-info-item">
+                    <span class="profile-info-label" data-i18n="profileCreatedAtLabel">
                       Дата регистрации
                     </span>
-                    <span id="profile-created-at" class="meta-value"></span>
+                    <span id="profile-created-at" class="profile-info-value"></span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div id="profile-status" class="status is-hidden"></div>
+            <div id="profile-status" class="profile-status is-hidden"></div>
           </div>
         </section>
       </section>
 
-      <section id="screen-stats" class="screen is-hidden">
-        <section class="container stack">
-          <div class="card stack">
-            <div class="row">
+      <section id="screen-stats" class="app-screen is-hidden">
+        <section class="panel panel--stats-sidebar">
+          <div class="card stats-card">
+            <div class="stats-header">
               <div>
                 <h2 data-i18n="statsTitle">Статистика</h2>
                 <p class="muted" data-i18n="statsSubtitle">
@@ -497,18 +501,18 @@
                 К тестам
               </button>
             </div>
-            <div class="stack">
-              <label class="field">
+            <div class="stats-filters">
+              <label class="stats-filter">
                 <span data-i18n="statsFilterTest">Тест</span>
                 <select id="stats-filter-test">
                   <option value="" data-i18n="statsFilterAllTests">Все тесты</option>
                 </select>
               </label>
-              <label class="field">
+              <label class="stats-filter">
                 <span data-i18n="statsFilterStartDate">С даты</span>
                 <input type="date" id="stats-filter-start-date" />
               </label>
-              <label class="field">
+              <label class="stats-filter">
                 <span data-i18n="statsFilterEndDate">По дату</span>
                 <input type="date" id="stats-filter-end-date" />
               </label>
@@ -521,11 +525,11 @@
                 Сбросить
               </button>
             </div>
-            <div class="tabs">
+            <div class="stats-view-tabs">
               <button
                 id="stats-view-single"
                 type="button"
-                class="tab is-active"
+                class="stats-view-tab is-active"
                 data-i18n="statsViewSingle"
               >
                 Попытка
@@ -533,14 +537,14 @@
               <button
                 id="stats-view-aggregate"
                 type="button"
-                class="tab"
+                class="stats-view-tab"
                 data-i18n="statsViewAggregate"
               >
                 Все попытки
               </button>
             </div>
-            <div id="stats-single-controls" class="row">
-              <label class="field">
+            <div id="stats-single-controls" class="stats-controls">
+              <label class="stats-control">
                 <span data-i18n="statsAttemptLabel">Попытка</span>
                 <select id="stats-attempt-select"></select>
               </label>
@@ -553,7 +557,7 @@
                 Обновить
               </button>
             </div>
-            <div id="stats-empty" class="status is-hidden">
+            <div id="stats-empty" class="stats-empty is-hidden">
               <strong data-i18n="statsEmptyTitle">
                 Пока нет попыток.
               </strong>
@@ -573,16 +577,16 @@
 
           <div class="card">
             <h3 data-i18n="statsAttemptListTitle">Список попыток</h3>
-            <ul id="stats-attempt-list" class="stack list"></ul>
+            <ul id="stats-attempt-list" class="stats-attempts"></ul>
           </div>
         </section>
 
-        <section class="container stack">
-          <div id="stats-kpi-grid" class="kpi-grid"></div>
+        <section class="panel panel--stats-main">
+          <div id="stats-kpi-grid" class="stats-kpi-grid"></div>
 
-          <div class="grid">
-            <div class="card stack">
-              <div class="stack-sm">
+          <div class="stats-charts">
+            <div class="card chart-card">
+              <div class="chart-header">
                 <h3 data-i18n="statsChartAttemptsTitle">
                   Динамика точности
                 </h3>
@@ -595,8 +599,8 @@
               </div>
             </div>
 
-            <div class="card stack">
-              <div class="stack-sm">
+            <div class="card chart-card">
+              <div class="chart-header">
                 <h3 data-i18n="statsChartTimeTitle">
                   Темп прохождения
                 </h3>
@@ -611,20 +615,20 @@
           </div>
 
           <div class="card">
-            <div class="stack-sm">
+            <div class="stats-section-header">
               <h3 data-i18n="statsQuestionsTitle">Лента вопросов</h3>
               <p class="muted" data-i18n="statsQuestionsSubtitle">
                 Детализация по выбранной попытке.
               </p>
             </div>
-            <div class="grid">
-              <div id="stats-question-stream" class="stack list"></div>
-              <div id="stats-question-preview" class="card stack is-hidden">
-                <div class="row">
+            <div class="stats-questions-layout">
+              <div id="stats-question-stream" class="stats-question-stream"></div>
+              <div id="stats-question-preview" class="stats-question-preview is-hidden">
+                <div class="stats-question-preview__header">
                   <h4 id="stats-preview-title" data-i18n="statsPreviewTitle">Предпросмотр вопроса</h4>
                   <button id="stats-preview-close" type="button" class="ghost" aria-label="Close">×</button>
                 </div>
-                <div id="stats-preview-content" class="stack"></div>
+                <div id="stats-preview-content" class="stats-question-preview__content"></div>
               </div>
             </div>
           </div>
