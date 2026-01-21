@@ -31,38 +31,36 @@ def _convert_with_cloudconvert(image_path: Path, out_dir: Path) -> Path | None:
         log.info("CloudConvert API key is missing; skipping metafile conversion")
         return None
 
+    out_dir.mkdir(parents=True, exist_ok=True)
     output_path = out_dir / f"{image_path.stem}.png"
+
     cloudconvert.configure(api_key=api_key)
 
-    job = cloudconvert.Job.create(
-        {
-            "tasks": {
-                "import-upload": {"operation": "import/upload"},
-                "convert": {
-                    "operation": "convert",
-                    "input": "import-upload",
-                    "input_format": image_path.suffix.lstrip("."),
-                    "output_format": "png",
-                },
-                "export-url": {"operation": "export/url", "input": "convert"},
-            }
+    job = cloudconvert.Job.create(payload={
+        "tasks": {
+            "import-upload": {"operation": "import/upload"},
+            "convert": {
+                "operation": "convert",
+                "input": "import-upload",
+                "input_format": image_path.suffix.lstrip(".").lower(),
+                "output_format": "png",
+            },
+            "export-url": {"operation": "export/url", "input": "convert"},
         }
-    )
-    upload_task = next((task for task in job.get("tasks", []) if task.get("name") == "import-upload"), None)
+    })
+
+    upload_task = next((t for t in job.get("tasks", []) if t.get("name") == "import-upload"), None)
     if not upload_task:
         log.warning("CloudConvert job creation response missing upload task")
         return None
 
-    with image_path.open("rb") as file_handle:
-        cloudconvert.Task.upload(
-codex/switch-to-cloudconvert-python-sdk-o59pwl
-            image_path.name,
-            file_handle,
-            upload_task["id"],
-        )
+    # Важно: по SDK сначала получаем task через Task.find, потом upload(file_name=..., task=...)
+    upload_task_full = cloudconvert.Task.find(id=upload_task["id"])
+    cloudconvert.Task.upload(file_name=str(image_path), task=upload_task_full)
 
-    job = cloudconvert.Job.wait(job["id"])
-    export_task = next((task for task in job.get("tasks", []) if task.get("name") == "export-url"), None)
+    job = cloudconvert.Job.wait(id=job["id"])
+
+    export_task = next((t for t in job.get("tasks", []) if t.get("name") == "export-url"), None)
     files = export_task.get("result", {}).get("files") if export_task else None
     if not files:
         log.warning("CloudConvert did not return export URL for %s", image_path.name)
@@ -76,9 +74,9 @@ codex/switch-to-cloudconvert-python-sdk-o59pwl
     download_response = requests.get(export_url, timeout=60)
     download_response.raise_for_status()
     output_path.write_bytes(download_response.content)
+
     log.info("Converted metafile %s to %s via CloudConvert", image_path.name, output_path.name)
     return output_path
-
 
 def convert_metafile_to_png(image_path: Path, out_dir: Path) -> Path | None:
     """
