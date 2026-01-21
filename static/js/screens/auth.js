@@ -46,9 +46,6 @@ export function initializeAuthScreenEvents() {
   dom.authLoginForm?.addEventListener("submit", handleLogin);
   dom.authRegisterForm?.addEventListener("submit", handleRegister);
 
-  // Logout button
-  dom.logoutButton?.addEventListener("click", handleLogout);
-
   console.log("[Auth] Auth events initialized");
 }
 
@@ -282,11 +279,11 @@ export function updateUserDisplay(user) {
       dom.userAvatarInitials.textContent = "";
     }
   }
-  if (dom.profileButton) {
-    dom.profileButton.classList.toggle("is-hidden", !user);
+  if (dom.userMenu) {
+    dom.userMenu.classList.add("is-hidden");
   }
-  if (dom.logoutButton) {
-    dom.logoutButton.classList.toggle("is-hidden", !user);
+  if (dom.userMenuToggle) {
+    dom.userMenuToggle.setAttribute("aria-expanded", "false");
   }
 }
 

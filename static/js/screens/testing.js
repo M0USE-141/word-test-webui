@@ -11,11 +11,13 @@ import {
 } from "../rendering.js";
 import {
   clearErrorCounts,
+  clearActiveSession,
   dom,
   getErrorCount,
   getSettings,
   loadErrorCounts,
   loadProgress,
+  saveActiveSession,
   saveLastResult,
   state,
 } from "../state.js";
@@ -66,6 +68,20 @@ export function setActiveTestingPanel(panelKey) {
     results: dom.resultsPanelToggle,
     questions: dom.questionsPanelToggle,
   };
+
+  if (window.matchMedia("(min-width: 721px)").matches) {
+    TESTING_PANELS.forEach((key) => {
+      const panel = panelMap[key];
+      const toggle = toggleMap[key];
+      if (panel) {
+        panel.classList.add("is-open");
+      }
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", "true");
+      }
+    });
+    return;
+  }
 
   TESTING_PANELS.forEach((key) => {
     const panel = panelMap[key];
@@ -167,6 +183,7 @@ export function finishTest() {
 
   state.session.finished = true;
   finalizeActiveQuestionTiming(state.session);
+  clearActiveSession(state.session.testId);
 
   let correct = 0;
   let answered = 0;
@@ -221,8 +238,10 @@ export function startTest() {
   }
 
   const settings = getSettings();
+  clearActiveSession(state.currentTest.id);
   state.session = buildSession(state.currentTest, settings);
   trackAttemptStarted(state.session);
+  saveActiveSession(state.session);
   renderResultSummary(null);
   updateTestingPanelsStatus();
   setActiveTestingPanel("questions");
@@ -268,6 +287,7 @@ export function initializeTestingScreenEvents() {
     );
     state.session.currentIndex = Math.max(0, state.session.currentIndex - 1);
     renderQuestion();
+    saveActiveSession(state.session);
   });
 
   dom.nextQuestionButton?.addEventListener("click", () => {
@@ -308,6 +328,7 @@ export function initializeTestingScreenEvents() {
       state.session.currentIndex + 1
     );
     renderQuestion();
+    saveActiveSession(state.session);
   });
 
   dom.finishTestButton?.addEventListener("click", () => {
@@ -322,6 +343,7 @@ export function initializeTestingScreenEvents() {
     if (state.session && !state.session.finished) {
       finalizeActiveQuestionTiming(state.session);
       trackAttemptAbandoned(state.session);
+      saveActiveSession(state.session);
     }
     setActiveScreen("management");
     dom.optionsContainer.classList.add("is-hidden");

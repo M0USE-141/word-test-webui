@@ -33,7 +33,13 @@
         </div>
         <div class="app-header__controls">
           <div class="user-controls">
-            <div id="user-chip" class="user-chip is-hidden">
+            <button
+              id="user-menu-toggle"
+              class="user-chip is-hidden"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
               <div class="user-avatar" aria-hidden="true">
                 <img
                   id="user-avatar-image"
@@ -43,35 +49,65 @@
                 />
                 <span id="user-avatar-initials"></span>
               </div>
-              <span id="user-display" class="user-display"></span>
+              <span class="user-chip__text">
+                <span id="user-display" class="user-display"></span>
+                <span class="user-chip__label" data-i18n="profileButton">Профиль</span>
+              </span>
+            </button>
+            <div id="user-menu" class="user-menu is-hidden" role="menu">
+              <button
+                type="button"
+                class="user-menu__item"
+                data-action="profile"
+                data-i18n="profileMenuProfile"
+              >
+                Профиль
+              </button>
+              <button
+                type="button"
+                class="user-menu__item"
+                data-action="stats"
+                data-i18n="profileMenuStats"
+              >
+                Статистика
+              </button>
+              <div class="user-menu__section">
+                <h4 data-i18n="profilePreferencesTitle">Интерфейс</h4>
+                <div class="language-select">
+                  <label for="lang-select" data-i18n="languageLabel">Язык</label>
+                  <select id="lang-select">
+                    <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
+                    <option value="en" data-i18n="languageEn">🇬🇧 English</option>
+                    <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
+                  </select>
+                </div>
+                <label class="theme-toggle" for="theme-toggle">
+                  <span class="theme-toggle__label" data-i18n="themeToggleTitle">Тема</span>
+                  <input
+                    id="theme-toggle"
+                    class="theme-toggle__input"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="Переключить тёмную тему"
+                    data-i18n-aria-label="themeToggleLabel"
+                  />
+                  <span class="theme-toggle__track" aria-hidden="true">
+                    <span class="theme-toggle__option" data-i18n="themeLight">Светлая</span>
+                    <span class="theme-toggle__option" data-i18n="themeDark">Тёмная</span>
+                    <span class="theme-toggle__thumb"></span>
+                  </span>
+                </label>
+              </div>
+              <button
+                type="button"
+                class="user-menu__item"
+                data-action="logout"
+                data-i18n="logoutButton"
+              >
+                Выйти
+              </button>
             </div>
-            <button id="profile-button" type="button" class="ghost is-hidden" data-i18n="profileButton">
-              Профиль
-            </button>
-            <button id="logout-button" type="button" class="ghost is-hidden" data-i18n="logoutButton">
-              Выйти
-            </button>
           </div>
-          <div class="language-select">
-            <label for="lang-select" data-i18n="languageLabel">Язык</label>
-            <select id="lang-select">
-              <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
-              <option value="en" data-i18n="languageEn">🇬🇧 English</option>
-              <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
-            </select>
-          </div>
-          <label class="theme-toggle" for="theme-toggle">
-            <span class="theme-toggle__label">🌞 / 🌙</span>
-            <input
-              id="theme-toggle"
-              class="theme-toggle__input"
-              type="checkbox"
-              role="switch"
-              aria-label="Переключить тёмную тему"
-              data-i18n-aria-label="themeToggleLabel"
-            />
-            <span class="theme-toggle__slider" aria-hidden="true"></span>
-          </label>
         </div>
       </div>
     </header>
@@ -231,14 +267,12 @@
               >
                 <div>
                   <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
+                  <p id="settings-test-title" class="muted"></p>
                 </div>
               </button>
               <div class="panel-card__actions">
                 <button id="exit-test" type="button" class="ghost">
                   <span data-i18n="exitButton">Выйти</span>
-                </button>
-                <button id="finish-test" type="button" class="danger">
-                  <span data-i18n="finishTestButton">Завершить тест</span>
                 </button>
               </div>
             </div>
@@ -336,7 +370,6 @@
                 Ещё нет завершённых попыток.
               </p>
               <ul id="result-details" class="result-details"></ul>
-              <p class="hint" id="progress-hint"></p>
             </div>
           </div>
 
@@ -349,34 +382,30 @@
                 aria-expanded="false"
               >
                 <div>
-                  <h2 data-i18n="questionsPanelTitle">Вопросы</h2>
-                  <p id="question-count" class="muted"></p>
+                  <p id="question-progress" class="question-progress" data-i18n="questionProgressZero">
+                    Вопрос 0 из 0
+                  </p>
                 </div>
               </button>
             </div>
-            <div class="panel-card__content">
-              <div class="card question-card">
-                <div class="question-card__header">
-                  <div>
-                    <h2 id="question-progress" data-i18n="questionProgressZero">
-                      Вопрос 0 из 0
-                    </h2>
-                    <p id="question-status" class="muted"></p>
-                  </div>
-                  <div class="question-actions">
-                    <button id="prev-question" type="button" data-i18n="prevButton">
-                      Назад
-                    </button>
-                    <button id="next-question" type="button" data-i18n="nextButton">
-                      Дальше
-                    </button>
-                  </div>
+            <div class="panel-card__content panel-questions">
+              <div class="question-card__header">
+                <p id="question-status" class="muted"></p>
+                <div class="question-actions">
+                  <button id="prev-question" type="button" data-i18n="prevButton">
+                    Назад
+                  </button>
+                  <button id="next-question" type="button" data-i18n="nextButton">
+                    Дальше
+                  </button>
+                  <button id="finish-test" type="button" class="danger" data-i18n="finishTestButton">
+                    Завершить тест
+                  </button>
                 </div>
-                <div id="question-container"></div>
               </div>
-              <div id="options-container" class="card is-hidden"></div>
-
-              <div class="card">
+              <div id="question-container"></div>
+              <div id="options-container" class="is-hidden"></div>
+              <div class="question-nav-block">
                 <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
                 <div id="question-nav" class="question-nav"></div>
               </div>
@@ -485,6 +514,19 @@
                     <span id="profile-created-at" class="profile-info-value"></span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div class="profile-actions">
+              <h3 data-i18n="profileActionsTitle">Действия</h3>
+              <p id="profile-active-test" class="muted"></p>
+              <div class="profile-actions__buttons">
+                <button id="profile-edit-test" type="button" class="secondary" data-i18n="profileEditTest">
+                  Редактировать тест
+                </button>
+                <button id="profile-view-stats" type="button" class="secondary" data-i18n="profileViewStats">
+                  Статистика теста
+                </button>
               </div>
             </div>
 

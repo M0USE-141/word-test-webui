@@ -16,12 +16,13 @@ export const dom = {
   authRegisterPassword: document.getElementById("auth-register-password"),
   authRegisterConfirmPassword: document.getElementById("auth-register-confirm-password"),
   authRegisterButton: document.getElementById("auth-register-button"),
-  userChip: document.getElementById("user-chip"),
+  userChip: document.getElementById("user-menu-toggle"),
   userDisplay: document.getElementById("user-display"),
   userAvatarImage: document.getElementById("user-avatar-image"),
   userAvatarInitials: document.getElementById("user-avatar-initials"),
-  profileButton: document.getElementById("profile-button"),
-  logoutButton: document.getElementById("logout-button"),
+  userMenuToggle: document.getElementById("user-menu-toggle"),
+  userMenu: document.getElementById("user-menu"),
+  userMenuItems: document.querySelectorAll("#user-menu .user-menu__item"),
   testCardsContainer: document.getElementById("test-cards"),
   testTabs: document.getElementById("test-tabs"),
   questionList: document.getElementById("question-nav"),
@@ -52,7 +53,7 @@ export const dom = {
   settingsPanelToggle: document.getElementById("panel-settings-toggle"),
   resultsPanelToggle: document.getElementById("panel-results-toggle"),
   questionsPanelToggle: document.getElementById("panel-questions-toggle"),
-  questionCountLabel: document.getElementById("question-count"),
+  settingsTestTitle: document.getElementById("settings-test-title"),
   resultSummary: document.getElementById("result-summary"),
   resultDetails: document.getElementById("result-details"),
   progressHint: document.getElementById("progress-hint"),
@@ -134,6 +135,9 @@ export const dom = {
   profileEmail: document.getElementById("profile-email"),
   profileCreatedAt: document.getElementById("profile-created-at"),
   profileStatus: document.getElementById("profile-status"),
+  profileActiveTest: document.getElementById("profile-active-test"),
+  profileEditTestButton: document.getElementById("profile-edit-test"),
+  profileViewStatsButton: document.getElementById("profile-view-stats"),
   statsBackButton: document.getElementById("stats-back"),
   statsRefreshButton: document.getElementById("stats-refresh"),
   statsFilterTestSelect: document.getElementById("stats-filter-test"),
@@ -206,6 +210,8 @@ const TESTS_CACHE_VERSION = "v1";
 const TESTS_CACHE_TTL_MS = 10 * 60 * 1000;
 const LAST_RESULT_KEY_PREFIX = "test-last-result:";
 const ERROR_COUNTS_KEY_PREFIX = "test-error-counts:";
+const ACTIVE_SESSION_KEY_PREFIX = "test-session:";
+const ACTIVE_SESSION_VERSION = "v1";
 
 export const state = {
   currentTest: null,
@@ -306,6 +312,149 @@ export function saveProgress(testId, answeredIds) {
   }
   const payload = Array.from(answeredIds);
   localStorage.setItem(`test-progress:${testId}`, JSON.stringify(payload));
+}
+
+function buildOptionOrderIndex(entry, options) {
+  if (!entry || !Array.isArray(options)) {
+    return [];
+  }
+  return options
+    .map((option) => entry.question.options.indexOf(option))
+    .filter((index) => index >= 0);
+}
+
+export function saveActiveSession(session) {
+  if (!session?.testId) {
+    return;
+  }
+  if (session.finished) {
+    clearActiveSession(session.testId);
+    return;
+  }
+  const payload = {
+    version: ACTIVE_SESSION_VERSION,
+    testId: session.testId,
+    questionOrder: session.questions.map((entry) => entry.questionId),
+    currentIndex: session.currentIndex,
+    answers: Array.from(session.answers.entries()),
+    answerStatus: Array.from(session.answerStatus.entries()),
+    optionOrders: Array.from(session.optionOrders.entries()).map(
+      ([questionId, options]) => {
+        const entry = session.questions.find((item) => item.questionId === questionId);
+        return {
+          questionId,
+          order: buildOptionOrderIndex(entry, options),
+        };
+      }
+    ),
+    settings: session.settings,
+    attemptId: session.attemptId,
+    clientId: session.clientId,
+    startedAt: session.startedAt,
+    activeQuestionId: session.activeQuestionId,
+    activeQuestionStartedAt: session.activeQuestionStartedAt,
+    questionShownAt: session.questionShownAt,
+    lastRenderedQuestionId: session.lastRenderedQuestionId,
+    questionTimings: Array.from(session.questionTimings.entries()),
+    finished: Boolean(session.finished),
+  };
+  localStorage.setItem(
+    `${ACTIVE_SESSION_KEY_PREFIX}${session.testId}`,
+    JSON.stringify(payload)
+  );
+}
+
+export function clearActiveSession(testId) {
+  if (!testId) {
+    return;
+  }
+  localStorage.removeItem(`${ACTIVE_SESSION_KEY_PREFIX}${testId}`);
+}
+
+export function loadActiveSession(test) {
+  if (!test?.id) {
+    return null;
+  }
+  const raw = localStorage.getItem(`${ACTIVE_SESSION_KEY_PREFIX}${test.id}`);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(raw);
+    if (payload?.version !== ACTIVE_SESSION_VERSION) {
+      return null;
+    }
+    if (payload?.testId !== test.id || payload.finished) {
+      return null;
+    }
+    const questionMap = new Map();
+    test.questions.forEach((question, index) => {
+      const questionId = question.id ?? index + 1;
+      questionMap.set(questionId, { question, questionId, originalIndex: index });
+    });
+    const questions = Array.isArray(payload.questionOrder)
+      ? payload.questionOrder
+          .map((questionId) => questionMap.get(questionId))
+          .filter(Boolean)
+      : [];
+    if (!questions.length) {
+      return null;
+    }
+    const optionOrders = new Map();
+    if (Array.isArray(payload.optionOrders)) {
+      payload.optionOrders.forEach((entry) => {
+        const questionEntry = questions.find(
+          (item) => item.questionId === entry.questionId
+        );
+        if (!questionEntry || !Array.isArray(entry.order)) {
+          return;
+        }
+        const orderedOptions = entry.order
+          .map((index) => questionEntry.question.options[index])
+          .filter(Boolean);
+        if (orderedOptions.length) {
+          optionOrders.set(entry.questionId, orderedOptions);
+        }
+      });
+    }
+    const answers = new Map(Array.isArray(payload.answers) ? payload.answers : []);
+    const answerStatus = new Map(
+      Array.isArray(payload.answerStatus) ? payload.answerStatus : []
+    );
+    const questionTimings = new Map(
+      Array.isArray(payload.questionTimings) ? payload.questionTimings : []
+    );
+    const currentIndex = Number.isFinite(payload.currentIndex)
+      ? Math.min(
+          Math.max(0, payload.currentIndex),
+          Math.max(0, questions.length - 1)
+        )
+      : 0;
+    const settings = {
+      ...getSettings(),
+      ...(payload.settings ?? {}),
+    };
+    return {
+      testId: test.id,
+      questions,
+      currentIndex,
+      answers,
+      answerStatus,
+      optionOrders,
+      finished: false,
+      settings,
+      attemptId: payload.attemptId,
+      clientId: payload.clientId,
+      startedAt: payload.startedAt,
+      activeQuestionId: payload.activeQuestionId ?? null,
+      activeQuestionStartedAt: payload.activeQuestionStartedAt ?? null,
+      questionShownAt: payload.questionShownAt ?? null,
+      lastRenderedQuestionId: payload.lastRenderedQuestionId ?? null,
+      questionTimings,
+    };
+  } catch (error) {
+    return null;
+  }
 }
 
 export function loadErrorCounts(testId) {

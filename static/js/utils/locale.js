@@ -36,6 +36,12 @@ export function applyLocale(lang, state, dom) {
     element.title = t(key);
   });
 
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    const key = element.dataset.i18nAriaLabel;
+    if (!key) return;
+    element.setAttribute("aria-label", t(key));
+  });
+
   return nextLocale;
 }
 

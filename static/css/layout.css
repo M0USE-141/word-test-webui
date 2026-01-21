@@ -32,7 +32,7 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text);
 }
 
 .language-select label {
@@ -43,40 +43,31 @@
   appearance: none;
   border-radius: 10px;
   padding: 0.4rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--card-muted);
+  color: var(--text);
   font-weight: 600;
   min-width: 140px;
 }
 
 .language-select select option {
-  color: #0f172a;
-  background: #ffffff;
+  color: var(--text);
+  background: var(--card);
 }
 
 .language-select select:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline: 2px solid var(--primary-soft-strong);
   outline-offset: 2px;
-}
-
-:root[data-theme="dark"] .language-select select {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-:root[data-theme="dark"] .language-select select option {
-  color: #e2e8f0;
-  background: #1f2937;
 }
 
 .theme-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.85);
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text);
   position: relative;
+  flex-wrap: wrap;
 }
 
 .theme-toggle__label {
@@ -89,35 +80,76 @@
   pointer-events: none;
 }
 
-.theme-toggle__slider {
+.theme-toggle__track {
   position: relative;
-  width: 44px;
-  height: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  width: 130px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
-  transition: background 0.2s ease;
-  flex-shrink: 0;
+  background: var(--card-muted);
+  border: 1px solid var(--border);
+  text-align: center;
+  overflow: hidden;
 }
 
-.theme-toggle__slider::after {
-  content: "";
+.theme-toggle__option {
+  position: relative;
+  z-index: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0.2rem 0.4rem;
+  transition: color 0.2s ease;
+}
+
+.theme-toggle__track .theme-toggle__option:first-child {
+  color: var(--text);
+}
+
+.theme-toggle__thumb {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.2);
-  transition: transform 0.2s ease;
+  width: calc(50% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+  transition: transform 0.25s ease;
 }
 
-.theme-toggle__input:checked + .theme-toggle__slider {
-  background: rgba(96, 165, 250, 0.7);
+.theme-toggle__input:checked + .theme-toggle__track .theme-toggle__thumb {
+  transform: translateX(100%);
 }
 
-.theme-toggle__input:checked + .theme-toggle__slider::after {
-  transform: translateX(20px);
+.theme-toggle__input:checked + .theme-toggle__track .theme-toggle__option:first-child {
+  color: var(--muted);
+}
+
+.theme-toggle__input:checked + .theme-toggle__track .theme-toggle__option:last-child {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .theme-toggle__track {
+  background: rgba(226, 232, 240, 0.2);
+  border-color: rgba(148, 163, 184, 0.6);
+}
+
+:root[data-theme="dark"] .theme-toggle__option {
+  color: rgba(226, 232, 240, 0.8);
+}
+
+:root[data-theme="dark"] .theme-toggle__input:checked + .theme-toggle__track .theme-toggle__option:last-child {
+  color: #0f172a;
+}
+
+:root[data-theme="dark"] .theme-toggle__thumb {
+  background: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.6);
 }
 
 .app {
@@ -182,7 +214,9 @@
 .test-collections {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: stretch;
+  grid-auto-flow: row dense;
 }
 
 .settings-grid {
@@ -248,6 +282,16 @@
   min-width: 0;
 }
 
+@media (min-width: 721px) {
+  .panel-card:not(.is-open) .panel-card__content {
+    display: block;
+  }
+
+  .panel-card__toggle {
+    cursor: default;
+  }
+}
+
 @media (max-width: 960px) {
   #screen-stats {
     grid-template-columns: 1fr;
@@ -281,5 +325,23 @@
 
   .app {
     padding: 1rem 1.25rem 2.5rem;
+  }
+
+  #screen-profile {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(100%, 420px);
+    background: var(--bg);
+    box-shadow: -12px 0 30px rgba(15, 23, 42, 0.2);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 40;
+    display: block;
+  }
+
+  #screen-profile.is-active {
+    transform: translateX(0);
   }
 }

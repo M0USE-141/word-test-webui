@@ -38,6 +38,7 @@ import {
 } from "../editor.js";
 import {
   renderManagementScreen,
+  renderQuestion,
   renderQuestionNav,
   renderResultSummary,
   renderTestCards,
@@ -47,7 +48,15 @@ import {
   updateProgressHint,
 } from "../rendering.js";
 import { t, formatNumber } from "../i18n.js";
-import { clearTestsCache, dom, editorMobileQuery, loadLastResult, state } from "../state.js";
+import {
+  clearActiveSession,
+  clearTestsCache,
+  dom,
+  editorMobileQuery,
+  loadActiveSession,
+  loadLastResult,
+  state,
+} from "../state.js";
 import {
   closeCreateTestModal,
   closeEditorModal,
@@ -85,20 +94,21 @@ export function renderTestCardsWithHandlers(tests, selectedId) {
     },
     onSelectTest: async (testId) => {
       await selectTest(testId);
+      setActiveScreen("testing");
+      const { setActiveTestingPanel } = await import("./testing.js");
+      setActiveTestingPanel("settings");
     },
     onStartTesting: async (testId) => {
       await selectTest(testId);
       setActiveScreen("testing");
+      const { setActiveTestingPanel } = await import("./testing.js");
+      setActiveTestingPanel("settings");
     },
     onEditTest: async (testId) => {
       await selectTest(testId);
       openEditorModal();
       renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
       resetEditorForm();
-    },
-    onViewStats: async (testId) => {
-      const { openStatsScreen } = await import("./statistics.js");
-      await openStatsScreen(testId);
     },
   });
 }
@@ -118,9 +128,11 @@ export async function refreshCurrentTest(testId = state.currentTest?.id) {
   state.testsCache = tests;
   renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
   state.session = null;
+  clearActiveSession(state.currentTest.id);
   updateProgressHint();
   updateTestingPanelsStatus();
   setActiveTestingPanel("settings");
+  updateSettingsTestTitle();
   dom.questionContainer.textContent = t("startTestingHint");
   dom.optionsContainer.textContent = "";
   dom.questionProgress.textContent = t("questionProgress", {
@@ -142,6 +154,7 @@ export async function selectTest(testId) {
     updateProgressHint();
     updateTestingPanelsStatus();
     setActiveTestingPanel("settings");
+    updateSettingsTestTitle();
     dom.questionContainer.textContent = t("noTestsLoaded");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
@@ -159,24 +172,45 @@ export async function selectTest(testId) {
   const isSameTest = state.currentTest?.id === testId;
   state.currentTest = await fetchTest(testId);
   updateProgressHint();
+  updateSettingsTestTitle();
 
   if (!isSameTest) {
-    state.session = null;
+    const restoredSession = loadActiveSession(state.currentTest);
+    state.session = restoredSession;
     updateTestingPanelsStatus();
-    setActiveTestingPanel("settings");
-    dom.questionContainer.textContent = t("startTestingHint");
-    dom.optionsContainer.textContent = "";
-    dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = t("questionProgress", {
-      current: formatNumber(0),
-      total: formatNumber(0),
-    });
-    renderQuestionNav();
+    if (restoredSession) {
+      setActiveTestingPanel("settings");
+      renderQuestion();
+      renderQuestionNav();
+    } else {
+      setActiveTestingPanel("settings");
+      dom.questionContainer.textContent = t("startTestingHint");
+      dom.optionsContainer.textContent = "";
+      dom.optionsContainer.classList.add("is-hidden");
+      dom.questionProgress.textContent = t("questionProgress", {
+        current: formatNumber(0),
+        total: formatNumber(0),
+      });
+      renderQuestionNav();
+    }
     renderResultSummary(loadLastResult(testId));
   }
 
   renderTestCardsWithHandlers(state.testsCache, testId);
   updateEditorTestActions();
+}
+
+export function updateSettingsTestTitle() {
+  if (!dom.settingsTestTitle) {
+    return;
+  }
+  if (state.currentTest) {
+    dom.settingsTestTitle.textContent = t("testSettingsFor", {
+      title: state.currentTest.title,
+    });
+  } else {
+    dom.settingsTestTitle.textContent = t("testSettingsEmpty");
+  }
 }
 
 /**

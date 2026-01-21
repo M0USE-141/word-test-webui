@@ -5,9 +5,17 @@
 
 import { fetchTests } from "./api.js";
 import { defaultLocale } from "./i18n.js";
-import { renderAuthScreen, renderManagementScreen } from "./rendering.js";
+import {
+  renderAuthScreen,
+  renderManagementScreen,
+  renderQuestion,
+  renderQuestionNav,
+  renderResultSummary,
+  setActiveScreen,
+  updateProgressHint,
+} from "./rendering.js";
 import { initTelemetry } from "./telemetry.js";
-import { dom, state } from "./state.js";
+import { dom, loadLastResult, state } from "./state.js";
 
 // Import utilities
 import { applyLocale, getStoredLocale } from "./utils/locale.js";
@@ -18,6 +26,7 @@ import {
   initializeManagementScreenEvents,
   renderTestCardsWithHandlers,
   selectTest,
+  updateSettingsTestTitle,
 } from "./screens/management.js";
 import {
   initializeTestingScreenEvents,
@@ -29,6 +38,7 @@ import {
   initializeAuthScreenEvents,
   checkAuthOnLoad,
   updateUserDisplay,
+  handleLogout,
 } from "./screens/auth.js";
 import {
   initializeProfileScreenEvents,
@@ -56,6 +66,11 @@ async function loadAppContent() {
 
     renderTestCardsWithHandlers(tests, tests[0].id);
     await selectTest(tests[0].id);
+    if (state.session) {
+      setActiveScreen("testing");
+      setActiveTestingPanel("settings");
+      renderQuestion();
+    }
   } catch (error) {
     if (dom.questionContainer) {
       dom.questionContainer.textContent = error.message;
@@ -99,8 +114,48 @@ async function initialize() {
   console.log("[App] Screen events initialized");
 
   // Profile button handler
-  dom.profileButton?.addEventListener("click", () => {
-    navigateToProfile();
+  const toggleUserMenu = (event) => {
+    event.stopPropagation();
+    const isOpen = !dom.userMenu?.classList.contains("is-hidden");
+    dom.userMenu?.classList.toggle("is-hidden", isOpen);
+    dom.userMenuToggle?.setAttribute("aria-expanded", String(!isOpen));
+  };
+
+  dom.userMenuToggle?.addEventListener("click", toggleUserMenu);
+  dom.userMenuToggle?.addEventListener("touchstart", toggleUserMenu);
+
+  document.addEventListener("click", (event) => {
+    if (
+      dom.userMenu &&
+      dom.userMenuToggle &&
+      !dom.userMenu.classList.contains("is-hidden")
+    ) {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !dom.userMenu.contains(target) &&
+        !dom.userMenuToggle.contains(target)
+      ) {
+        dom.userMenu.classList.add("is-hidden");
+        dom.userMenuToggle.setAttribute("aria-expanded", "false");
+      }
+    }
+  });
+
+  dom.userMenuItems?.forEach((item) => {
+    item.addEventListener("click", async () => {
+      const action = item.dataset.action;
+      dom.userMenu?.classList.add("is-hidden");
+      dom.userMenuToggle?.setAttribute("aria-expanded", "false");
+      if (action === "profile") {
+        navigateToProfile();
+      } else if (action === "stats") {
+        const { openStatsScreen } = await import("./screens/statistics.js");
+        await openStatsScreen(state.currentTest?.id || null);
+      } else if (action === "logout") {
+        await handleLogout();
+      }
+    });
   });
 
   // Listen for profile updates to refresh user display
@@ -120,6 +175,16 @@ async function initialize() {
   dom.langSelect?.addEventListener("change", (event) => {
     console.log("[App] Language changed to:", event.target.value);
     applyLocale(event.target.value, state, dom);
+    updateTestingPanelsStatus();
+    updateSettingsTestTitle();
+    if (state.session) {
+      renderQuestion();
+      renderQuestionNav();
+    }
+    if (state.currentTest) {
+      renderResultSummary(loadLastResult(state.currentTest.id));
+      updateProgressHint();
+    }
   });
 
   // Check authentication status

@@ -4,6 +4,7 @@ import {
   loadErrorCounts,
   loadLastResult,
   loadProgress,
+  saveActiveSession,
   saveErrorCounts,
   saveProgress,
   state,
@@ -111,6 +112,9 @@ function createQuestionNavButton(entry, index) {
     }
     state.session.currentIndex = index;
     renderQuestion();
+    if (state.session) {
+      saveActiveSession(state.session);
+    }
   });
   return button;
 }
@@ -414,6 +418,9 @@ export function renderBlocks(container, blocks) {
 }
 
 export function updateProgressHint() {
+  if (!dom.progressHint) {
+    return;
+  }
   if (!state.currentTest) {
     dom.progressHint.textContent = "";
     return;
@@ -618,6 +625,7 @@ export function renderQuestion() {
           durationMs
         );
         flushQueues();
+        saveActiveSession(state.session);
         if (state.session.settings.showAnswersImmediately && dom.answerFeedback) {
           dom.answerFeedback.textContent = getAnswerFeedback(
             index,
@@ -658,6 +666,7 @@ export function renderQuestion() {
     state.session.lastRenderedQuestionId = entry.questionId;
     trackQuestionShown(state.session, entry, state.session.currentIndex);
   }
+  saveActiveSession(state.session);
 }
 
 export function renderResultSummary(stats) {
@@ -740,7 +749,6 @@ export function renderTestCards(
     onSelectTest = () => {},
     onStartTesting = async () => {},
     onEditTest = async () => {},
-    onViewStats = async () => {},
   } = {}
 ) {
   clearElement(dom.testCardsContainer);
@@ -817,8 +825,11 @@ export function renderTestCards(
 
     header.append(title, accessBadge);
 
+    const info = document.createElement("div");
+    info.className = "test-card__info";
+
     const meta = document.createElement("div");
-    meta.className = "test-card__meta";
+    meta.className = "test-card__info-item";
     meta.textContent = t("testCount", {
       count: formatNumber(test.questionCount),
     });
@@ -832,7 +843,7 @@ export function renderTestCards(
     }
 
     const stats = document.createElement("div");
-    stats.className = "test-card__stats";
+    stats.className = "test-card__info-item";
     const lastResult = loadLastResult(test.id);
     if (lastResult) {
       const formattedPercent = formatNumber(lastResult.percent, {
@@ -848,6 +859,8 @@ export function renderTestCards(
       stats.textContent = t("lastResultEmpty");
     }
 
+    info.append(meta, stats);
+
     const actions = document.createElement("div");
     actions.className = "test-card__actions";
 
@@ -862,7 +875,6 @@ export function renderTestCards(
     const editButton = document.createElement("button");
     editButton.type = "button";
     editButton.className = "secondary";
-    // Non-owners see "Propose changes" instead of "Edit"
     if (test.is_owner === false && test.owner_id !== null) {
       editButton.textContent = t("proposeChangesButton");
     } else {
@@ -873,17 +885,9 @@ export function renderTestCards(
       await onEditTest(test.id);
     });
 
-    const statsButton = document.createElement("button");
-    statsButton.type = "button";
-    statsButton.className = "ghost";
-    statsButton.textContent = t("statsButton");
-    statsButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await onViewStats(test.id);
-    });
+    actions.append(testingButton, editButton);
 
-    actions.append(testingButton, editButton, statsButton);
-    card.append(header, meta, stats, actions);
+    card.append(header, info, actions);
     card.addEventListener("click", async () => {
       await onSelectTest(test.id);
     });
