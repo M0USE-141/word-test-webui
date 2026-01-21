@@ -124,6 +124,41 @@ docker run --rm -p 8000:8000 -v "${PWD}/data:/app/data" bsu-test-master
 docker compose up --build
 ```
 
+## Конвертация WMF/EMF в PNG (Linux/PythonAnywhere)
+
+По умолчанию в Linux/PythonAnywhere конвертация WMF/EMF через Pillow недоступна,
+поэтому используется CloudConvert API. Укажите токен в переменной окружения:
+
+```bash
+export CLOUDCONVERT_API_KEY="your-token"
+```
+
+Если токен не задан, приложение пропустит конвертацию и оставит исходный WMF/EMF.
+
+## Деплой на PythonAnywhere
+
+1. Создайте репозиторий приложения на PythonAnywhere и клонируйте `main`:
+
+   ```bash
+   git clone https://github.com/<org>/<repo>.git ~/projects/bsu-test-master
+   ```
+
+2. Создайте виртуальное окружение и установите зависимости:
+
+   ```bash
+   python3.11 -m venv ~/venvs/bsu-test-master
+   ~/venvs/bsu-test-master/bin/pip install -r requirements.txt
+   ```
+
+3. Убедитесь, что задан `CLOUDCONVERT_API_KEY` в окружении PythonAnywhere,
+   чтобы работала конвертация WMF/EMF.
+
+4. Настройте WSGI-файл и укажите путь к приложению (FastAPI через ASGI):
+
+   ```python
+   from api.app import app  # noqa
+   ```
+
 ## Standalone (PyInstaller)
 
 Сборка единого бинарника:
