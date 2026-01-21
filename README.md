@@ -124,13 +124,6 @@ docker run --rm -p 8000:8000 -v "${PWD}/data:/app/data" bsu-test-master
 docker compose up --build
 ```
 
-## CI/CD
-
-GitHub Actions запускает:
-
-- `pytest` с покрытием (`pytest-cov`) и порогом > 90%.
-- После успешного merge в `main` выполняется деплой на PythonAnywhere через SSH.
-
 ## Конвертация WMF/EMF в PNG (Linux/PythonAnywhere)
 
 По умолчанию в Linux/PythonAnywhere конвертация WMF/EMF через Pillow недоступна,
@@ -165,14 +158,6 @@ export CLOUDCONVERT_API_KEY="your-token"
    ```python
    from api.app import app  # noqa
    ```
-
-5. Укажите в GitHub Secrets параметры для автоматического деплоя (см. workflow):
-
-   - `PA_SSH_HOST`, `PA_SSH_USER`, `PA_SSH_KEY`
-   - `PA_APP_DIR` (путь к репозиторию на сервере)
-   - `PA_VENV_BIN` (путь к `pip`/`python` внутри venv, например `~/venvs/bsu-test-master/bin`)
-   - `PA_WSGI_FILE` (путь к WSGI-файлу, который нужно `touch` для перезагрузки)
-После merge в `main` workflow обновит код, установит зависимости и перезагрузит приложение.
 
 ## Standalone (PyInstaller)
 
