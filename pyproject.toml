@@ -20,4 +20,5 @@ dependencies = [
     "email-validator>=2.0.0",
     "gunicorn>=23.0.0",
     "requests>=2.32.0",
+    "python-dotenv>=1.2.1",
 ]
