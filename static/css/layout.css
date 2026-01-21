@@ -116,7 +116,8 @@
   width: calc(50% - 6px);
   height: calc(100% - 6px);
   border-radius: 999px;
-  background: var(--card);
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
   transition: transform 0.25s ease;
 }
@@ -134,7 +135,8 @@
 }
 
 :root[data-theme="dark"] .theme-toggle__track {
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(226, 232, 240, 0.2);
+  border-color: rgba(148, 163, 184, 0.6);
 }
 
 :root[data-theme="dark"] .theme-toggle__option {
@@ -143,6 +145,11 @@
 
 :root[data-theme="dark"] .theme-toggle__input:checked + .theme-toggle__track .theme-toggle__option:last-child {
   color: #0f172a;
+}
+
+:root[data-theme="dark"] .theme-toggle__thumb {
+  background: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.6);
 }
 
 .app {

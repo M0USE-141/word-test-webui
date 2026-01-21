@@ -114,12 +114,15 @@ async function initialize() {
   console.log("[App] Screen events initialized");
 
   // Profile button handler
-  dom.userMenuToggle?.addEventListener("click", (event) => {
+  const toggleUserMenu = (event) => {
     event.stopPropagation();
     const isOpen = !dom.userMenu?.classList.contains("is-hidden");
     dom.userMenu?.classList.toggle("is-hidden", isOpen);
     dom.userMenuToggle?.setAttribute("aria-expanded", String(!isOpen));
-  });
+  };
+
+  dom.userMenuToggle?.addEventListener("click", toggleUserMenu);
+  dom.userMenuToggle?.addEventListener("touchstart", toggleUserMenu);
 
   document.addEventListener("click", (event) => {
     if (
