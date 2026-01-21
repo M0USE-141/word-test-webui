@@ -2,9 +2,9 @@ import argparse
 import uuid
 from pathlib import Path
 
-from logging_setup import setup_console_logging
-from serialization import serialize_test_payload
-from word_extract import WordTestExtractor
+from core.logging_setup import setup_console_logging
+from core.serialization import serialize_test_payload
+from core.word_extract import WordTestExtractor
 
 setup_console_logging()
 

@@ -8,7 +8,7 @@ project_root = Path(SPECPATH)
 datas = [
     (str(project_root / "static"), "static"),
     (str(project_root / "templates"), "templates"),
-    (str(project_root / "omml2mml.xsl"), "."),
+    (str(project_root / "core" / "omml2mml.xsl"), "core"),
 ]
 
 hiddenimports = []
@@ -18,7 +18,7 @@ hiddenimports += collect_submodules("python_multipart")
 hiddenimports += collect_submodules("starlette")
 
 a = Analysis(
-    ["run_app.py"],
+    ["scripts/run_app.py"],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
