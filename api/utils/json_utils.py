@@ -8,11 +8,6 @@ def json_dump(payload: object) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def ndjson_dump(payload: object) -> str:
-    """Serialize object to compact JSON string (for NDJSON)."""
-    return json.dumps(payload, ensure_ascii=False)
-
-
 def json_load(data: str) -> object:
     """Deserialize JSON string to object."""
     return json.loads(data)
