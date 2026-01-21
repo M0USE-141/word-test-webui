@@ -74,13 +74,10 @@
   gap: 1rem;
 }
 
-.panel-card__content--questions > .card {
-  padding: 1rem;
-}
-
 .question-stack {
   display: grid;
   gap: 1rem;
+  padding: 1rem;
 }
 
 #question-container {
@@ -99,6 +96,19 @@
 
 .question-nav-block h3 {
   margin: 0 0 0.5rem;
+}
+
+.question-stack .question-actions {
+  gap: 0.75rem;
+}
+
+.question-stack .question-actions .danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.question-stack .question-actions .danger:hover {
+  background: var(--danger-strong);
 }
 
 .upload-form {
@@ -1297,7 +1307,7 @@ button.danger:hover {
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  min-width: 200px;
+  min-width: 240px;
   padding: 0.5rem;
   border-radius: 12px;
   background: var(--card);
@@ -1328,6 +1338,30 @@ button.danger:hover {
 .user-menu__item:hover,
 .user-menu__item:focus-visible {
   background: var(--card-muted);
+}
+
+.user-menu__section {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0.75rem 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.user-menu__section h4 {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.user-menu__section .language-select,
+.user-menu__section .theme-toggle {
+  width: 100%;
+}
+
+.user-menu__section .language-select select {
+  min-width: 100%;
 }
 
 :root[data-theme="dark"] .user-chip {
@@ -1561,26 +1595,6 @@ button.danger:hover {
 
 .profile-actions__buttons button {
   flex: 1 1 160px;
-}
-
-.profile-preferences {
-  display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card-muted);
-}
-
-.profile-preferences__row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-  align-items: end;
-}
-
-.profile-preferences .theme-toggle {
-  gap: 0.5rem;
 }
 
 .profile-status {

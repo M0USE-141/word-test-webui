@@ -17,17 +17,33 @@ export function setupThemeToggle(toggleElement) {
 
   const saved = localStorage.getItem(THEME_STORAGE_KEY);
   const current = applyThemePreference(saved || DEFAULT_THEME);
+  const transitionDelayMs = 220;
+  let pendingThemeTimeout = null;
 
   // Set initial checkbox state
   if (toggleElement.type === "checkbox") {
     toggleElement.checked = current === "dark";
     toggleElement.addEventListener("change", () => {
-      applyThemePreference(toggleElement.checked ? "dark" : "light");
+      const nextTheme = toggleElement.checked ? "dark" : "light";
+      if (pendingThemeTimeout) {
+        clearTimeout(pendingThemeTimeout);
+      }
+      pendingThemeTimeout = setTimeout(() => {
+        applyThemePreference(nextTheme);
+        pendingThemeTimeout = null;
+      }, transitionDelayMs);
     });
   } else {
     toggleElement.addEventListener("click", () => {
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-      applyThemePreference(isDark ? "light" : "dark");
+      const nextTheme = isDark ? "light" : "dark";
+      if (pendingThemeTimeout) {
+        clearTimeout(pendingThemeTimeout);
+      }
+      pendingThemeTimeout = setTimeout(() => {
+        applyThemePreference(nextTheme);
+        pendingThemeTimeout = null;
+      }, transitionDelayMs);
     });
   }
 }

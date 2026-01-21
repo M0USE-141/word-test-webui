@@ -98,6 +98,18 @@ export function renderTestCardsWithHandlers(tests, selectedId) {
       const { setActiveTestingPanel } = await import("./testing.js");
       setActiveTestingPanel("settings");
     },
+    onStartTesting: async (testId) => {
+      await selectTest(testId);
+      setActiveScreen("testing");
+      const { setActiveTestingPanel } = await import("./testing.js");
+      setActiveTestingPanel("settings");
+    },
+    onEditTest: async (testId) => {
+      await selectTest(testId);
+      openEditorModal();
+      renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+      resetEditorForm();
+    },
   });
 }
 

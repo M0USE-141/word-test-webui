@@ -69,6 +69,20 @@ export function setActiveTestingPanel(panelKey) {
     questions: dom.questionsPanelToggle,
   };
 
+  if (window.matchMedia("(min-width: 721px)").matches) {
+    TESTING_PANELS.forEach((key) => {
+      const panel = panelMap[key];
+      const toggle = toggleMap[key];
+      if (panel) {
+        panel.classList.add("is-open");
+      }
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", "true");
+      }
+    });
+    return;
+  }
+
   TESTING_PANELS.forEach((key) => {
     const panel = panelMap[key];
     const toggle = toggleMap[key];

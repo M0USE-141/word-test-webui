@@ -747,6 +747,8 @@ export function renderTestCards(
     onCreateTest = () => {},
     onImportTest = () => {},
     onSelectTest = () => {},
+    onStartTesting = async () => {},
+    onEditTest = async () => {},
   } = {}
 ) {
   clearElement(dom.testCardsContainer);
@@ -858,7 +860,34 @@ export function renderTestCards(
     }
 
     info.append(meta, stats);
-    card.append(header, info);
+
+    const actions = document.createElement("div");
+    actions.className = "test-card__actions";
+
+    const testingButton = document.createElement("button");
+    testingButton.type = "button";
+    testingButton.textContent = t("testingButton");
+    testingButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await onStartTesting(test.id);
+    });
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "secondary";
+    if (test.is_owner === false && test.owner_id !== null) {
+      editButton.textContent = t("proposeChangesButton");
+    } else {
+      editButton.textContent = t("editingButton");
+    }
+    editButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await onEditTest(test.id);
+    });
+
+    actions.append(testingButton, editButton);
+
+    card.append(header, info, actions);
     card.addEventListener("click", async () => {
       await onSelectTest(test.id);
     });
