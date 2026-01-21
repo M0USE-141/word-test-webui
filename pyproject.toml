@@ -2,7 +2,7 @@
 name = "testmasterbsu"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "python-docx>=1.2.0",
     "lxml>=5.3.0",
