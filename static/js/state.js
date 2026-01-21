@@ -53,7 +53,7 @@ export const dom = {
   settingsPanelToggle: document.getElementById("panel-settings-toggle"),
   resultsPanelToggle: document.getElementById("panel-results-toggle"),
   questionsPanelToggle: document.getElementById("panel-questions-toggle"),
-  questionCountLabel: document.getElementById("question-count"),
+  settingsTestTitle: document.getElementById("settings-test-title"),
   resultSummary: document.getElementById("result-summary"),
   resultDetails: document.getElementById("result-details"),
   progressHint: document.getElementById("progress-hint"),

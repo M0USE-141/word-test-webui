@@ -81,30 +81,6 @@
               </button>
             </div>
           </div>
-          <div class="language-select">
-            <label for="lang-select" data-i18n="languageLabel">Язык</label>
-            <select id="lang-select">
-              <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
-              <option value="en" data-i18n="languageEn">🇬🇧 English</option>
-              <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
-            </select>
-          </div>
-          <label class="theme-toggle" for="theme-toggle">
-            <span class="theme-toggle__label" data-i18n="themeToggleTitle">Тема</span>
-            <span class="theme-toggle__track" aria-hidden="true">
-              <span class="theme-toggle__option" data-i18n="themeLight">Светлая</span>
-              <span class="theme-toggle__option" data-i18n="themeDark">Тёмная</span>
-              <span class="theme-toggle__thumb"></span>
-            </span>
-            <input
-              id="theme-toggle"
-              class="theme-toggle__input"
-              type="checkbox"
-              role="switch"
-              aria-label="Переключить тёмную тему"
-              data-i18n-aria-label="themeToggleLabel"
-            />
-          </label>
         </div>
       </div>
     </header>
@@ -264,6 +240,7 @@
               >
                 <div>
                   <h2 data-i18n="testSettingsTitle">Настройки теста</h2>
+                  <p id="settings-test-title" class="muted"></p>
                 </div>
               </button>
               <div class="panel-card__actions">
@@ -381,16 +358,14 @@
                 aria-expanded="false"
               >
                 <div>
-                  <h2 data-i18n="questionsPanelTitle">Вопросы</h2>
                   <p id="question-progress" class="question-progress" data-i18n="questionProgressZero">
                     Вопрос 0 из 0
                   </p>
-                  <p id="question-count" class="muted"></p>
                 </div>
               </button>
             </div>
             <div class="panel-card__content panel-card__content--questions">
-              <div class="card question-card">
+              <div class="card question-stack">
                 <div class="question-card__header">
                   <p id="question-status" class="muted"></p>
                   <div class="question-actions">
@@ -403,12 +378,11 @@
                   </div>
                 </div>
                 <div id="question-container"></div>
-              </div>
-              <div id="options-container" class="card is-hidden"></div>
-
-              <div class="card">
-                <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
-                <div id="question-nav" class="question-nav"></div>
+                <div id="options-container" class="is-hidden"></div>
+                <div class="question-nav-block">
+                  <h3 data-i18n="questionNavTitle">Навигация по вопросам</h3>
+                  <div id="question-nav" class="question-nav"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -528,6 +502,36 @@
                 <button id="profile-view-stats" type="button" class="secondary" data-i18n="profileViewStats">
                   Статистика теста
                 </button>
+              </div>
+            </div>
+
+            <div class="profile-preferences">
+              <h3 data-i18n="profilePreferencesTitle">Интерфейс</h3>
+              <div class="profile-preferences__row">
+                <div class="language-select">
+                  <label for="lang-select" data-i18n="languageLabel">Язык</label>
+                  <select id="lang-select">
+                    <option value="ru" data-i18n="languageRu">🇷🇺 Русский</option>
+                    <option value="en" data-i18n="languageEn">🇬🇧 English</option>
+                    <option value="uz" data-i18n="languageUz">🇺🇿 O'zbek</option>
+                  </select>
+                </div>
+                <label class="theme-toggle" for="theme-toggle">
+                  <span class="theme-toggle__label" data-i18n="themeToggleTitle">Тема</span>
+                  <input
+                    id="theme-toggle"
+                    class="theme-toggle__input"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="Переключить тёмную тему"
+                    data-i18n-aria-label="themeToggleLabel"
+                  />
+                  <span class="theme-toggle__track" aria-hidden="true">
+                    <span class="theme-toggle__option" data-i18n="themeLight">Светлая</span>
+                    <span class="theme-toggle__option" data-i18n="themeDark">Тёмная</span>
+                    <span class="theme-toggle__thumb"></span>
+                  </span>
+                </label>
               </div>
             </div>
 

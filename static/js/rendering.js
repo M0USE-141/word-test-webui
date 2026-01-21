@@ -823,8 +823,11 @@ export function renderTestCards(
 
     header.append(title, accessBadge);
 
+    const info = document.createElement("div");
+    info.className = "test-card__info";
+
     const meta = document.createElement("div");
-    meta.className = "test-card__meta";
+    meta.className = "test-card__info-item";
     meta.textContent = t("testCount", {
       count: formatNumber(test.questionCount),
     });
@@ -838,7 +841,7 @@ export function renderTestCards(
     }
 
     const stats = document.createElement("div");
-    stats.className = "test-card__stats";
+    stats.className = "test-card__info-item";
     const lastResult = loadLastResult(test.id);
     if (lastResult) {
       const formattedPercent = formatNumber(lastResult.percent, {
@@ -854,7 +857,8 @@ export function renderTestCards(
       stats.textContent = t("lastResultEmpty");
     }
 
-    card.append(header, meta, stats);
+    info.append(meta, stats);
+    card.append(header, info);
     card.addEventListener("click", async () => {
       await onSelectTest(test.id);
     });

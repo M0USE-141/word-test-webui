@@ -26,6 +26,7 @@ import {
   initializeManagementScreenEvents,
   renderTestCardsWithHandlers,
   selectTest,
+  updateSettingsTestTitle,
 } from "./screens/management.js";
 import {
   initializeTestingScreenEvents,
@@ -67,7 +68,7 @@ async function loadAppContent() {
     await selectTest(tests[0].id);
     if (state.session) {
       setActiveScreen("testing");
-      setActiveTestingPanel("questions");
+      setActiveTestingPanel("settings");
       renderQuestion();
     }
   } catch (error) {
@@ -172,6 +173,7 @@ async function initialize() {
     console.log("[App] Language changed to:", event.target.value);
     applyLocale(event.target.value, state, dom);
     updateTestingPanelsStatus();
+    updateSettingsTestTitle();
     if (state.session) {
       renderQuestion();
       renderQuestionNav();

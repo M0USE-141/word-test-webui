@@ -95,6 +95,8 @@ export function renderTestCardsWithHandlers(tests, selectedId) {
     onSelectTest: async (testId) => {
       await selectTest(testId);
       setActiveScreen("testing");
+      const { setActiveTestingPanel } = await import("./testing.js");
+      setActiveTestingPanel("settings");
     },
   });
 }
@@ -118,6 +120,7 @@ export async function refreshCurrentTest(testId = state.currentTest?.id) {
   updateProgressHint();
   updateTestingPanelsStatus();
   setActiveTestingPanel("settings");
+  updateSettingsTestTitle();
   dom.questionContainer.textContent = t("startTestingHint");
   dom.optionsContainer.textContent = "";
   dom.questionProgress.textContent = t("questionProgress", {
@@ -139,6 +142,7 @@ export async function selectTest(testId) {
     updateProgressHint();
     updateTestingPanelsStatus();
     setActiveTestingPanel("settings");
+    updateSettingsTestTitle();
     dom.questionContainer.textContent = t("noTestsLoaded");
     dom.optionsContainer.textContent = "";
     dom.optionsContainer.classList.add("is-hidden");
@@ -156,14 +160,16 @@ export async function selectTest(testId) {
   const isSameTest = state.currentTest?.id === testId;
   state.currentTest = await fetchTest(testId);
   updateProgressHint();
+  updateSettingsTestTitle();
 
   if (!isSameTest) {
     const restoredSession = loadActiveSession(state.currentTest);
     state.session = restoredSession;
     updateTestingPanelsStatus();
     if (restoredSession) {
-      setActiveTestingPanel("questions");
+      setActiveTestingPanel("settings");
       renderQuestion();
+      renderQuestionNav();
     } else {
       setActiveTestingPanel("settings");
       dom.questionContainer.textContent = t("startTestingHint");
@@ -180,6 +186,19 @@ export async function selectTest(testId) {
 
   renderTestCardsWithHandlers(state.testsCache, testId);
   updateEditorTestActions();
+}
+
+export function updateSettingsTestTitle() {
+  if (!dom.settingsTestTitle) {
+    return;
+  }
+  if (state.currentTest) {
+    dom.settingsTestTitle.textContent = t("testSettingsFor", {
+      title: state.currentTest.title,
+    });
+  } else {
+    dom.settingsTestTitle.textContent = t("testSettingsEmpty");
+  }
 }
 
 /**
