@@ -16,21 +16,22 @@ import {
   trackQuestionSkipped,
   updateQuestionTiming,
 } from "./telemetry.js";
+import { ensureChartJsLoaded, ensureMathJaxLoaded } from "./vendor-loader.js";
 
 const MATHJAX_IDLE_TIMEOUT_MS = 120;
 const NAV_RENDER_BATCH_SIZE = 60;
 const NAV_IDLE_TIMEOUT_MS = 120;
 const mathJaxQueue = new Set();
 let mathJaxScheduled = false;
+let mathJaxLoading = false;
 let lastQuestionNavSession = null;
 let questionNavRenderToken = 0;
 
-function queueMathJaxTypeset(container) {
-  if (!container || !window.MathJax?.typesetPromise) {
+function scheduleMathJaxTypeset() {
+  if (mathJaxScheduled) {
     return;
   }
-  mathJaxQueue.add(container);
-  if (mathJaxScheduled) {
+  if (!window.MathJax?.typesetPromise) {
     return;
   }
   mathJaxScheduled = true;
@@ -48,6 +49,28 @@ function queueMathJaxTypeset(container) {
   } else {
     window.requestAnimationFrame(runTypeset);
   }
+}
+
+function queueMathJaxTypeset(container) {
+  if (!container) {
+    return;
+  }
+  mathJaxQueue.add(container);
+  if (!window.MathJax?.typesetPromise) {
+    if (!mathJaxLoading) {
+      mathJaxLoading = true;
+      ensureMathJaxLoaded()
+        .then(() => {
+          mathJaxLoading = false;
+          scheduleMathJaxTypeset();
+        })
+        .catch(() => {
+          mathJaxLoading = false;
+        });
+    }
+    return;
+  }
+  scheduleMathJaxTypeset();
 }
 
 function updateQuestionNavButtonState(button, entry, index) {
@@ -1509,6 +1532,11 @@ function renderStatsCharts(selectedAttempt) {
     return;
   }
   if (!window.Chart) {
+    ensureChartJsLoaded()
+      .then(() => {
+        renderStatsCharts(selectedAttempt);
+      })
+      .catch(() => {});
     return;
   }
 
@@ -1620,6 +1648,14 @@ export function renderStatsView() {
  */
 function renderAggregateCharts(attempts) {
   if (!dom.statsChartAttempts || !dom.statsChartTime) return;
+  if (!window.Chart) {
+    ensureChartJsLoaded()
+      .then(() => {
+        renderAggregateCharts(attempts);
+      })
+      .catch(() => {});
+    return;
+  }
 
   if (!attempts.length) {
     statsAttemptsChart?.destroy();
