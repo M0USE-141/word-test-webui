@@ -109,10 +109,6 @@ python cli.py path/to/test.docx --output data/tests
 окружения `EVENTS_RETENTION_DAYS` (по умолчанию 30 дней). При значении `0` или
 меньше очистка отключается.
 
-## Примечания
-
-- Устаревшие файлы `api_old.py` и `static/js/app_old.js` удалены.
-
 ## Docker
 
 ### Сборка и запуск
