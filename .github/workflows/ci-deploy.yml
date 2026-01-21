@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install system converters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick libreoffice
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -37,10 +41,19 @@ jobs:
           PA_APP_DIR: ${{ secrets.PA_APP_DIR }}
           PA_VENV_BIN: ${{ secrets.PA_VENV_BIN }}
           PA_WSGI_FILE: ${{ secrets.PA_WSGI_FILE }}
+          PA_SYSTEM_PACKAGES: ${{ secrets.PA_SYSTEM_PACKAGES }}
         run: |
-          ssh -o StrictHostKeyChecking=no "$PA_SSH_USER@$PA_SSH_HOST" << 'SSH'
+          ssh -o StrictHostKeyChecking=no "$PA_SSH_USER@$PA_SSH_HOST" << SSH
           set -e
           cd "$PA_APP_DIR"
+          if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            if [ -n "$PA_SYSTEM_PACKAGES" ]; then
+              sudo apt-get update
+              sudo apt-get install -y $PA_SYSTEM_PACKAGES
+            fi
+          else
+            echo "Skipping system package installation (sudo unavailable)."
+          fi
           git fetch --all
           git reset --hard origin/main
           "$PA_VENV_BIN/python" -m pip install -r requirements.txt

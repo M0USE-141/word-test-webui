@@ -179,8 +179,12 @@ export METAFILE_CONVERTERS="soffice,inkscape,magick,convert"
    - `PA_APP_DIR` (путь к репозиторию на сервере)
    - `PA_VENV_BIN` (путь к `pip`/`python` внутри venv, например `~/venvs/bsu-test-master/bin`)
    - `PA_WSGI_FILE` (путь к WSGI-файлу, который нужно `touch` для перезагрузки)
+   - `PA_SYSTEM_PACKAGES` (опционально, например `imagemagick libreoffice`)
 
 После merge в `main` workflow обновит код, установит зависимости и перезагрузит приложение.
+Если на сервере доступен `sudo`, он также попытается установить системные пакеты из
+`PA_SYSTEM_PACKAGES`. На PythonAnywhere `sudo` обычно недоступен — тогда нужно заранее
+установить внешние конвертеры через доступные способы платформы.
 
 ## Standalone (PyInstaller)
 
