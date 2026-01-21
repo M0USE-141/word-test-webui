@@ -8,7 +8,6 @@ import {
 } from "./state.js";
 import { clearElement, renderBlocks } from "./rendering.js";
 import { formatNumber, t } from "./i18n.js";
-import { ensureMathJaxLoaded } from "./vendor-loader.js";
 
 const EDITOR_RENDER_BATCH_SIZE = 24;
 const EDITOR_IDLE_TIMEOUT_MS = 120;
@@ -477,11 +476,9 @@ export function renderEditorObjects(question = findEditorQuestion()) {
     card.append(content, controls);
     dom.editorObjectsList.appendChild(card);
 
-    ensureMathJaxLoaded()
-      .then(() => {
-        window.MathJax?.typesetPromise?.([details]);
-      })
-      .catch(() => {});
+    if (window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([details]);
+    }
   });
 }
 

@@ -6,7 +6,6 @@ import { fetchAttemptDetails, fetchAttemptStats } from "../api.js";
 import { renderStatsView, setActiveScreen, hideStatsQuestionPreview } from "../rendering.js";
 import { dom, state } from "../state.js";
 import { getClientId } from "../telemetry.js";
-import { ensureChartJsLoaded } from "../vendor-loader.js";
 
 /**
  * Open statistics screen for specific test (or all tests)
@@ -17,7 +16,6 @@ export async function openStatsScreen(testId = null) {
     await selectTest(testId);
   }
   state.stats.filterTestId = testId;
-  ensureChartJsLoaded().catch(() => {});
   setActiveScreen("stats");
   populateTestFilter();
   await loadStatsData({ preserveSelection: false });
