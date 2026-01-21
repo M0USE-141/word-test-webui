@@ -253,6 +253,9 @@ export function hideAuthScreen() {
  * @param {object|null} user
  */
 export function updateUserDisplay(user) {
+  if (dom.userChip) {
+    dom.userChip.classList.toggle("is-hidden", !user);
+  }
   if (dom.userDisplay) {
     if (user) {
       // Show display_name if available, otherwise username
@@ -263,12 +266,37 @@ export function updateUserDisplay(user) {
       dom.userDisplay.classList.add("is-hidden");
     }
   }
+  if (dom.userAvatarImage && dom.userAvatarInitials) {
+    if (user?.avatar_url) {
+      dom.userAvatarImage.src = `${user.avatar_url}?t=${Date.now()}`;
+      dom.userAvatarImage.classList.remove("is-hidden");
+      dom.userAvatarInitials.textContent = "";
+    } else if (user) {
+      dom.userAvatarImage.src = "";
+      dom.userAvatarImage.classList.add("is-hidden");
+      const name = user.display_name || user.username || "";
+      dom.userAvatarInitials.textContent = getInitials(name);
+    } else {
+      dom.userAvatarImage.src = "";
+      dom.userAvatarImage.classList.add("is-hidden");
+      dom.userAvatarInitials.textContent = "";
+    }
+  }
   if (dom.profileButton) {
     dom.profileButton.classList.toggle("is-hidden", !user);
   }
   if (dom.logoutButton) {
     dom.logoutButton.classList.toggle("is-hidden", !user);
   }
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
 }
 
 /**
