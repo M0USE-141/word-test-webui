@@ -55,9 +55,10 @@ def _convert_with_cloudconvert(image_path: Path, out_dir: Path) -> Path | None:
 
     with image_path.open("rb") as file_handle:
         cloudconvert.Task.upload(
-            file_name=image_path.name,
-            file=file_handle,
-            task=upload_task["id"],
+codex/switch-to-cloudconvert-python-sdk-o59pwl
+            image_path.name,
+            file_handle,
+            upload_task["id"],
         )
 
     job = cloudconvert.Job.wait(job["id"])
