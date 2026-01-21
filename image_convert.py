@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import requests
+import cloudconvert
 import logging
 import os
-import time
+import requests
 from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
@@ -32,12 +32,10 @@ def _convert_with_cloudconvert(image_path: Path, out_dir: Path) -> Path | None:
         return None
 
     output_path = out_dir / f"{image_path.stem}.png"
-    session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {api_key}"})
+    cloudconvert.configure(api_key=api_key)
 
-    job_response = session.post(
-        "https://api.cloudconvert.com/v2/jobs",
-        json={
+    job = cloudconvert.Job.create(
+        {
             "tasks": {
                 "import-upload": {"operation": "import/upload"},
                 "convert": {
@@ -48,47 +46,33 @@ def _convert_with_cloudconvert(image_path: Path, out_dir: Path) -> Path | None:
                 },
                 "export-url": {"operation": "export/url", "input": "convert"},
             }
-        },
-        timeout=30,
+        }
     )
-    job_response.raise_for_status()
-    job_data = job_response.json().get("data", {})
-    job_id = job_data.get("id")
-    tasks = job_data.get("tasks", [])
-    upload_task = next((task for task in tasks if task.get("name") == "import-upload"), None)
-    form = upload_task.get("result", {}).get("form") if upload_task else None
-    if not job_id or not form:
-        log.warning("CloudConvert job creation response missing upload form")
+    upload_task = next((task for task in job.get("tasks", []) if task.get("name") == "import-upload"), None)
+    if not upload_task:
+        log.warning("CloudConvert job creation response missing upload task")
         return None
 
-    upload_response = session.post(
-        form["url"],
-        data=form["parameters"],
-        files={"file": image_path.read_bytes()},
-        timeout=60,
-    )
-    upload_response.raise_for_status()
-
-    export_url = None
-    for _ in range(6):
-        status_response = session.get(
-            f"https://api.cloudconvert.com/v2/jobs/{job_id}", timeout=30
+    with image_path.open("rb") as file_handle:
+        cloudconvert.Task.upload(
+            file_name=image_path.name,
+            file=file_handle,
+            task=upload_task["id"],
         )
-        status_response.raise_for_status()
-        status_data = status_response.json().get("data", {})
-        status_tasks = status_data.get("tasks", [])
-        export_task = next((task for task in status_tasks if task.get("name") == "export-url"), None)
-        files = export_task.get("result", {}).get("files") if export_task else None
-        if files:
-            export_url = files[0].get("url")
-            break
-        time.sleep(1)
 
-    if not export_url:
+    job = cloudconvert.Job.wait(job["id"])
+    export_task = next((task for task in job.get("tasks", []) if task.get("name") == "export-url"), None)
+    files = export_task.get("result", {}).get("files") if export_task else None
+    if not files:
         log.warning("CloudConvert did not return export URL for %s", image_path.name)
         return None
 
-    download_response = session.get(export_url, timeout=60)
+    export_url = files[0].get("url")
+    if not export_url:
+        log.warning("CloudConvert export URL missing for %s", image_path.name)
+        return None
+
+    download_response = requests.get(export_url, timeout=60)
     download_response.raise_for_status()
     output_path.write_bytes(download_response.content)
     log.info("Converted metafile %s to %s via CloudConvert", image_path.name, output_path.name)
