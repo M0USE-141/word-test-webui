@@ -12,21 +12,73 @@ def test_convert_metafile_to_png_skips_non_metafile(tmp_path: Path) -> None:
     assert image_convert.convert_metafile_to_png(image_path, tmp_path) is None
 
 
-def test_convert_metafile_to_png_uses_external_tool(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_convert_metafile_to_png_uses_cloudconvert(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     image_path = tmp_path / "diagram.wmf"
     image_path.write_bytes(b"data")
 
     monkeypatch.setattr(image_convert.os, "name", "posix")
-    monkeypatch.setattr(image_convert, "_converter_order", lambda: ("soffice",))
-    monkeypatch.setattr(image_convert.shutil, "which", lambda name: "/usr/bin/soffice")
+    monkeypatch.setenv("CLOUDCONVERT_API_KEY", "test-key")
 
     output_path = tmp_path / "diagram.png"
 
-    def fake_run(command, capture_output, text):
-        output_path.write_bytes(b"png")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    class FakeResponse:
+        def __init__(self, payload=None, content=b""):
+            self._payload = payload or {}
+            self.content = content
 
-    monkeypatch.setattr(image_convert.subprocess, "run", fake_run)
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return self._payload
+
+    class FakeSession:
+        def __init__(self):
+            self.headers = {}
+            self.calls = []
+
+        def post(self, url, json=None, data=None, files=None, timeout=None):
+            self.calls.append(("post", url))
+            if url.endswith("/jobs"):
+                return FakeResponse(
+                    {
+                        "data": {
+                            "id": "job-1",
+                            "tasks": [
+                                {
+                                    "name": "import-upload",
+                                    "result": {
+                                        "form": {
+                                            "url": "https://upload.example.com",
+                                            "parameters": {"key": "value"},
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                )
+            return FakeResponse()
+
+        def get(self, url, timeout=None):
+            self.calls.append(("get", url))
+            if url.endswith("/jobs/job-1"):
+                return FakeResponse(
+                    {
+                        "data": {
+                            "tasks": [
+                                {
+                                    "name": "export-url",
+                                    "result": {"files": [{"url": "https://download.example.com/file.png"}]},
+                                }
+                            ]
+                        }
+                    }
+                )
+            return FakeResponse(content=b"png")
+
+    monkeypatch.setattr(image_convert.requests, "Session", FakeSession)
+    monkeypatch.setattr(image_convert.time, "sleep", lambda _: None)
 
     converted = image_convert.convert_metafile_to_png(image_path, tmp_path)
     assert converted == output_path
