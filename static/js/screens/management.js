@@ -38,6 +38,7 @@ import {
 } from "../editor.js";
 import {
   renderManagementScreen,
+  renderQuestion,
   renderQuestionNav,
   renderResultSummary,
   renderTestCards,
@@ -47,7 +48,15 @@ import {
   updateProgressHint,
 } from "../rendering.js";
 import { t, formatNumber } from "../i18n.js";
-import { clearTestsCache, dom, editorMobileQuery, loadLastResult, state } from "../state.js";
+import {
+  clearActiveSession,
+  clearTestsCache,
+  dom,
+  editorMobileQuery,
+  loadActiveSession,
+  loadLastResult,
+  state,
+} from "../state.js";
 import {
   closeCreateTestModal,
   closeEditorModal,
@@ -85,20 +94,7 @@ export function renderTestCardsWithHandlers(tests, selectedId) {
     },
     onSelectTest: async (testId) => {
       await selectTest(testId);
-    },
-    onStartTesting: async (testId) => {
-      await selectTest(testId);
       setActiveScreen("testing");
-    },
-    onEditTest: async (testId) => {
-      await selectTest(testId);
-      openEditorModal();
-      renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
-      resetEditorForm();
-    },
-    onViewStats: async (testId) => {
-      const { openStatsScreen } = await import("./statistics.js");
-      await openStatsScreen(testId);
     },
   });
 }
@@ -118,6 +114,7 @@ export async function refreshCurrentTest(testId = state.currentTest?.id) {
   state.testsCache = tests;
   renderTestCardsWithHandlers(state.testsCache, state.currentTest.id);
   state.session = null;
+  clearActiveSession(state.currentTest.id);
   updateProgressHint();
   updateTestingPanelsStatus();
   setActiveTestingPanel("settings");
@@ -161,17 +158,23 @@ export async function selectTest(testId) {
   updateProgressHint();
 
   if (!isSameTest) {
-    state.session = null;
+    const restoredSession = loadActiveSession(state.currentTest);
+    state.session = restoredSession;
     updateTestingPanelsStatus();
-    setActiveTestingPanel("settings");
-    dom.questionContainer.textContent = t("startTestingHint");
-    dom.optionsContainer.textContent = "";
-    dom.optionsContainer.classList.add("is-hidden");
-    dom.questionProgress.textContent = t("questionProgress", {
-      current: formatNumber(0),
-      total: formatNumber(0),
-    });
-    renderQuestionNav();
+    if (restoredSession) {
+      setActiveTestingPanel("questions");
+      renderQuestion();
+    } else {
+      setActiveTestingPanel("settings");
+      dom.questionContainer.textContent = t("startTestingHint");
+      dom.optionsContainer.textContent = "";
+      dom.optionsContainer.classList.add("is-hidden");
+      dom.questionProgress.textContent = t("questionProgress", {
+        current: formatNumber(0),
+        total: formatNumber(0),
+      });
+      renderQuestionNav();
+    }
     renderResultSummary(loadLastResult(testId));
   }
 

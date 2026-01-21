@@ -40,6 +40,9 @@ export function initializeProfileScreenEvents() {
 
   // Avatar delete
   dom.profileAvatarDelete?.addEventListener("click", handleAvatarDelete);
+
+  dom.profileEditTestButton?.addEventListener("click", handleEditTest);
+  dom.profileViewStatsButton?.addEventListener("click", handleViewStats);
 }
 
 /**
@@ -48,6 +51,7 @@ export function initializeProfileScreenEvents() {
 export async function navigateToProfile() {
   setActiveScreen("profile");
   await loadProfileData();
+  updateProfileActions();
 }
 
 /**
@@ -101,6 +105,23 @@ function renderProfileData(profile) {
   if (dom.profileAvatarDelete) {
     dom.profileAvatarDelete.classList.toggle("is-hidden", !profile.avatar_url);
   }
+
+  updateProfileActions();
+}
+
+function updateProfileActions() {
+  if (!dom.profileActiveTest) {
+    return;
+  }
+  if (state.currentTest) {
+    dom.profileActiveTest.textContent = t("profileActiveTest", {
+      title: state.currentTest.title,
+    });
+  } else {
+    dom.profileActiveTest.textContent = t("profileNoActiveTest");
+  }
+  dom.profileEditTestButton?.toggleAttribute("disabled", !state.currentTest);
+  dom.profileViewStatsButton?.toggleAttribute("disabled", !state.currentTest);
 }
 
 /**
@@ -147,6 +168,29 @@ function getInitials(name) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
   return name.substring(0, 2).toUpperCase();
+}
+
+async function handleEditTest() {
+  if (!state.currentTest) {
+    showProfileStatus(t("profileSelectTest"), true);
+    return;
+  }
+  const { openEditorModal } = await import("../components/modals.js");
+  const { renderEditorQuestionList, resetEditorForm } = await import("../editor.js");
+  const { handleDeleteQuestion } = await import("./management.js");
+
+  openEditorModal();
+  renderEditorQuestionList({ onDeleteQuestion: handleDeleteQuestion });
+  resetEditorForm();
+}
+
+async function handleViewStats() {
+  if (!state.currentTest) {
+    showProfileStatus(t("profileSelectTest"), true);
+    return;
+  }
+  const { openStatsScreen } = await import("./statistics.js");
+  await openStatsScreen(state.currentTest.id);
 }
 
 /**
