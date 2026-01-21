@@ -24,7 +24,7 @@ uvicorn api:app --reload
 ## CLI
 
 ```bash
-python cli.py path/to/test.docx --output data/tests
+python scripts/cli.py path/to/test.docx --output data/tests
 ```
 
 После запуска появится папка `data/tests/<test_id>/` с `test.json` и ассетами.

@@ -16,8 +16,8 @@ from api.models.db.test_collection import AccessLevel
 from api.services import access_service
 from api.utils import assets_dir, json_load, payload_path, test_dir
 from api.services.test_service import load_test_payload, save_test_payload
-from serialization import serialize_metadata, serialize_test_payload
-from word_extract import WordTestExtractor
+from core.serialization import serialize_metadata, serialize_test_payload
+from core.word_extract import WordTestExtractor
 
 router = APIRouter(prefix="/api/tests", tags=["tests"])
 

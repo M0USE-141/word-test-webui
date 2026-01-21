@@ -8,7 +8,7 @@ from api.config import STATIC_DIR
 from api.database import init_db
 from api.routes import access, assets, attempts, auth, change_requests, questions, statistics, tests, users
 from api.services.cleanup_service import schedule_events_cleanup
-from logging_setup import setup_console_logging
+from core.logging_setup import setup_console_logging
 import logging
 
 setup_console_logging()

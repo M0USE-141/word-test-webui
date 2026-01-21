@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable
 
-from models import ContentItem, TestQuestion
+from core.models import ContentItem, TestQuestion
 
 
 INLINE_TEXT_TYPE = "text"

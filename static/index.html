@@ -33,7 +33,18 @@
         </div>
         <div class="app-header__controls">
           <div class="user-controls">
-            <span id="user-display" class="user-display is-hidden"></span>
+            <div id="user-chip" class="user-chip is-hidden">
+              <div class="user-avatar" aria-hidden="true">
+                <img
+                  id="user-avatar-image"
+                  src=""
+                  alt=""
+                  class="user-avatar__image is-hidden"
+                />
+                <span id="user-avatar-initials"></span>
+              </div>
+              <span id="user-display" class="user-display"></span>
+            </div>
             <button id="profile-button" type="button" class="ghost is-hidden" data-i18n="profileButton">
               Профиль
             </button>

@@ -7,8 +7,8 @@ from pathlib import Path
 from docx import Document
 from lxml import etree
 
-from image_convert import convert_metafile_to_png
-from models import ContentItem, TestOption, TestQuestion
+from core.image_convert import convert_metafile_to_png
+from core.models import ContentItem, TestOption, TestQuestion
 
 log = logging.getLogger(__name__)
 
