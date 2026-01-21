@@ -124,6 +124,64 @@ docker run --rm -p 8000:8000 -v "${PWD}/data:/app/data" bsu-test-master
 docker compose up --build
 ```
 
+## CI/CD
+
+GitHub Actions запускает:
+
+- `pytest` с покрытием (`pytest-cov`) и порогом > 90%.
+- После успешного merge в `main` выполняется деплой на PythonAnywhere через SSH.
+
+## Конвертация WMF/EMF в PNG (Linux/PythonAnywhere)
+
+По умолчанию в Linux/PythonAnywhere конвертация WMF/EMF через Pillow недоступна,
+поэтому добавлена поддержка внешних конвертеров. Можно выбрать доступный инструмент,
+указав порядок через переменную окружения `METAFILE_CONVERTERS`:
+
+```bash
+export METAFILE_CONVERTERS="soffice,inkscape,magick,convert"
+```
+
+Поддерживаемые значения:
+- `soffice` или `libreoffice` (LibreOffice headless)
+- `inkscape`
+- `magick` или `convert` (ImageMagick)
+
+Если внешний конвертер недоступен, приложение продолжит работу и пропустит конвертацию,
+оставив исходный WMF/EMF.
+
+## Деплой на PythonAnywhere
+
+1. Создайте репозиторий приложения на PythonAnywhere и клонируйте `main`:
+
+   ```bash
+   git clone https://github.com/<org>/<repo>.git ~/projects/bsu-test-master
+   ```
+
+2. Создайте виртуальное окружение и установите зависимости:
+
+   ```bash
+   python3.11 -m venv ~/venvs/bsu-test-master
+   ~/venvs/bsu-test-master/bin/pip install -r requirements.txt
+   ```
+
+3. При необходимости установите внешние инструменты (LibreOffice / Inkscape / ImageMagick)
+   в окружении PythonAnywhere, чтобы работала конвертация WMF/EMF.
+
+4. Настройте WSGI-файл и укажите путь к приложению (FastAPI через ASGI):
+
+   ```python
+   from api.app import app  # noqa
+   ```
+
+5. Укажите в GitHub Secrets параметры для автоматического деплоя (см. workflow):
+
+   - `PA_SSH_HOST`, `PA_SSH_USER`, `PA_SSH_KEY`
+   - `PA_APP_DIR` (путь к репозиторию на сервере)
+   - `PA_VENV_BIN` (путь к `pip`/`python` внутри venv, например `~/venvs/bsu-test-master/bin`)
+   - `PA_WSGI_FILE` (путь к WSGI-файлу, который нужно `touch` для перезагрузки)
+
+После merge в `main` workflow обновит код, установит зависимости и перезагрузит приложение.
+
 ## Standalone (PyInstaller)
 
 Сборка единого бинарника:

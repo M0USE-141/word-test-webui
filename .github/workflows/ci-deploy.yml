@@ -1,0 +1,48 @@
+name: CI and Deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests with coverage
+        run: pytest
+
+  deploy:
+    needs: tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PA_SSH_KEY }}
+      - name: Deploy to PythonAnywhere
+        env:
+          PA_SSH_HOST: ${{ secrets.PA_SSH_HOST }}
+          PA_SSH_USER: ${{ secrets.PA_SSH_USER }}
+          PA_APP_DIR: ${{ secrets.PA_APP_DIR }}
+          PA_VENV_BIN: ${{ secrets.PA_VENV_BIN }}
+          PA_WSGI_FILE: ${{ secrets.PA_WSGI_FILE }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$PA_SSH_USER@$PA_SSH_HOST" << 'SSH'
+          set -e
+          cd "$PA_APP_DIR"
+          git fetch --all
+          git reset --hard origin/main
+          "$PA_VENV_BIN/python" -m pip install -r requirements.txt
+          touch "$PA_WSGI_FILE"
+          SSH
